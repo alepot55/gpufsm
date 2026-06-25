@@ -149,8 +149,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - ✅ **Draft paper FATTO** (task #10): `paper/DRAFT.md` (arXiv-style, tutti i finding + figure + related work verificato).
 - ⛔ **Nsight (task #6) BLOCCATO**: `ERR_NVGPUCTRPERM` (counter admin-gated, serve sudo/`NVreg_RestrictProfilingToAdminUsers=0`+reboot).
   Fix + alternativa in `docs/PROFILING.md`. La tesi compute-bound è già provata dall'ablation (shared-CSR pareggia) → ncu è confermativo.
-- TODO rimasti: **worklist Triton** (probabile "can't express" come Gluon, da confermare); **ANML loader** (task #8);
-  **worklist warp/block-parallel** (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità); migrare DRAFT.md → LaTeX.
+- ✅ **ANML loader FATTO** (task #8, parser): `io/anml.py` parsa il sottoinsieme ANML (homogeneous→edge-labelled,
+  symbol-set classes/ranges/negation/wildcard) + exporter `to_anml`; validato con fixture + round-trip (4 test).
+  ⚠️ Manca solo il **download dei dati ANMLZoo reali** (DATASETS vuoto, serve SHA pinnato da mirror fidato — non
+  bypassare la safety). Con i dati → numeri su automi reali (forte per i reviewer).
+- TODO rimasti: **worklist Triton** (probabile "can't express" come Gluon, da confermare); **worklist warp/block-parallel**
+  (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità); migrare DRAFT.md → LaTeX; pin SHA ANMLZoo + run suite.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
   + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
 
