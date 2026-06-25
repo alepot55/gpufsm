@@ -21,13 +21,15 @@ frontend. Two findings stand out. First, on a faithful full-scan NFA kernel the 
 is *compute*, not memory: staging the transition table into shared memory (zero global
 traffic) leaves throughput unchanged, and throughput scales as 1/n² with state count — so
 memory-layout techniques cannot help until the algorithm is made work-efficient. We then
-build a work-efficient active-set kernel that is 250×–10⁴× faster and reaches 15–132 Gbps.
+build a work-efficient active-set kernel that is 250×–10⁴× faster and reaches 15–142 Gbps.
 Second, the Triton↔CUDA gap is a per-DSL constant (≈15.7× on this kernel) that no
 traffic/compute term explains, while Warp — an equally high-level *Python* DSL — matches or
 beats hand-written CUDA (0.62×). Abstraction regret is therefore set by the execution
 *paradigm* (tile/SPMD vs thread-SIMT), not by how high-level the DSL looks: Triton's tile
 model strains to express data-dependent automata control flow, Gluon cannot express it at
-all, and Warp's thread model expresses it for free.
+all, and Warp's thread model expresses it for free. And expressibility does not buy
+efficiency: Triton *can* express the work-efficient worklist kernel (via `libdevice.ffs`),
+yet still pays ≈9× there — the tile/SPMD penalty is a constant on scalar irregular work.
 
 ## 1. Introduction
 
@@ -44,7 +46,7 @@ inspection, regex, bioinformatics).
   attribute the DSL gap to *expressible memory layout and control flow*, distinguishing it
   from generic performance-portability efficiency (Pennycook et al.) and from autotuning.
 - **(B) A work-efficient portable NFA engine.** An active-set/worklist bit-packed kernel
-  (§4) that removes the O(n²) compute wall and reaches 15–132 Gbps, the regime where the
+  (§4) that removes the O(n²) compute wall and reaches 15–142 Gbps, the regime where the
   memory axes become load-bearing.
 - **(C) A reproducible artifact.** One registry-based framework, a CPU reference oracle,
   median+CI95 sweeps, and figures regenerated only from versioned CSVs.
@@ -119,7 +121,7 @@ async) cannot help until the algorithm is work-efficient.
 
 **6.2 The work-efficient kernel unlocks the regime.** The `worklist` kernel is 250×–10⁴×
 faster than full-scan (the speedup grows with n: 1148× at 64 states, 7147× at 500) and
-reaches 15–132 Gbps (Fig. `fig_worklist_speedup`), moving the workload toward memory-bound
+reaches 15–142 Gbps (Fig. `fig_worklist_speedup`), moving the workload toward memory-bound
 where the §4 memory techniques become load-bearing (future work confirms with Nsight once
 counters are unblocked, `docs/PROFILING.md`).
 
@@ -130,6 +132,15 @@ Triton's tile/SPMD paradigm strains to express per-state data-dependent control 
 only run as one unrolled program), Gluon cannot express it at all, while Warp's thread-SIMT
 model expresses it naturally and its codegen beats hand-written CUDA. Regret tracks *what the
 model forbids you to express*, not abstraction height.
+
+**6.4 Expressibility ≠ efficiency: the regret persists on the work-efficient kernel.** A
+sharper test: can Triton express the *work-efficient* worklist (the kernel that matters), and
+at what cost? Unlike Gluon (no scalar load), Triton *can* — `libdevice.ffs` plus a
+data-dependent `while` loop iterate the active bits — and it is validated against the oracle.
+But it still pays **≈9× vs CUDA** on that kernel (CUDA worklist 142 Gbps vs Triton worklist
+25 Gbps at ≤64 states), versus 15.7× on the full scan. So even when Triton expresses the right
+algorithm, its tile/SPMD model imposes a large constant penalty on scalar, data-dependent
+automata work — expressibility does not buy efficiency.
 
 ## 7. Related work
 
