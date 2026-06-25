@@ -63,9 +63,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   operazionalizzato (cost model predittivo) e difeso da perf-portability (Pennycook 2016) e dal
   counter-thesis autotuning (arXiv:2505.03780). Core difendibile = automi irregolari × layout-memoria
   vincolato-dal-DSL × ablation/cost-model quantificato.
-- **Multi-DSL (direzione raccomandata):** aggiungere **Warp** (thread-SIMT Python, esprime control-flow
-  irregolare) + **Gluon** (frontend low-level di Triton: misura il regret dentro un solo toolchain) come
-  sonde; **Mojo** per breadth cross-vendor. Trap (solo-tensor, NON benchmarkare): cuTile, CuTe DSL,
+- **Multi-DSL (stato):** **Warp** backend FATTO e verde (thread-SIMT Python esprime gli automi, ≤64 stati).
+  **Gluon**: provato e **NON esprime il kernel** — `gl.load` ritorna sempre un tensore con layout (niente
+  scalar load), quindi il loop CSR data-dependent `for k in range(lo,hi)` è inesprimibile. È un *finding*
+  più forte di un kernel: la abstraction regret sugli automi è prima di tutto un limite di **control-flow**,
+  non solo di layout (Gluon dà controllo del layout ma non serve). Vedi `docs/DSL_EXPRESSIVENESS.md`.
+  **Mojo** = breadth cross-vendor futura. Trap (solo-tensor, NON benchmarkare): cuTile, CuTe DSL,
   ThunderKittens, Pallas, TileLang.
 - **Venue/timeline (oggi 2026-06-25; IISWC/PACT/MICRO/ASPLOS-Spring SCADUTI):** arXiv ora → **PMBS@SC26
   (paper 5 ago 2026)** target realistico → **ASPLOS 2027 Fall (9 set 2026)** anchor conferenza. Stretch:
