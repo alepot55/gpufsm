@@ -97,14 +97,18 @@ __global__ void dense_nfa_kernel(
 // byte->bit + global->register ablation. Same CSR algorithm as the dense kernel.
 static constexpr int BITPACKED_MAX_WORDS = 8;  // up to 512 states
 
+// Core single-string bit-packed NFA simulation. The CSR/accept pointers may live
+// in GLOBAL **or** SHARED memory — the code is identical, which is exactly what
+// lets the global->shared CSR ablation reuse one implementation. Working set is a
+// register-resident NWORDS-word bitmask. latch-first-match.
 template <int NWORDS>
-__global__ void bitpacked_nfa_kernel(
+__device__ __forceinline__ void simulate_one(
     const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
     const int* eps_row_ptr, const int* eps_targets,
     const unsigned long long* accept_words,
     const int* input_symbols, int input_len,
     int num_states, int start_state, int uses_any,
-    int* out_flag, int* out_len) {
+    int& out_f, int& out_l) {
 
     unsigned long long cur[NWORDS];
     unsigned long long nxt[NWORDS];
@@ -124,7 +128,7 @@ __global__ void bitpacked_nfa_kernel(
         }
     }
 
-    int out_f = 0, out_l = 0, done = 0;
+    out_f = 0; out_l = 0; int done = 0;
 #pragma unroll
     for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) done = 1;
     if (done) { out_f = 1; out_l = 0; }
@@ -161,14 +165,26 @@ __global__ void bitpacked_nfa_kernel(
         for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) m = 1;
         if (m) { out_f = 1; out_l = pos + 1; done = 1; }
     }
+}
+
+template <int NWORDS>
+__global__ void bitpacked_nfa_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_symbols, int input_len,
+    int num_states, int start_state, int uses_any,
+    int* out_flag, int* out_len) {
+    int out_f, out_l;
+    simulate_one<NWORDS>(sym_row_ptr, sym_targets, sym_symbols, eps_row_ptr, eps_targets,
+                         accept_words, input_symbols, input_len,
+                         num_states, start_state, uses_any, out_f, out_l);
     *out_flag = out_f; *out_len = out_l;
 }
 
 // Multi-stream technique — single->multi-stream ablation axis.
-// One block (one thread) per input string: blockIdx.x selects the string,
-// strings run concurrently across the SMs. Same bit-packed register-resident
-// working set; the read-only CSR is shared by all blocks. Inputs are passed as a
-// single concatenated buffer + per-string offsets (CSR-of-strings).
+// One thread per input string (blockIdx.x*blockDim.x+threadIdx.x); strings run
+// concurrently across the SMs. Read-only CSR shared by all threads, in GLOBAL memory.
 template <int NWORDS>
 __global__ void bitpacked_multistream_kernel(
     const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
@@ -177,66 +193,59 @@ __global__ void bitpacked_multistream_kernel(
     const int* input_data, const int* input_offsets, int num_strings,
     int num_states, int start_state, int uses_any,
     int* out_flags, int* out_lens) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    int out_f, out_l;
+    simulate_one<NWORDS>(sym_row_ptr, sym_targets, sym_symbols, eps_row_ptr, eps_targets,
+                         accept_words, input_data + input_offsets[i],
+                         input_offsets[i + 1] - input_offsets[i],
+                         num_states, start_state, uses_any, out_f, out_l);
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
+// Multi-stream + global->shared CSR ablation. Each block cooperatively stages the
+// entire read-only CSR (+ accept words) into shared memory once; every thread then
+// reads transitions from shared instead of global. **This layout cannot be
+// expressed in Triton** (its compiler owns shared memory) — the core
+// abstraction-regret demonstration on the CUDA side. Shared bytes are computed and
+// requested by the host launcher; layout matches the host's size computation.
+template <int NWORDS>
+__global__ void bitpacked_multistream_shared_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state, int uses_any,
+    int nnz_sym, int nnz_eps,
+    int* out_flags, int* out_lens) {
+
+    extern __shared__ unsigned char smem[];
+    unsigned long long* s_acc = reinterpret_cast<unsigned long long*>(smem);
+    int* s_srp = reinterpret_cast<int*>(s_acc + NWORDS);
+    int* s_st  = s_srp + (num_states + 1);
+    int* s_ss  = s_st + nnz_sym;
+    int* s_erp = s_ss + nnz_sym;
+    int* s_et  = s_erp + (num_states + 1);
+
+    for (int j = threadIdx.x; j < NWORDS; j += blockDim.x) s_acc[j] = accept_words[j];
+    for (int j = threadIdx.x; j < num_states + 1; j += blockDim.x) {
+        s_srp[j] = sym_row_ptr[j];
+        s_erp[j] = eps_row_ptr[j];
+    }
+    for (int j = threadIdx.x; j < nnz_sym; j += blockDim.x) {
+        s_st[j] = sym_targets[j];
+        s_ss[j] = sym_symbols[j];
+    }
+    for (int j = threadIdx.x; j < nnz_eps; j += blockDim.x) s_et[j] = eps_targets[j];
+    __syncthreads();  // all threads must reach this before the bounds check / return
 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= num_strings) return;
-    const int* input_symbols = input_data + input_offsets[i];
-    int input_len = input_offsets[i + 1] - input_offsets[i];
-
-    unsigned long long cur[NWORDS];
-    unsigned long long nxt[NWORDS];
-#pragma unroll
-    for (int w = 0; w < NWORDS; ++w) cur[w] = 0ULL;
-    cur[start_state >> 6] |= (1ULL << (start_state & 63));
-
-    for (int it = 0; it < num_states; ++it) {
-        for (int s = 0; s < num_states; ++s) {
-            if (cur[s >> 6] & (1ULL << (s & 63))) {
-                for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
-                    int t = eps_targets[k];
-                    cur[t >> 6] |= (1ULL << (t & 63));
-                }
-            }
-        }
-    }
-
-    int out_f = 0, out_l = 0, done = 0;
-#pragma unroll
-    for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) done = 1;
-    if (done) { out_f = 1; out_l = 0; }
-
-    for (int pos = 0; pos < input_len && !done; ++pos) {
-        int sym = input_symbols[pos];
-#pragma unroll
-        for (int w = 0; w < NWORDS; ++w) nxt[w] = 0ULL;
-        for (int s = 0; s < num_states; ++s) {
-            if (cur[s >> 6] & (1ULL << (s & 63))) {
-                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
-                    int tsym = sym_symbols[k];
-                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
-                        int t = sym_targets[k];
-                        nxt[t >> 6] |= (1ULL << (t & 63));
-                    }
-                }
-            }
-        }
-        for (int it = 0; it < num_states; ++it) {
-            for (int s = 0; s < num_states; ++s) {
-                if (nxt[s >> 6] & (1ULL << (s & 63))) {
-                    for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
-                        int t = eps_targets[k];
-                        nxt[t >> 6] |= (1ULL << (t & 63));
-                    }
-                }
-            }
-        }
-#pragma unroll
-        for (int w = 0; w < NWORDS; ++w) cur[w] = nxt[w];
-        int m = 0;
-#pragma unroll
-        for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) m = 1;
-        if (m) { out_f = 1; out_l = pos + 1; done = 1; }
-    }
+    int out_f, out_l;
+    simulate_one<NWORDS>(s_srp, s_st, s_ss, s_erp, s_et, s_acc,
+                         input_data + input_offsets[i],
+                         input_offsets[i + 1] - input_offsets[i],
+                         num_states, start_state, uses_any, out_f, out_l);
     out_flags[i] = out_f; out_lens[i] = out_l;
 }
 
@@ -437,12 +446,119 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream(
     return {flags, lens, kernel_ms};
 }
 
+// Bytes of dynamic shared memory the shared-CSR kernel needs for this NFA.
+static size_t shared_csr_bytes(int nwords, int num_states, int nnz_sym, int nnz_eps) {
+    return static_cast<size_t>(nwords) * sizeof(unsigned long long)
+         + static_cast<size_t>(num_states + 1) * sizeof(int) * 2
+         + static_cast<size_t>(nnz_sym) * sizeof(int) * 2
+         + static_cast<size_t>(nnz_eps) * sizeof(int);
+}
+
+static void launch_multistream_shared(
+    int nwords, int num_strings,
+    const int* srp, const int* st, const int* ss, const int* erp, const int* et,
+    const unsigned long long* acc, const int* in, const int* off,
+    int num_states, int start_state, int uses_any, int nnz_sym, int nnz_eps,
+    size_t shared_bytes, int* flags, int* lens) {
+    int threads = 256;
+    int blocks = (num_strings + threads - 1) / threads;
+#define LAUNCH_MSS(NW)                                                                              \
+    do {                                                                                           \
+        if (shared_bytes > 48 * 1024)                                                              \
+            CUDA_CHECK(cudaFuncSetAttribute(bitpacked_multistream_shared_kernel<NW>,               \
+                cudaFuncAttributeMaxDynamicSharedMemorySize, static_cast<int>(shared_bytes)));     \
+        bitpacked_multistream_shared_kernel<NW><<<blocks, threads, shared_bytes>>>(                \
+            srp, st, ss, erp, et, acc, in, off, num_strings, num_states, start_state, uses_any,    \
+            nnz_sym, nnz_eps, flags, lens);                                                        \
+    } while (0)
+    switch (nwords) {
+        case 1: LAUNCH_MSS(1); break;
+        case 2: LAUNCH_MSS(2); break;
+        case 3: LAUNCH_MSS(3); break;
+        case 4: LAUNCH_MSS(4); break;
+        case 5: LAUNCH_MSS(5); break;
+        case 6: LAUNCH_MSS(6); break;
+        case 7: LAUNCH_MSS(7); break;
+        case 8: LAUNCH_MSS(8); break;
+        default:
+            throw std::runtime_error("multistream_shared: num_states > " +
+                std::to_string(BITPACKED_MAX_WORDS * 64) + " not supported (nwords=" +
+                std::to_string(nwords) + ")");
+    }
+#undef LAUNCH_MSS
+}
+
+// Multi-stream + shared-CSR. Returns (flags, lens, kernel_ms). Throws if the CSR
+// does not fit the device's opt-in shared-memory budget.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_shared(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+    int nnz_sym = static_cast<int>(sym_targets.request().size);
+    int nnz_eps = static_cast<int>(eps_targets.request().size);
+    size_t shared_bytes = shared_csr_bytes(nwords, num_states, nnz_sym, nnz_eps);
+
+    int max_optin = 0;
+    CUDA_CHECK(cudaDeviceGetAttribute(&max_optin, cudaDevAttrMaxSharedMemoryPerBlockOptin, 0));
+    if (static_cast<int>(shared_bytes) > max_optin) {
+        throw std::runtime_error("multistream_shared: CSR needs " + std::to_string(shared_bytes) +
+            " B shared mem > device opt-in max " + std::to_string(max_optin) + " B");
+    }
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        launch_multistream_shared(nwords, num_strings, d_srp, d_st, d_ss, d_erp, d_et, d_acc,
+                                  d_in, d_off, num_states, start_state, uses_any, nnz_sym, nnz_eps,
+                                  shared_bytes, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+
+    return {flags, lens, kernel_ms};
+}
+
 PYBIND11_MODULE(_cuda, m) {
-    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream CSR NFA kernels)";
+    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR] NFA kernels)";
     m.def("run_dense", &run_dense,
           "Simulate an NFA (CSR, int8 working set) over an input; returns (accepted, match_len, kernel_ms).");
     m.def("run_bitpacked", &run_bitpacked,
           "Simulate an NFA (CSR, packed-bitmask working set) over an input; returns (accepted, match_len, kernel_ms).");
     m.def("run_multistream", &run_multistream,
-          "Simulate an NFA over a batch (one block/string); returns (flags, lens, kernel_ms).");
+          "Simulate an NFA over a batch (one thread/string, global CSR); returns (flags, lens, kernel_ms).");
+    m.def("run_multistream_shared", &run_multistream_shared,
+          "Multi-stream with read-only CSR staged into shared memory; returns (flags, lens, kernel_ms).");
 }

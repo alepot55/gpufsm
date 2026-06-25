@@ -129,17 +129,26 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
         return data, offsets
 
     class CUDAMultistreamExecutor:
-        """Multi-stream: one block/string, whole batch in a single launch.
+        """Multi-stream: one thread/string, whole batch in a single launch.
 
         ``run_batch`` is the real path; ``run`` is a batch of one. The batch-wide
         kernel time is reported on the first :class:`Result` (0 on the rest), so
-        ``sum(r.kernel_ms)`` is the launch time for the whole batch.
+        ``sum(r.kernel_ms)`` is the launch time for the whole batch. ``technique``
+        selects the CSR placement: ``multistream`` (global CSR) or
+        ``multistream_shared`` (read-only CSR staged into shared memory) — the
+        global->shared CSR ablation axis.
         """
+
+        _RUNNERS = {
+            "multistream": "run_multistream",
+            "multistream_shared": "run_multistream_shared",
+        }
 
         def __init__(self, nfa: NFA, technique: str = "multistream") -> None:
             self.nfa = nfa
             self.technique = technique
             self._accept_words = _pack_accept(nfa)
+            self._runner = getattr(_cuda, self._RUNNERS[technique])
 
         def run(self, input_bytes: bytes) -> Result:
             return self.run_batch([input_bytes])[0]
@@ -149,7 +158,7 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
             t0 = time.perf_counter()
             data, offsets = _pack_inputs(inputs)
             transfer_ms = (time.perf_counter() - t0) * 1000.0
-            flags, lens, kernel_ms = _cuda.run_multistream(
+            flags, lens, kernel_ms = self._runner(
                 np.ascontiguousarray(nfa.sym_row_ptr, dtype=np.int32),
                 np.ascontiguousarray(nfa.sym_targets, dtype=np.int32),
                 np.ascontiguousarray(nfa.sym_symbols, dtype=np.int32),
@@ -177,6 +186,10 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
 
     @register(Backend.CUDA, "multistream")
     def _make_cuda_multistream(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
+        return CUDAMultistreamExecutor(nfa, technique)
+
+    @register(Backend.CUDA, "multistream_shared")
+    def _make_cuda_multistream_shared(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
         return CUDAMultistreamExecutor(nfa, technique)
 
 
