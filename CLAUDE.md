@@ -50,9 +50,26 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (C) framework+artifact come complemento (badge Artifact Evaluation).
 - **Caveat novelty:** (B) è forte SOLO se batte la baseline multi-stream banale e si avvicina (~2–3×) a
   ngAP/CUDA; altrimenti il paper poggia su (A)+(C) onesti.
-- **SOTA da citare/battere:** ngAP (ASPLOS'24), BitGen (MICRO'25), AsyncAP (HPCA), iNFAnt/iNFAnt2, DFAGE,
-  Hyperscan (NSDI'19, baseline CPU). Benchmark: ANMLZoo (IISWC'16), AutomataZoo (IISWC'18). Metriche:
-  throughput (Gbps) + latency, con mean/std/CI su ≥2 GPU; profilare banda/occupancy/L2 (Nsight).
+- **SOTA da citare/battere (verificato 2026-06-25, vedi `docs/LITERATURE_REVIEW.md`):** ngAP (ASPLOS'24
+  Best Paper, 10.1145/3617232.3624848; ext. TOCS 10.1145/3748646), **HybridSA** (OOPSLA'24,
+  10.1145/3689771 — NFA bit-parallela GPU, la prior art più vicina al nostro bit-thesis: citare e
+  differenziare), **BitGen** (MICRO'25, 10.1145/3725843.3756052 — è "Interleaved Bitstream Execution",
+  bitstream Parabix per regex, **NON** packing 1-bit di stati NFA), **AsyncAP** (SIGMETRICS/POMACS 2023,
+  10.1145/3579453 — ⚠️ NON è HPCA), **AutomataBLAS** (TACO'25, 10.1145/3774656 — AP-as-SpMV memory-efficient),
+  iNFAnt (SIGCOMM CCR'10), Hyperscan (NSDI'19, baseline CPU). Benchmark: ANMLZoo (IISWC'16),
+  AutomataZoo (IISWC'18). Metriche: throughput (Gbps) + latency, mediana+CI95 (timing non-gaussiani,
+  Hoefler&Belli SC'15) su ≥2 GPU; roofline + Nsight (DRAM bytes, L2 hit, occupancy, sectors/req).
+- **Novità "abstraction regret":** termine inedito (0 hit in letteratura) MA il fenomeno no — va
+  operazionalizzato (cost model predittivo) e difeso da perf-portability (Pennycook 2016) e dal
+  counter-thesis autotuning (arXiv:2505.03780). Core difendibile = automi irregolari × layout-memoria
+  vincolato-dal-DSL × ablation/cost-model quantificato.
+- **Multi-DSL (direzione raccomandata):** aggiungere **Warp** (thread-SIMT Python, esprime control-flow
+  irregolare) + **Gluon** (frontend low-level di Triton: misura il regret dentro un solo toolchain) come
+  sonde; **Mojo** per breadth cross-vendor. Trap (solo-tensor, NON benchmarkare): cuTile, CuTe DSL,
+  ThunderKittens, Pallas, TileLang.
+- **Venue/timeline (oggi 2026-06-25; IISWC/PACT/MICRO/ASPLOS-Spring SCADUTI):** arXiv ora → **PMBS@SC26
+  (paper 5 ago 2026)** target realistico → **ASPLOS 2027 Fall (9 set 2026)** anchor conferenza. Stretch:
+  HPCA 2027 (31 lug), PPoPP 2027 (3 ago). In 1 settimana è realistico un **preprint arXiv A+C**, non un full conference.
 - **Venue:** IISWC/PACT/PPoPP (per A) → MICRO/ASPLOS (se B regge). **Preprint arXiv presto** per priorità;
   artifact su Zenodo (DOI). Lavoro autosufficiente e indipendente dall'affiliazione.
 - Esiste un report `/deep-research` (verifica citazioni/numeri esatti) — integrare quando disponibile.
