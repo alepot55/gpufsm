@@ -15,7 +15,7 @@ Public API::
 
 from __future__ import annotations
 
-from .api import benchmark, run
+from .api import benchmark, run, run_batch
 from .nfa import ANY_SYMBOL, NFA, NFABuilder
 from .reference import simulate
 from .registry import Backend, available_backends, is_available, list_techniques
@@ -31,6 +31,7 @@ __all__ = [
     "Result",
     "BenchmarkStats",
     "run",
+    "run_batch",
     "benchmark",
     "simulate",
     "available_backends",

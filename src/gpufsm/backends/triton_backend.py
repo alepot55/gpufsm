@@ -368,5 +368,203 @@ if _triton_available():  # pragma: no cover - requires GPU
     def _make_triton_bitpacked(nfa: NFA, technique: str) -> TritonBitpackedExecutor:
         return TritonBitpackedExecutor(nfa, technique)
 
+    # ------------------------------------------------------------------
+    # Multi-stream technique — single->multi-stream ablation axis.
+    # grid=(num_strings,): one program per input string, all strings concurrent.
+    # Same bit-packed working set, sliced per program (cur/nxt are N*NWORDS).
+    # Inputs are a single concatenated buffer + per-string offsets.
+    # ------------------------------------------------------------------
+    @triton.jit
+    def _multistream_kernel(
+        sym_row_ptr,
+        sym_targets,
+        sym_symbols,
+        eps_row_ptr,
+        eps_targets,
+        accept_words,
+        input_data,
+        input_offsets,
+        num_strings,
+        out_flags,
+        out_lens,
+        cur,
+        nxt,
+        start_state,
+        NUM_STATES: tl.constexpr,
+        NWORDS: tl.constexpr,
+        ANY_ID: tl.constexpr,
+        USES_ANY: tl.constexpr,
+    ):
+        pid = tl.program_id(0)
+        if pid < num_strings:
+            base = pid * NWORDS
+            in_lo = tl.load(input_offsets + pid)
+            input_len = tl.load(input_offsets + pid + 1) - in_lo
+            one = tl.full((), 1, tl.int64)
+
+            for w in range(NWORDS):
+                tl.store(cur + base + w, 0)
+            sw = start_state >> 6
+            tl.store(cur + base + sw, tl.load(cur + base + sw) | (one << (start_state & 63)))
+
+            for _ in range(NUM_STATES):
+                for s in range(NUM_STATES):
+                    wi = s >> 6
+                    bit = one << (s & 63)
+                    if (tl.load(cur + base + wi) & bit) != 0:
+                        lo = tl.load(eps_row_ptr + s)
+                        hi = tl.load(eps_row_ptr + s + 1)
+                        for k in range(lo, hi):
+                            t = tl.load(eps_targets + k)
+                            twi = base + (t >> 6)
+                            tl.store(cur + twi, tl.load(cur + twi) | (one << (t & 63)))
+
+            out_f = 0
+            out_l = 0
+            done = 0
+            for w in range(NWORDS):
+                if (tl.load(cur + base + w) & tl.load(accept_words + w)) != 0:
+                    done = 1
+            if done == 1:
+                out_f = 1
+                out_l = 0
+
+            for pos in range(input_len):
+                if done == 0:
+                    sym = tl.load(input_data + in_lo + pos)
+                    for w in range(NWORDS):
+                        tl.store(nxt + base + w, 0)
+                    for s in range(NUM_STATES):
+                        wi = s >> 6
+                        bit = one << (s & 63)
+                        if (tl.load(cur + base + wi) & bit) != 0:
+                            lo = tl.load(sym_row_ptr + s)
+                            hi = tl.load(sym_row_ptr + s + 1)
+                            for k in range(lo, hi):
+                                tsym = tl.load(sym_symbols + k)
+                                hit = tsym == sym
+                                if USES_ANY:
+                                    hit = hit or (tsym == ANY_ID)
+                                if hit:
+                                    t = tl.load(sym_targets + k)
+                                    twi = base + (t >> 6)
+                                    tl.store(nxt + twi, tl.load(nxt + twi) | (one << (t & 63)))
+                    for _ in range(NUM_STATES):
+                        for s in range(NUM_STATES):
+                            wi = s >> 6
+                            bit = one << (s & 63)
+                            if (tl.load(nxt + base + wi) & bit) != 0:
+                                lo = tl.load(eps_row_ptr + s)
+                                hi = tl.load(eps_row_ptr + s + 1)
+                                for k in range(lo, hi):
+                                    t = tl.load(eps_targets + k)
+                                    twi = base + (t >> 6)
+                                    tl.store(nxt + twi, tl.load(nxt + twi) | (one << (t & 63)))
+                    for w in range(NWORDS):
+                        tl.store(cur + base + w, tl.load(nxt + base + w))
+                    m = 0
+                    for w in range(NWORDS):
+                        if (tl.load(cur + base + w) & tl.load(accept_words + w)) != 0:
+                            m = 1
+                    if m == 1:
+                        out_f = 1
+                        out_l = pos + 1
+                        done = 1
+
+            tl.store(out_flags + pid, out_f)
+            tl.store(out_lens + pid, out_l)
+
+    class TritonMultistreamExecutor:
+        """Multi-stream: grid=(num_strings,), whole batch in a single launch.
+
+        ``run_batch`` is the real path; ``run`` is a batch of one. The batch-wide
+        kernel time is reported on the first :class:`Result` (0 on the rest).
+        """
+
+        def __init__(self, nfa: NFA, technique: str = "multistream") -> None:
+            self.nfa = nfa
+            self.technique = technique
+            self._nwords = (nfa.num_states + _WORD_BITS - 1) // _WORD_BITS
+            dev = torch.device("cuda")
+            self._dev = dev
+            self._sym_row_ptr = torch.as_tensor(nfa.sym_row_ptr, device=dev)
+            self._sym_targets = torch.as_tensor(nfa.sym_targets, device=dev)
+            self._sym_symbols = torch.as_tensor(nfa.sym_symbols, device=dev)
+            self._eps_row_ptr = torch.as_tensor(nfa.eps_row_ptr, device=dev)
+            self._eps_targets = torch.as_tensor(nfa.eps_targets, device=dev)
+            self._accept_words = torch.as_tensor(_pack_accept(nfa, self._nwords), device=dev)
+
+        def run(self, input_bytes: bytes) -> Result:
+            return self.run_batch([input_bytes])[0]
+
+        def run_batch(self, inputs: list[bytes]) -> list[Result]:
+            if not inputs:
+                return []
+            dev = self._dev
+            n = len(inputs)
+            t0 = time.perf_counter()
+            offsets = np.zeros(n + 1, dtype=np.int32)
+            for i, b in enumerate(inputs):
+                offsets[i + 1] = offsets[i] + len(b)
+            data_np = (
+                np.frombuffer(b"".join(inputs), dtype=np.uint8).astype(np.int32)
+                if offsets[-1] > 0
+                else np.zeros(0, dtype=np.int32)
+            )
+            data = torch.as_tensor(data_np, device=dev)
+            off = torch.as_tensor(offsets, device=dev)
+            transfer_ms = (time.perf_counter() - t0) * 1000.0
+
+            flags = torch.zeros(n, dtype=torch.int32, device=dev)
+            lens = torch.zeros(n, dtype=torch.int32, device=dev)
+            cur = torch.zeros(n * self._nwords, dtype=torch.int64, device=dev)
+            nxt = torch.zeros(n * self._nwords, dtype=torch.int64, device=dev)
+
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            _multistream_kernel[(n,)](
+                self._sym_row_ptr,
+                self._sym_targets,
+                self._sym_symbols,
+                self._eps_row_ptr,
+                self._eps_targets,
+                self._accept_words,
+                data,
+                off,
+                n,
+                flags,
+                lens,
+                cur,
+                nxt,
+                int(self.nfa.start_state),
+                NUM_STATES=int(self.nfa.num_states),
+                NWORDS=int(self._nwords),
+                ANY_ID=int(ANY_SYMBOL),
+                USES_ANY=bool(self.nfa.uses_any_symbol),
+            )
+            end.record()
+            torch.cuda.synchronize()
+            kernel_ms = float(start.elapsed_time(end))
+
+            flags_h = flags.cpu().numpy()
+            lens_h = lens.cpu().numpy()
+            results: list[Result] = []
+            for i in range(n):
+                results.append(
+                    Result(
+                        accepted=bool(flags_h[i]),
+                        match_len=int(lens_h[i]),
+                        kernel_ms=kernel_ms if i == 0 else 0.0,
+                        total_ms=(kernel_ms + transfer_ms) if i == 0 else 0.0,
+                        transfer_ms=transfer_ms if i == 0 else 0.0,
+                    )
+                )
+            return results
+
+    @register(Backend.TRITON, "multistream")
+    def _make_triton_multistream(nfa: NFA, technique: str) -> TritonMultistreamExecutor:
+        return TritonMultistreamExecutor(nfa, technique)
+
 
 register_availability(Backend.TRITON, _triton_available)

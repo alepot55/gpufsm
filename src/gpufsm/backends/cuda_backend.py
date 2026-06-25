@@ -117,5 +117,67 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
     def _make_cuda_bitpacked(nfa: NFA, technique: str) -> CUDABitpackedExecutor:
         return CUDABitpackedExecutor(nfa, technique)
 
+    def _pack_inputs(inputs: list[bytes]) -> tuple[np.ndarray, np.ndarray]:
+        """Concatenate a batch into one symbol buffer + CSR-style offsets."""
+        offsets = np.zeros(len(inputs) + 1, dtype=np.int32)
+        for i, b in enumerate(inputs):
+            offsets[i + 1] = offsets[i] + len(b)
+        if inputs:
+            data = np.frombuffer(b"".join(inputs), dtype=np.uint8).astype(np.int32)
+        else:
+            data = np.zeros(0, dtype=np.int32)
+        return data, offsets
+
+    class CUDAMultistreamExecutor:
+        """Multi-stream: one block/string, whole batch in a single launch.
+
+        ``run_batch`` is the real path; ``run`` is a batch of one. The batch-wide
+        kernel time is reported on the first :class:`Result` (0 on the rest), so
+        ``sum(r.kernel_ms)`` is the launch time for the whole batch.
+        """
+
+        def __init__(self, nfa: NFA, technique: str = "multistream") -> None:
+            self.nfa = nfa
+            self.technique = technique
+            self._accept_words = _pack_accept(nfa)
+
+        def run(self, input_bytes: bytes) -> Result:
+            return self.run_batch([input_bytes])[0]
+
+        def run_batch(self, inputs: list[bytes]) -> list[Result]:
+            nfa = self.nfa
+            t0 = time.perf_counter()
+            data, offsets = _pack_inputs(inputs)
+            transfer_ms = (time.perf_counter() - t0) * 1000.0
+            flags, lens, kernel_ms = _cuda.run_multistream(
+                np.ascontiguousarray(nfa.sym_row_ptr, dtype=np.int32),
+                np.ascontiguousarray(nfa.sym_targets, dtype=np.int32),
+                np.ascontiguousarray(nfa.sym_symbols, dtype=np.int32),
+                np.ascontiguousarray(nfa.eps_row_ptr, dtype=np.int32),
+                np.ascontiguousarray(nfa.eps_targets, dtype=np.int32),
+                np.ascontiguousarray(self._accept_words, dtype=np.uint64),
+                np.ascontiguousarray(data, dtype=np.int32),
+                np.ascontiguousarray(offsets, dtype=np.int32),
+                int(nfa.num_states),
+                int(nfa.start_state),
+                int(nfa.uses_any_symbol),
+            )
+            results: list[Result] = []
+            for i in range(len(inputs)):
+                results.append(
+                    Result(
+                        accepted=bool(flags[i]),
+                        match_len=int(lens[i]),
+                        kernel_ms=float(kernel_ms) if i == 0 else 0.0,
+                        total_ms=(float(kernel_ms) + transfer_ms) if i == 0 else 0.0,
+                        transfer_ms=transfer_ms if i == 0 else 0.0,
+                    )
+                )
+            return results
+
+    @register(Backend.CUDA, "multistream")
+    def _make_cuda_multistream(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
+        return CUDAMultistreamExecutor(nfa, technique)
+
 
 register_availability(Backend.CUDA, _cuda_available)
