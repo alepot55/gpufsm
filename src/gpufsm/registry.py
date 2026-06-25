@@ -20,6 +20,7 @@ class Backend(str, Enum):
     CPU = "cpu"  # reference simulator — always available, the correctness oracle
     TRITON = "triton"
     CUDA = "cuda"
+    WARP = "warp"  # NVIDIA Warp — Python thread-SIMT probe (abstraction spectrum)
 
 
 @runtime_checkable

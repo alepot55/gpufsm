@@ -11,7 +11,11 @@ from . import cpu  # noqa: F401  (always available)
 
 # Optional backends: import by name so a missing module/dependency is a no-op
 # rather than a hard failure (and mypy doesn't require them to exist yet).
-for _optional in ("gpufsm.backends.triton_backend", "gpufsm.backends.cuda_backend"):
+for _optional in (
+    "gpufsm.backends.triton_backend",
+    "gpufsm.backends.cuda_backend",
+    "gpufsm.backends.warp_backend",
+):
     try:
         importlib.import_module(_optional)
     except Exception:  # pragma: no cover - depends on environment

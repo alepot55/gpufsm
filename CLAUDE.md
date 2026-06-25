@@ -50,9 +50,26 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (C) framework+artifact come complemento (badge Artifact Evaluation).
 - **Caveat novelty:** (B) è forte SOLO se batte la baseline multi-stream banale e si avvicina (~2–3×) a
   ngAP/CUDA; altrimenti il paper poggia su (A)+(C) onesti.
-- **SOTA da citare/battere:** ngAP (ASPLOS'24), BitGen (MICRO'25), AsyncAP (HPCA), iNFAnt/iNFAnt2, DFAGE,
-  Hyperscan (NSDI'19, baseline CPU). Benchmark: ANMLZoo (IISWC'16), AutomataZoo (IISWC'18). Metriche:
-  throughput (Gbps) + latency, con mean/std/CI su ≥2 GPU; profilare banda/occupancy/L2 (Nsight).
+- **SOTA da citare/battere (verificato 2026-06-25, vedi `docs/LITERATURE_REVIEW.md`):** ngAP (ASPLOS'24
+  Best Paper, 10.1145/3617232.3624848; ext. TOCS 10.1145/3748646), **HybridSA** (OOPSLA'24,
+  10.1145/3689771 — NFA bit-parallela GPU, la prior art più vicina al nostro bit-thesis: citare e
+  differenziare), **BitGen** (MICRO'25, 10.1145/3725843.3756052 — è "Interleaved Bitstream Execution",
+  bitstream Parabix per regex, **NON** packing 1-bit di stati NFA), **AsyncAP** (SIGMETRICS/POMACS 2023,
+  10.1145/3579453 — ⚠️ NON è HPCA), **AutomataBLAS** (TACO'25, 10.1145/3774656 — AP-as-SpMV memory-efficient),
+  iNFAnt (SIGCOMM CCR'10), Hyperscan (NSDI'19, baseline CPU). Benchmark: ANMLZoo (IISWC'16),
+  AutomataZoo (IISWC'18). Metriche: throughput (Gbps) + latency, mediana+CI95 (timing non-gaussiani,
+  Hoefler&Belli SC'15) su ≥2 GPU; roofline + Nsight (DRAM bytes, L2 hit, occupancy, sectors/req).
+- **Novità "abstraction regret":** termine inedito (0 hit in letteratura) MA il fenomeno no — va
+  operazionalizzato (cost model predittivo) e difeso da perf-portability (Pennycook 2016) e dal
+  counter-thesis autotuning (arXiv:2505.03780). Core difendibile = automi irregolari × layout-memoria
+  vincolato-dal-DSL × ablation/cost-model quantificato.
+- **Multi-DSL (direzione raccomandata):** aggiungere **Warp** (thread-SIMT Python, esprime control-flow
+  irregolare) + **Gluon** (frontend low-level di Triton: misura il regret dentro un solo toolchain) come
+  sonde; **Mojo** per breadth cross-vendor. Trap (solo-tensor, NON benchmarkare): cuTile, CuTe DSL,
+  ThunderKittens, Pallas, TileLang.
+- **Venue/timeline (oggi 2026-06-25; IISWC/PACT/MICRO/ASPLOS-Spring SCADUTI):** arXiv ora → **PMBS@SC26
+  (paper 5 ago 2026)** target realistico → **ASPLOS 2027 Fall (9 set 2026)** anchor conferenza. Stretch:
+  HPCA 2027 (31 lug), PPoPP 2027 (3 ago). In 1 settimana è realistico un **preprint arXiv A+C**, non un full conference.
 - **Venue:** IISWC/PACT/PPoPP (per A) → MICRO/ASPLOS (se B regge). **Preprint arXiv presto** per priorità;
   artifact su Zenodo (DOI). Lavoro autosufficiente e indipendente dall'affiliazione.
 - Esiste un report `/deep-research` (verifica citazioni/numeri esatti) — integrare quando disponibile.
@@ -68,9 +85,48 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - **Branch di lavoro**: `claude/repo-refactor-optimize-snflie`. Commit chiari e atomici.
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
 
-## 7. Stato corrente (handoff sessione 1)
+## 7. Stato corrente (handoff sessione 2)
 
-### Fatto e verde (CPU)
+### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
+- **Backend GPU validati + 2 tecniche memory-centric.** `pytest` → **23 verdi** (20 CPU + 3 GPU).
+  Tecniche per backend GPU: `dense`, `bitpacked`, `multistream` (`gpufsm list`).
+- **Tecnica `bitpacked`** (asse byte→bit): working-set = bitmask packed (1 bit/stato, parole 64-bit) invece
+  di un int8/stato; stesso algoritmo CSR del `dense`, solo il layout cambia (apples-to-apples). Triton: kernel
+  con accept-test word-parallel; ⚠️ le maschere bit DEVONO essere int64 (`one << x`) — i literal Python li
+  tronca Triton a int32 perdendo i bit ≥32 (rompeva NFA >64 stati, ora coperto da stress 65..500 stati).
+  CUDA: kernel `template<int NWORDS>` → per ≤64 stati (NWORDS=1) il working-set è un `unsigned long long`
+  **register-resident** (byte→bit + global→register); dispatch fino a 512 stati. Evidenza (~4 KB, no-match
+  full-scan): triton 2.69→2.14 ms (1.26×); cuda 4.11→2.00 ms (2.05×).
+- **Tecnica `multistream`** (asse single→multi-stream) + **API `run_batch`** (esportata): un batch di stringhe
+  in un solo lancio, un program/block per stringa (Triton grid=(N,) con slice cur/nxt per-program; CUDA un
+  block/stringa, input concatenati + offset). `run_batch` ha fallback a loop di `run`, quindi ogni tecnica è
+  batchabile. ⚠️ Il multi-stream **non è novel** (CLAUDE.md §4): tenuto come baseline onesta dell'ablation.
+  Evidenza (1024×256 B vs loop per-stringa): triton 242→3.8 ms (63×); cuda 324→8.3 ms (39×) — in gran parte
+  ammortamento overhead-launch + parallelismo tra SM.
+- Commit: `fix(gpu): validate ...`, `feat(gpu): add bit-packed ...`, `feat(gpu): add multi-stream ...`.
+- Fix iniziale di validazione (commit `fix(gpu): validate Triton + CUDA dense backends on hardware`):
+  - **Triton**: il kernel `dense` aveva `return` dentro il `for` per-posizione (vietato da Triton →
+    `UnsupportedLanguageConstruct`). Riscritto con flag `done` che congela il primo match (latch-first-match)
+    e lascia girare il loop fino in fondo.
+  - **CUDA**: aggiunto `CUDA_CHECK` su launch/sync (gli errori erano silenziati e mascheravano il guasto reale).
+  - **CMakeLists**: default `CMAKE_CUDA_ARCHITECTURES` = `75-real;80-real;86-real;89-real` (solo SASS, **niente
+    PTX**), impostato **prima** di `enable_language(CUDA)`. Il toolkit (13.3) è più recente del max CUDA del
+    driver (13.0): qualsiasi PTX incorporato viene rifiutato al load ("PTX compiled with an unsupported
+    toolchain"); le cubin real-arch caricano grazie alla minor-version compatibility. Evitare numeri nudi
+    (`89`) e `native` (incorporano PTX) su toolkit/driver disallineati.
+- **Setup ambiente** (l'host ha `externally-managed-environment` PEP 668): venv `.venv` con
+  `--system-site-packages` (riusa torch 2.9.1+cu128 + triton 3.5.1 da `~/.local`). Install:
+  `.venv/bin/pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`.
+  ⚠️ `GPUFSM_BUILD_CUDA=ON` come env var NON basta: scikit-build-core legge il define dal pyproject → va
+  passato via `--config-settings`.
+- ⚠️ Nota perf/scope: `dense` resta la baseline single-program non ottimizzata (l'esempio di abstraction
+  regret). `bitpacked`/`multistream` sono i primi due assi dell'ablation. Mancano ancora gli assi
+  **global→shared CSR** e **sync→async transfer** (pinned + cudaMemcpyAsync), e una versione
+  **bit-parallela coalescizzata** (thread cooperanti per parola, stile iNFAnt) che è dove il contributo (B)
+  deve battere il multi-stream banale e avvicinarsi a ngAP/CUDA. CUDA bitpacked/multistream limitati a ≤512
+  stati (BITPACKED_MAX_WORDS=8); la suite paper arriva a 500 → ok, ma estendere se serve.
+
+### Fatto e verde (CPU) — sessione 1
 - Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,
   io/{anml,datasets}), backend CPU (`reference`, `bitmap`).
 - Packaging `pyproject`+`scikit-build-core` (build CUDA graceful), CI GitHub Actions (ruff+mypy+pytest CPU).
@@ -79,20 +135,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - Dataset con checksum (`io/datasets`), docs (METHODOLOGY/REPRODUCIBILITY/CONTRIBUTING), paper migrato in `paper/`.
 - Trim legacy completato: working tree ~90M → 17M.
 
-### Scritto ma NON validato (serve GPU — l'ambiente di sviluppo non ne aveva)
-- `backends/triton_backend.py`: kernel Triton `dense` (single-program, mirror del reference). Si registra
-  solo se torch+triton+GPU presenti.
-- `backends/cuda_backend.py` + `backends/cuda/nfa_kernel.cu`: kernel CUDA CSR `dense` + binding pybind11,
-  build con `GPUFSM_BUILD_CUDA=ON`. Si registra solo se l'estensione `_cuda` è importabile.
-- Test `tests/test_gpu_backends.py` (marker `gpu`, ora SKIPPED): confronto Triton/CUDA vs reference su
-  esempi + fuzz. **Primo compito su GPU: farli passare** (`pytest -m gpu`).
-
 ### TODO prossima sessione (priorità)
-1. **Validare GPU**: `pip install -e ".[dev,triton]"` + `GPUFSM_BUILD_CUDA=ON`; far passare `pytest -m gpu`.
-   Probabili fix ai kernel `dense` (loop dinamici Triton, dtype, compile pybind11/CUDA).
-2. **Tecniche bit-packed/multi-stream GPU** (il contributo): versione packed-1-bit + multi-stream
-   coalescizzato, con `gpufsm.bitmap` come specifica eseguibile. Poi l'**ablation memory**
-   (byte→bit, global→shared CSR, sync→async, single→multi-stream).
+1. **Completare l'ablation memory** (il contributo A): mancano gli assi **global→shared CSR** (CSR read-only
+   in shared memory per blocco) e **sync→async transfer** (pinned + buffer persistenti + `cudaMemcpyAsync`,
+   riportando kernel-time e transfer-time separati — `Result` già li distingue). Poi la versione
+   **bit-parallela coalescizzata** (thread cooperanti per parola di stato, stile iNFAnt) per (B): deve battere
+   il multi-stream banale e avvicinarsi (~2–3×) a ngAP/CUDA.
+2. **Sweep/CSV multi-tecnica**: estendere `gpufsm sweep` per coprire tutte le tecniche×backend e produrre il
+   CSV per l'ablation (lo schema alimenta le figure). Aggiungere un comando/bench batch per il multi-stream.
 3. **ANML loader** (`io/anml.py` è uno stub): parser Python per ANMLZoo/AutomataZoo + benchmark suite.
 4. **Figure paper**: riscrivere `paper/generate_figures.py` sullo schema CSV di `gpufsm sweep`.
 5. **§13.2 SOTA**: integrare citazioni/numeri dal `/deep-research` (run `wf_b1efa63a-655`).

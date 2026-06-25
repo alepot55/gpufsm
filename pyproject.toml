@@ -23,6 +23,7 @@ dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]
 triton = ["triton>=3.0", "torch>=2.1"]
+warp = ["warp-lang>=1.0"]
 paper = ["matplotlib>=3.7", "pandas>=2.0"]
 bitgen = []  # optional heavy backend (BitGen, MICRO'25); kept out of the core
 dev = ["pytest>=7.4", "ruff>=0.5", "mypy>=1.8"]
@@ -51,10 +52,21 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Warp kernels are a DSL: `int(0)` declares a mutable wp.int32 local — a bare
+# literal makes Warp miscompile later conditional reassignments. Keep the casts.
+"src/gpufsm/backends/warp_backend.py" = ["UP018"]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true
 files = ["src/gpufsm"]
+
+# Warp kernels are a DSL compiled by warp-lang, not ordinary Python: warp's typed
+# stubs flag bitwise ops on wp.uint64 inside @wp.kernel bodies. Don't type-check it.
+[[tool.mypy.overrides]]
+module = "gpufsm.backends.warp_backend"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -10,7 +10,7 @@ import random
 
 import pytest
 
-from gpufsm import ANY_SYMBOL, NFABuilder, available_backends, run, simulate
+from gpufsm import ANY_SYMBOL, NFABuilder, available_backends, run, run_batch, simulate
 from gpufsm.examples import EXAMPLES
 from gpufsm.registry import Backend as _B
 from gpufsm.registry import list_techniques
@@ -63,3 +63,71 @@ def test_gpu_matches_reference_fuzz():
             ref = simulate(nfa, data)
             res = run(nfa, data, backend=backend, technique=technique)
             assert (res.accepted, res.match_len) == ref
+
+
+@skip_no_gpu
+def test_gpu_run_batch_matches_reference():
+    """run_batch (native multi-stream + loop fallback) reproduces the oracle per string."""
+    rng = random.Random(11)
+    alphabet = "abcd"
+    for backend, technique in _cases():
+        for _ in range(8):
+            b = NFABuilder()
+            n = rng.randint(1, 64)  # ≤64 so every technique applies (incl. Warp single-word)
+            for _ in range(n):
+                b.add_state(accept=rng.random() < 0.2)
+            b.set_start(rng.randrange(n))
+            for s in range(n):
+                for _ in range(rng.randint(0, 2)):
+                    sym = ANY_SYMBOL if rng.random() < 0.05 else ord(rng.choice(alphabet))
+                    b.add_transition(s, sym, rng.randrange(n))
+                for _ in range(rng.randint(0, 1)):
+                    b.add_epsilon(s, rng.randrange(n))
+            nfa = b.build()
+            batch = [
+                bytes(ord(rng.choice(alphabet)) for _ in range(rng.randint(0, 16)))
+                for _ in range(rng.randint(1, 24))
+            ]
+            refs = [simulate(nfa, d) for d in batch]
+            res = run_batch(nfa, batch, backend=backend, technique=technique)
+            assert [(r.accepted, r.match_len) for r in res] == refs, (
+                f"{backend.value}/{technique} batch mismatch"
+            )
+
+
+# Multi-word (>64 states) batch coverage for backends/techniques that support it
+# (CUDA + Triton multistream variants); Warp's single-word kernel is excluded.
+_MULTIWORD_CASES = [
+    (b, t)
+    for (b, t) in _cases()
+    if b in (_B.CUDA, _B.TRITON) and t.startswith("multistream")
+]
+
+
+@skip_no_gpu
+@pytest.mark.skipif(not _MULTIWORD_CASES, reason="no multi-word-capable GPU technique")
+def test_gpu_multiword_batch_matches_reference():
+    rng = random.Random(23)
+    alphabet = "abcde"
+    for backend, technique in _MULTIWORD_CASES:
+        for n in (65, 130, 300):  # NWORDS 2,3,5
+            b = NFABuilder()
+            for _ in range(n):
+                b.add_state(accept=rng.random() < 0.1)
+            b.set_start(rng.randrange(n))
+            for s in range(n):
+                for _ in range(rng.randint(0, 2)):
+                    sym = ANY_SYMBOL if rng.random() < 0.05 else ord(rng.choice(alphabet))
+                    b.add_transition(s, sym, rng.randrange(n))
+                for _ in range(rng.randint(0, 1)):
+                    b.add_epsilon(s, rng.randrange(n))
+            nfa = b.build()
+            batch = [
+                bytes(ord(rng.choice(alphabet)) for _ in range(rng.randint(0, 24)))
+                for _ in range(rng.randint(1, 16))
+            ]
+            refs = [simulate(nfa, d) for d in batch]
+            res = run_batch(nfa, batch, backend=backend, technique=technique)
+            assert [(r.accepted, r.match_len) for r in res] == refs, (
+                f"{backend.value}/{technique} multiword batch mismatch (n={n})"
+            )

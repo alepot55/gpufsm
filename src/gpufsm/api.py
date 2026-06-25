@@ -20,6 +20,28 @@ def run(
     return factory(nfa, technique).run(input_bytes)
 
 
+def run_batch(
+    nfa: NFA,
+    inputs: list[bytes],
+    backend: Backend | str = Backend.CPU,
+    technique: str | None = None,
+) -> list[Result]:
+    """Run ``nfa`` over a batch of inputs (one :class:`Result` per input).
+
+    Backends/techniques that expose a native ``run_batch`` (e.g. the multi-stream
+    GPU kernels, one program/block per string) handle the whole batch in a single
+    launch; everything else falls back to looping :meth:`run`, so every technique
+    supports batching transparently.
+    """
+    backend = Backend(backend)
+    technique, factory = get_factory(backend, technique)
+    executor = factory(nfa, technique)
+    batch = getattr(executor, "run_batch", None)
+    if callable(batch):
+        return batch(inputs)
+    return [executor.run(b) for b in inputs]
+
+
 def benchmark(
     nfa: NFA,
     input_bytes: bytes,
