@@ -143,10 +143,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   frontier-based, elimina l'O(n²). **1000–7000× più veloce del full-scan**, speedup crescente con n (n=64→1148×,
   n=500→7147×). Validato vs reference (30 batch ≤500 stati, 0 mismatch). È la base del contributo (B).
   TODO: versione Triton worklist; verificare con Nsight se ora è memory-bound (→ gli assi memory contano).
-- Profiling Nsight + roofline (task #6) per provare empiricamente compute-bound→memory-bound.
-- Sweep rigoroso multi-tecnica + multi-GPU (task #7), figure (task #9), ANML suite (task #8), paper (task #10).
+- ✅ **Sweep rigoroso FATTO** (task #7): `paper/data/sweep_techniques.csv` (median+CI95). worklist 15–132 Gbps
+  vs full-scan ~0.5; multistream/shared/async identici → compute-bound confermato.
+- ✅ **Figure FATTE** (task #9): `paper/figures.py` (4 figure dai CSV versionati; supera la legacy generate_figures.py).
+- ✅ **Draft paper FATTO** (task #10): `paper/DRAFT.md` (arXiv-style, tutti i finding + figure + related work verificato).
+- ⛔ **Nsight (task #6) BLOCCATO**: `ERR_NVGPUCTRPERM` (counter admin-gated, serve sudo/`NVreg_RestrictProfilingToAdminUsers=0`+reboot).
+  Fix + alternativa in `docs/PROFILING.md`. La tesi compute-bound è già provata dall'ablation (shared-CSR pareggia) → ncu è confermativo.
+- TODO rimasti: **worklist Triton** (probabile "can't express" come Gluon, da confermare); **ANML loader** (task #8);
+  **worklist warp/block-parallel** (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità); migrare DRAFT.md → LaTeX.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
-  + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime). Basta per il preprint.
+  + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
 
 ### Fatto e verde (CPU) — sessione 1
 - Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,
