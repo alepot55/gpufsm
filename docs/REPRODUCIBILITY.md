@@ -1,51 +1,81 @@
-# Reproducibility
+# Reproducibility / Artifact Guide
 
 The project is designed to be re-run end-to-end by anyone, without privileged access.
+Every figure and headline number regenerates from committed code + versioned CSVs.
 
 ## Environment
 
-```bash
-python -m pip install -e ".[dev]"            # CPU-only: reference + bit-packed, no GPU needed
-python -m pip install -e ".[dev,triton]"     # + Triton backend (requires a CUDA GPU)
-GPUFSM_BUILD_CUDA=ON python -m pip install -e ".[dev]"   # + CUDA backend (requires toolkit + GPU)
-gpufsm env                                   # capture python / numpy / backend availability
-```
-
-Pin the exact GPU, driver and toolkit versions in any reported results.
-
-## Correctness
+CPU-only (reference + bit-packed spec, no GPU) installs cleanly:
 
 ```bash
-pytest -m "not gpu" -q     # CPU: reference vs bit-packed (incl. 300-case fuzz), API, CLI, datasets
-pytest -m gpu -q           # on a GPU box: Triton/CUDA verdicts must equal the CPU reference
+python -m pip install -e ".[dev]"
+gpufsm env            # capture python / numpy / backend availability + versions
 ```
 
-The CPU reference (`gpufsm.reference`) is the single oracle. The bit-packed simulator and every GPU
-backend are checked against it on the full suite — this is the cross-implementation validation the prior
-study lacked.
-
-## Benchmarks
+GPU backends (Triton / CUDA / Warp) — on a CUDA box:
 
 ```bash
-gpufsm sweep --repeats 10 --out results/sweep.csv   # mean/std/CI95 per (backend, technique)
+# Triton + Warp are pure-Python wheels; CUDA needs the toolkit and is built via CMake.
+pip install -e ".[dev,triton,warp]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON
 ```
 
-- Always report `warmup` and `repeats`; the CSV carries `mean_ms`, `std_ms`, `ci95_ms`.
-- Kernel time and transfer time are reported separately.
-- Re-run on ≥2 distinct GPUs for the paper.
+Gotchas (learned on the reference host, RTX 4070 / CUDA 13.x):
+- **`GPUFSM_BUILD_CUDA=ON` as an env var is NOT enough** — scikit-build-core reads the
+  define from `pyproject.toml`; pass it via `--config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`.
+- **Toolkit newer than the driver's max CUDA** => embedded PTX is rejected at load
+  (`PTX ... unsupported toolchain`). CMake defaults to **real SASS only**
+  (`75/80/86/89-real`); override `-DCMAKE_CUDA_ARCHITECTURES` for other GPUs. Avoid bare
+  arch numbers and `native` (they embed PTX).
+- On PEP 668 ("externally-managed") hosts use a venv: `python -m venv --system-site-packages .venv`.
+
+Pin the exact GPU, driver and toolkit versions in any reported result (the sweep CSV
+records GPU + torch/triton/warp/cuda versions per row).
+
+## Correctness (the cross-implementation validation the prior study lacked)
+
+```bash
+pytest -m "not gpu" -q    # 32 CPU tests: reference vs bit-packed (300-case fuzz), cost model,
+                          # ANML loader (fixture + round-trip), API, CLI, datasets
+pytest -m gpu -q          # on a GPU box: every backend/technique verdict == the CPU reference
+                          #   (examples, fuzz, batch run_batch, >64-state multiword batch)
+gpufsm verify             # cross-backend agreement on the example suite (0 failures expected)
+```
+
+`gpufsm.reference` is the single oracle (latch-first-match). The bit-packed spec
+(`gpufsm.bitmap`) and every GPU technique are checked bit-identical to it.
+
+## Headline results -> exact commands
+
+| Claim | Command | Artifact |
+|---|---|---|
+| Throughput sweep (median+CI95), all techniques x sizes | `python scripts/sweep_techniques.py` | `paper/data/sweep_techniques.csv` |
+| Cost-model calibration + abstraction-regret ratios | `python scripts/calibrate_costmodel.py` | `paper/data/costmodel_rtx4070.csv`, `docs/RESULTS_COSTMODEL.md` |
+| Figures (throughput, worklist speedup, memory ablation, regret) | `python paper/figures.py` | `paper/figures/fig_*.pdf` / `.png` |
+| Worklist 15-142 Gbps vs full-scan; memory axes within noise | sweep CSV rows | `fig_throughput_vs_states`, `fig_memory_ablation` |
+| Abstraction regret: Triton 15.7x (full-scan), ~9x (worklist) vs CUDA; Warp 0.62x | calibrate + sweep | `fig_abstraction_regret`, `docs/RESULTS_COSTMODEL.md` |
+| DSL expressibility (CUDA/Warp express; Triton strains; Gluon cannot) | n/a (documented + probed) | `docs/DSL_EXPRESSIVENESS.md` |
+
+Figures depend **only** on committed CSVs, so the paper rebuilds deterministically. The
+sweep/calibration scripts skip unsupported (backend, technique, size) cells (e.g. Triton/Warp
+worklist > 64 states) with a log line rather than failing.
+
+## Profiling (Nsight)
+
+GPU performance counters are admin-gated on the reference host; see `docs/PROFILING.md` for
+the one-time enable (`sudo`, or `NVreg_RestrictProfilingToAdminUsers=0` + reboot) and the
+`ncu` / `scripts/profile_target.py` recipe. The compute-bound claim does **not** depend on
+counters — it is established by controlled ablation (`multistream_shared`, modeled CSR
+traffic = 0, ties `multistream`) and 1/n^2 scaling.
 
 ## Data
 
 - Small fixtures are vendored under `data/`.
-- The large ANMLZoo/AutomataZoo suite is fetched on demand via `gpufsm.io.datasets.ensure`, which
-  **verifies SHA-256** before use and caches the result. No private/SharePoint links.
+- The large ANMLZoo/AutomataZoo suite is fetched on demand via `gpufsm.io.datasets.ensure`,
+  which **verifies SHA-256** before use and refuses unverified downloads (no SharePoint).
+  Pin the mirror SHA-256 in `DATASETS` before enabling the suite. `gpufsm.io.anml.load_anml`
+  parses the supported ANML subset (validated by fixture + NFA->ANML->NFA round-trip).
 
-## Figures and paper
+## Paper
 
-```bash
-# regenerate figures strictly from versioned CSVs, then build the paper
-python paper/generate_figures.py
-latexmk -pdf paper/main.tex
-```
-
-Figures must depend only on committed CSVs so the paper rebuilds deterministically.
+The current working draft is `paper/DRAFT.md` (Markdown; LaTeX migration pending). All its
+numbers trace to the CSVs/docs above.
