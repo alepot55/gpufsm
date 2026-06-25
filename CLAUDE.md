@@ -139,10 +139,10 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
    (batte la CUDA scritta a mano). Due DSL Python di pari livello agli estremi → conta tile/SPMD vs thread-SIMT.
 
 ### TODO prossima sessione (riformulato dai finding)
-- **Priorità #1 per contributo (B): kernel WORK-EFFICIENT** (active-set/worklist, niente full-scan O(n²)).
-  È il prerequisito perché la tesi memory-centric (e gli assi già implementati) mostrino valore: porta il
-  kernel nel regime memory-bound dove byte→bit/shared-CSR/async contano. Poi battere il multistream banale e
-  avvicinarsi a ngAP/CUDA.
+- ✅ **Kernel WORK-EFFICIENT FATTO** (CUDA `worklist`): itera solo gli stati attivi (bit set) + eps-closure
+  frontier-based, elimina l'O(n²). **1000–7000× più veloce del full-scan**, speedup crescente con n (n=64→1148×,
+  n=500→7147×). Validato vs reference (30 batch ≤500 stati, 0 mismatch). È la base del contributo (B).
+  TODO: versione Triton worklist; verificare con Nsight se ora è memory-bound (→ gli assi memory contano).
 - Profiling Nsight + roofline (task #6) per provare empiricamente compute-bound→memory-bound.
 - Sweep rigoroso multi-tecnica + multi-GPU (task #7), figure (task #9), ANML suite (task #8), paper (task #10).
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
