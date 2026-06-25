@@ -68,9 +68,30 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - **Branch di lavoro**: `claude/repo-refactor-optimize-snflie`. Commit chiari e atomici.
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
 
-## 7. Stato corrente (handoff sessione 1)
+## 7. Stato corrente (handoff sessione 2)
 
-### Fatto e verde (CPU)
+### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
+- **Backend GPU validati su hardware (TODO #1 chiuso).** `pytest` → **22 verdi** (20 CPU + 2 GPU).
+  `gpufsm verify` → CPU/Triton/CUDA concordano con l'oracolo `reference.py` su tutta la suite esempi.
+- Fix applicati (commit `fix(gpu): validate Triton + CUDA dense backends on hardware`):
+  - **Triton**: il kernel `dense` aveva `return` dentro il `for` per-posizione (vietato da Triton →
+    `UnsupportedLanguageConstruct`). Riscritto con flag `done` che congela il primo match (latch-first-match)
+    e lascia girare il loop fino in fondo.
+  - **CUDA**: aggiunto `CUDA_CHECK` su launch/sync (gli errori erano silenziati e mascheravano il guasto reale).
+  - **CMakeLists**: default `CMAKE_CUDA_ARCHITECTURES` = `75-real;80-real;86-real;89-real` (solo SASS, **niente
+    PTX**), impostato **prima** di `enable_language(CUDA)`. Il toolkit (13.3) è più recente del max CUDA del
+    driver (13.0): qualsiasi PTX incorporato viene rifiutato al load ("PTX compiled with an unsupported
+    toolchain"); le cubin real-arch caricano grazie alla minor-version compatibility. Evitare numeri nudi
+    (`89`) e `native` (incorporano PTX) su toolkit/driver disallineati.
+- **Setup ambiente** (l'host ha `externally-managed-environment` PEP 668): venv `.venv` con
+  `--system-site-packages` (riusa torch 2.9.1+cu128 + triton 3.5.1 da `~/.local`). Install:
+  `.venv/bin/pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`.
+  ⚠️ `GPUFSM_BUILD_CUDA=ON` come env var NON basta: scikit-build-core legge il define dal pyproject → va
+  passato via `--config-settings`.
+- ⚠️ Nota perf: i benchmark attuali mostrano i kernel `dense` single-program **non ottimizzati** (Triton ~0.18 ms
+  vs CPU/CUDA ~0.014 ms su 4 KB). È atteso — l'ottimizzazione è il TODO #1 sotto (era #2).
+
+### Fatto e verde (CPU) — sessione 1
 - Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,
   io/{anml,datasets}), backend CPU (`reference`, `bitmap`).
 - Packaging `pyproject`+`scikit-build-core` (build CUDA graceful), CI GitHub Actions (ruff+mypy+pytest CPU).
@@ -79,23 +100,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - Dataset con checksum (`io/datasets`), docs (METHODOLOGY/REPRODUCIBILITY/CONTRIBUTING), paper migrato in `paper/`.
 - Trim legacy completato: working tree ~90M → 17M.
 
-### Scritto ma NON validato (serve GPU — l'ambiente di sviluppo non ne aveva)
-- `backends/triton_backend.py`: kernel Triton `dense` (single-program, mirror del reference). Si registra
-  solo se torch+triton+GPU presenti.
-- `backends/cuda_backend.py` + `backends/cuda/nfa_kernel.cu`: kernel CUDA CSR `dense` + binding pybind11,
-  build con `GPUFSM_BUILD_CUDA=ON`. Si registra solo se l'estensione `_cuda` è importabile.
-- Test `tests/test_gpu_backends.py` (marker `gpu`, ora SKIPPED): confronto Triton/CUDA vs reference su
-  esempi + fuzz. **Primo compito su GPU: farli passare** (`pytest -m gpu`).
-
 ### TODO prossima sessione (priorità)
-1. **Validare GPU**: `pip install -e ".[dev,triton]"` + `GPUFSM_BUILD_CUDA=ON`; far passare `pytest -m gpu`.
-   Probabili fix ai kernel `dense` (loop dinamici Triton, dtype, compile pybind11/CUDA).
-2. **Tecniche bit-packed/multi-stream GPU** (il contributo): versione packed-1-bit + multi-stream
+1. **Tecniche bit-packed/multi-stream GPU** (il contributo): versione packed-1-bit + multi-stream
    coalescizzato, con `gpufsm.bitmap` come specifica eseguibile. Poi l'**ablation memory**
-   (byte→bit, global→shared CSR, sync→async, single→multi-stream).
-3. **ANML loader** (`io/anml.py` è uno stub): parser Python per ANMLZoo/AutomataZoo + benchmark suite.
-4. **Figure paper**: riscrivere `paper/generate_figures.py` sullo schema CSV di `gpufsm sweep`.
-5. **§13.2 SOTA**: integrare citazioni/numeri dal `/deep-research` (run `wf_b1efa63a-655`).
+   (byte→bit, global→shared CSR, sync→async, single→multi-stream). NB: i kernel `dense` attuali sono
+   single-program (`grid=(1,)` Triton, `<<<1,1>>>` CUDA) → baseline corretta ma lentissima, da battere.
+2. **ANML loader** (`io/anml.py` è uno stub): parser Python per ANMLZoo/AutomataZoo + benchmark suite.
+3. **Figure paper**: riscrivere `paper/generate_figures.py` sullo schema CSV di `gpufsm sweep`.
+4. **§13.2 SOTA**: integrare citazioni/numeri dal `/deep-research` (run `wf_b1efa63a-655`).
 
 ### Dove sta il codice
 Repo nuova **`gpufsm`** (privata). Storia pulita: contenuto = commit iniziale del branch `gpufsm-main`
