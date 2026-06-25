@@ -68,6 +68,37 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - **Branch di lavoro**: `claude/repo-refactor-optimize-snflie`. Commit chiari e atomici.
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
 
-## 7. Stato corrente
-Refactoring in corso sul branch `claude/repo-refactor-optimize-snflie` della vecchia repo; verrà spostato
-nella nuova repo `gpufsm`. Vedi il piano completo in `/root/.claude/plans/voglio-un-refactoring-completo-jolly-teapot.md`.
+## 7. Stato corrente (handoff sessione 1)
+
+### Fatto e verde (CPU)
+- Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,
+  io/{anml,datasets}), backend CPU (`reference`, `bitmap`).
+- Packaging `pyproject`+`scikit-build-core` (build CUDA graceful), CI GitHub Actions (ruff+mypy+pytest CPU).
+- Test: **20 verdi** (`pytest -m "not gpu"`), incl. fuzz 300 NFA bitmap==reference. ruff+mypy puliti.
+  `pip install -e .` funziona. CLI `env/list/verify/bench/sweep` funzionano.
+- Dataset con checksum (`io/datasets`), docs (METHODOLOGY/REPRODUCIBILITY/CONTRIBUTING), paper migrato in `paper/`.
+- Trim legacy completato: working tree ~90M → 17M.
+
+### Scritto ma NON validato (serve GPU — l'ambiente di sviluppo non ne aveva)
+- `backends/triton_backend.py`: kernel Triton `dense` (single-program, mirror del reference). Si registra
+  solo se torch+triton+GPU presenti.
+- `backends/cuda_backend.py` + `backends/cuda/nfa_kernel.cu`: kernel CUDA CSR `dense` + binding pybind11,
+  build con `GPUFSM_BUILD_CUDA=ON`. Si registra solo se l'estensione `_cuda` è importabile.
+- Test `tests/test_gpu_backends.py` (marker `gpu`, ora SKIPPED): confronto Triton/CUDA vs reference su
+  esempi + fuzz. **Primo compito su GPU: farli passare** (`pytest -m gpu`).
+
+### TODO prossima sessione (priorità)
+1. **Validare GPU**: `pip install -e ".[dev,triton]"` + `GPUFSM_BUILD_CUDA=ON`; far passare `pytest -m gpu`.
+   Probabili fix ai kernel `dense` (loop dinamici Triton, dtype, compile pybind11/CUDA).
+2. **Tecniche bit-packed/multi-stream GPU** (il contributo): versione packed-1-bit + multi-stream
+   coalescizzato, con `gpufsm.bitmap` come specifica eseguibile. Poi l'**ablation memory**
+   (byte→bit, global→shared CSR, sync→async, single→multi-stream).
+3. **ANML loader** (`io/anml.py` è uno stub): parser Python per ANMLZoo/AutomataZoo + benchmark suite.
+4. **Figure paper**: riscrivere `paper/generate_figures.py` sullo schema CSV di `gpufsm sweep`.
+5. **§13.2 SOTA**: integrare citazioni/numeri dal `/deep-research` (run `wf_b1efa63a-655`).
+
+### Dove sta il codice
+Repo nuova **`gpufsm`** (privata). Storia pulita: contenuto = commit iniziale del branch `gpufsm-main`
+(orphan) della vecchia repo `triton_vs_cuda_fsm`. La provenienza/legacy (kernel ngAP v2, BitGen, anml) resta
+nella history di `triton_vs_cuda_fsm` per riferimento durante il port GPU.
+Piano completo: `/root/.claude/plans/voglio-un-refactoring-completo-jolly-teapot.md`.
