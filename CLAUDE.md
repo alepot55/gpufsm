@@ -146,7 +146,8 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - ✅ **Sweep rigoroso FATTO** (task #7): `paper/data/sweep_techniques.csv` (median+CI95). worklist 15–132 Gbps
   vs full-scan ~0.5; multistream/shared/async identici → compute-bound confermato.
 - ✅ **Figure FATTE** (task #9): `paper/figures.py` (4 figure dai CSV versionati; supera la legacy generate_figures.py).
-- ✅ **Draft paper FATTO** (task #10): `paper/DRAFT.md` (arXiv-style, tutti i finding + figure + related work verificato).
+- ✅ **Paper FATTO** (task #10): `paper/DRAFT.md` (prosa) + **`paper/gpufsm.tex` (IEEEtran, compila → PDF 3pp, 4 figure)**
+  + `docs/REPRODUCIBILITY.md` (guida artifact AE-style, mappa claim→comando). Resta solo: Zenodo DOI (release) + espansione contenuti.
 - ⛔ **Nsight (task #6) BLOCCATO**: `ERR_NVGPUCTRPERM` (counter admin-gated, serve sudo/`NVreg_RestrictProfilingToAdminUsers=0`+reboot).
   Fix + alternativa in `docs/PROFILING.md`. La tesi compute-bound è già provata dall'ablation (shared-CSR pareggia) → ncu è confermativo.
 - ✅ **ANML loader FATTO** (task #8, parser): `io/anml.py` parsa il sottoinsieme ANML (homogeneous→edge-labelled,
