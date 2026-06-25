@@ -142,6 +142,7 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
         _RUNNERS = {
             "multistream": "run_multistream",
             "multistream_shared": "run_multistream_shared",
+            "multistream_async": "run_multistream_async",
         }
 
         def __init__(self, nfa: NFA, technique: str = "multistream") -> None:
@@ -190,6 +191,10 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
 
     @register(Backend.CUDA, "multistream_shared")
     def _make_cuda_multistream_shared(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
+        return CUDAMultistreamExecutor(nfa, technique)
+
+    @register(Backend.CUDA, "multistream_async")
+    def _make_cuda_multistream_async(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
         return CUDAMultistreamExecutor(nfa, technique)
 
 

@@ -14,6 +14,7 @@
 #include <pybind11/stl.h>
 
 #include <cuda_runtime.h>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -551,8 +552,119 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_sha
     return {flags, lens, kernel_ms};
 }
 
+// Multi-stream + sync→async transfer ablation. Pinned host staging + N CUDA streams
+// pipeline H2D(chunk) -> kernel(chunk) -> D2H(chunk) so input transfer overlaps
+// compute (and vice-versa), hiding PCIe latency that a single blocking cudaMemcpy
+// would expose. The read-only CSR is copied once up front; per-chunk launches reuse
+// the global-CSR kernel by shifting the offsets/output pointers (offsets are absolute
+// into input_data, so no kernel change is needed). Returns (flags, lens, total_ms)
+// where total_ms is the overlapped end-to-end device time.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_async(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    constexpr int N_STREAMS = 4;
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+    int in_len = static_cast<int>(input_data.request().size);
+
+    py::array_t<int> flags(num_strings < 0 ? 0 : num_strings);
+    py::array_t<int> lens(num_strings < 0 ? 0 : num_strings);
+    if (num_strings <= 0) return {flags, lens, 0.0f};
+
+    // CSR copied once (small, read-only).
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+
+    // Pin the caller's host buffers IN PLACE (cudaHostRegister) instead of allocating
+    // a second pinned buffer and copying into it — that extra full-input host memcpy
+    // would dwarf any overlap benefit. Outputs are pinned likewise for async D2H.
+    int* h_in = static_cast<int*>(input_data.request().ptr);
+    int* h_off = static_cast<int*>(input_offsets.request().ptr);
+    int* h_flags = static_cast<int*>(flags.request().ptr);
+    int* h_lens = static_cast<int*>(lens.request().ptr);
+    if (in_len) CUDA_CHECK(cudaHostRegister(h_in, sizeof(int) * in_len, cudaHostRegisterDefault));
+    CUDA_CHECK(cudaHostRegister(h_flags, sizeof(int) * num_strings, cudaHostRegisterDefault));
+    CUDA_CHECK(cudaHostRegister(h_lens, sizeof(int) * num_strings, cudaHostRegisterDefault));
+
+    int *d_in, *d_off, *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_in, sizeof(int) * (in_len ? in_len : 1)));
+    CUDA_CHECK(cudaMalloc(&d_off, sizeof(int) * (num_strings + 1)));
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * num_strings));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * num_strings));
+
+    cudaStream_t streams[N_STREAMS];
+    for (int s = 0; s < N_STREAMS; ++s) CUDA_CHECK(cudaStreamCreate(&streams[s]));
+
+    // Offsets are needed device-side; copy once (cheap) before the pipeline.
+    CUDA_CHECK(cudaMemcpy(d_off, h_off, sizeof(int) * (num_strings + 1), cudaMemcpyHostToDevice));
+
+    int chunk = (num_strings + N_STREAMS - 1) / N_STREAMS;
+    int threads = 256;
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    for (int c = 0; c < N_STREAMS; ++c) {
+        int lo = c * chunk;
+        if (lo >= num_strings) break;
+        int hi = lo + chunk; if (hi > num_strings) hi = num_strings;
+        int nstr = hi - lo;
+        int byte_lo = h_off[lo], byte_hi = h_off[hi];
+        cudaStream_t st = streams[c % N_STREAMS];
+        if (byte_hi > byte_lo) {
+            CUDA_CHECK(cudaMemcpyAsync(d_in + byte_lo, h_in + byte_lo,
+                sizeof(int) * (byte_hi - byte_lo), cudaMemcpyHostToDevice, st));
+        }
+        int blocks = (nstr + threads - 1) / threads;
+#define LAUNCH_ASYNC(NW) bitpacked_multistream_kernel<NW><<<blocks, threads, 0, st>>>( \
+        d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off + lo, nstr, \
+        num_states, start_state, uses_any, d_flags + lo, d_lens + lo)
+        switch (nwords) {
+            case 1: LAUNCH_ASYNC(1); break;
+            case 2: LAUNCH_ASYNC(2); break;
+            case 3: LAUNCH_ASYNC(3); break;
+            case 4: LAUNCH_ASYNC(4); break;
+            case 5: LAUNCH_ASYNC(5); break;
+            case 6: LAUNCH_ASYNC(6); break;
+            case 7: LAUNCH_ASYNC(7); break;
+            case 8: LAUNCH_ASYNC(8); break;
+            default:
+                throw std::runtime_error("multistream_async: num_states > " +
+                    std::to_string(BITPACKED_MAX_WORDS * 64) + " not supported");
+        }
+#undef LAUNCH_ASYNC
+        CUDA_CHECK(cudaMemcpyAsync(h_flags + lo, d_flags + lo, sizeof(int) * nstr,
+            cudaMemcpyDeviceToHost, st));
+        CUDA_CHECK(cudaMemcpyAsync(h_lens + lo, d_lens + lo, sizeof(int) * nstr,
+            cudaMemcpyDeviceToHost, st));
+    }
+    CUDA_CHECK(cudaGetLastError());
+    cudaEventRecord(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float total_ms = 0.0f; cudaEventElapsedTime(&total_ms, start, stop);
+
+    // h_flags/h_lens ARE the numpy output buffers — async D2H already wrote them.
+    for (int s = 0; s < N_STREAMS; ++s) cudaStreamDestroy(streams[s]);
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_in); cudaFree(d_off); cudaFree(d_flags); cudaFree(d_lens);
+    if (in_len) cudaHostUnregister(h_in);
+    cudaHostUnregister(h_flags); cudaHostUnregister(h_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+
+    return {flags, lens, total_ms};
+}
+
 PYBIND11_MODULE(_cuda, m) {
-    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR] NFA kernels)";
+    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR/async] NFA kernels)";
     m.def("run_dense", &run_dense,
           "Simulate an NFA (CSR, int8 working set) over an input; returns (accepted, match_len, kernel_ms).");
     m.def("run_bitpacked", &run_bitpacked,
@@ -561,4 +673,7 @@ PYBIND11_MODULE(_cuda, m) {
           "Simulate an NFA over a batch (one thread/string, global CSR); returns (flags, lens, kernel_ms).");
     m.def("run_multistream_shared", &run_multistream_shared,
           "Multi-stream with read-only CSR staged into shared memory; returns (flags, lens, kernel_ms).");
+    m.def("run_multistream_async", &run_multistream_async,
+          "Multi-stream with pinned host staging + streamed async H2D/kernel/D2H overlap; "
+          "returns (flags, lens, total_ms).");
 }
