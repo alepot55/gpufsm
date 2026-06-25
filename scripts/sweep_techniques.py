@@ -124,7 +124,11 @@ def main() -> None:
                 if be is Backend.WARP and n > 64:
                     continue
                 nfa = random_nfa(n, seed=1000 + n)
-                m = measure(nfa, be, te, batch, total_bytes)
+                try:
+                    m = measure(nfa, be, te, batch, total_bytes)
+                except (ValueError, RuntimeError) as e:
+                    print(f"{be.value:7}/{te:18} n={n:4d}  SKIP ({type(e).__name__}: {str(e)[:60]})")
+                    continue
                 if m is None:
                     continue
                 row = {
