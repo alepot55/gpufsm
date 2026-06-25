@@ -71,5 +71,51 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
     def _make_cuda(nfa: NFA, technique: str) -> CUDAExecutor:
         return CUDAExecutor(nfa, technique)
 
+    def _pack_accept(nfa: NFA) -> np.ndarray:
+        """Pack the accept set into 64-bit words (the kernel's working-set layout)."""
+        nwords = (nfa.num_states + 63) // 64
+        words = np.zeros(nwords, dtype=np.uint64)
+        for s in range(nfa.num_states):
+            if nfa.accept[s]:
+                words[s >> 6] |= np.uint64(1) << np.uint64(s & 63)
+        return words
+
+    class CUDABitpackedExecutor:
+        """Bit-packed working set (1 bit/state). The memory-centric thesis kernel."""
+
+        def __init__(self, nfa: NFA, technique: str = "bitpacked") -> None:
+            self.nfa = nfa
+            self.technique = technique
+            self._accept_words = _pack_accept(nfa)
+
+        def run(self, input_bytes: bytes) -> Result:
+            nfa = self.nfa
+            t0 = time.perf_counter()
+            syms = np.frombuffer(input_bytes, dtype=np.uint8).astype(np.int32)
+            transfer_ms = (time.perf_counter() - t0) * 1000.0
+            accepted, match_len, kernel_ms = _cuda.run_bitpacked(
+                np.ascontiguousarray(nfa.sym_row_ptr, dtype=np.int32),
+                np.ascontiguousarray(nfa.sym_targets, dtype=np.int32),
+                np.ascontiguousarray(nfa.sym_symbols, dtype=np.int32),
+                np.ascontiguousarray(nfa.eps_row_ptr, dtype=np.int32),
+                np.ascontiguousarray(nfa.eps_targets, dtype=np.int32),
+                np.ascontiguousarray(self._accept_words, dtype=np.uint64),
+                np.ascontiguousarray(syms, dtype=np.int32),
+                int(nfa.num_states),
+                int(nfa.start_state),
+                int(nfa.uses_any_symbol),
+            )
+            return Result(
+                accepted=bool(accepted),
+                match_len=int(match_len),
+                kernel_ms=float(kernel_ms),
+                total_ms=float(kernel_ms) + transfer_ms,
+                transfer_ms=transfer_ms,
+            )
+
+    @register(Backend.CUDA, "bitpacked")
+    def _make_cuda_bitpacked(nfa: NFA, technique: str) -> CUDABitpackedExecutor:
+        return CUDABitpackedExecutor(nfa, technique)
+
 
 register_availability(Backend.CUDA, _cuda_available)

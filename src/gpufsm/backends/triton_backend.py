@@ -31,6 +31,7 @@ def _triton_available() -> bool:
 
 
 if _triton_available():  # pragma: no cover - requires GPU
+    import numpy as np
     import torch
     import triton
     import triton.language as tl
@@ -181,6 +182,191 @@ if _triton_available():  # pragma: no cover - requires GPU
     @register(Backend.TRITON, "dense")
     def _make_triton(nfa: NFA, technique: str) -> TritonExecutor:
         return TritonExecutor(nfa, technique)
+
+    # ------------------------------------------------------------------
+    # Bit-packed technique — the memory-centric thesis artifact.
+    # The active state-set is a packed bitmask (1 bit/state, 64-bit words)
+    # instead of one int8 slot/state: byte->bit, the first ablation axis.
+    # Same CSR algorithm as ``dense`` (apples-to-apples); only the working-set
+    # layout changes. Mirrors the executable spec in :mod:`gpufsm.bitmap`.
+    # ------------------------------------------------------------------
+    _WORD_BITS = 64
+
+    @triton.jit
+    def _bitpacked_kernel(
+        sym_row_ptr,
+        sym_targets,
+        sym_symbols,
+        eps_row_ptr,
+        eps_targets,
+        accept_words,
+        input_symbols,
+        out_flag,
+        out_len,
+        cur,
+        nxt,
+        input_len,
+        start_state,
+        NUM_STATES: tl.constexpr,
+        NWORDS: tl.constexpr,
+        ANY_ID: tl.constexpr,
+        USES_ANY: tl.constexpr,
+    ):
+        # One int64 set-bit for runtime targets (avoids int32 overflow at bit 31+
+        # and Python/Triton operator ambiguity on ``1 << <runtime>``).
+        one = tl.full((), 1, tl.int64)
+
+        # cur := { start_state }
+        for w in range(NWORDS):
+            tl.store(cur + w, 0)
+        sw = start_state >> 6
+        sb = one << (start_state & 63)
+        tl.store(cur + sw, tl.load(cur + sw) | sb)
+
+        # Epsilon closure: NUM_STATES passes guarantee convergence.
+        for _ in range(NUM_STATES):
+            for s in range(NUM_STATES):
+                wi = s >> 6
+                bit = one << (s & 63)  # int64 mask (int32 literals truncate bits >=32)
+                if (tl.load(cur + wi) & bit) != 0:
+                    lo = tl.load(eps_row_ptr + s)
+                    hi = tl.load(eps_row_ptr + s + 1)
+                    for k in range(lo, hi):
+                        t = tl.load(eps_targets + k)
+                        twi = t >> 6
+                        tbit = one << (t & 63)
+                        tl.store(cur + twi, tl.load(cur + twi) | tbit)
+
+        # Word-parallel accept test (NWORDS iterations, not NUM_STATES).
+        out_f = 0
+        out_l = 0
+        done = 0
+        for w in range(NWORDS):
+            if (tl.load(cur + w) & tl.load(accept_words + w)) != 0:
+                done = 1
+        if done == 1:
+            out_f = 1
+            out_l = 0
+
+        for pos in range(input_len):
+            if done == 0:
+                sym = tl.load(input_symbols + pos)
+                for w in range(NWORDS):
+                    tl.store(nxt + w, 0)
+                for s in range(NUM_STATES):
+                    wi = s >> 6
+                    bit = one << (s & 63)  # int64 mask (int32 literals truncate bits >=32)
+                    if (tl.load(cur + wi) & bit) != 0:
+                        lo = tl.load(sym_row_ptr + s)
+                        hi = tl.load(sym_row_ptr + s + 1)
+                        for k in range(lo, hi):
+                            tsym = tl.load(sym_symbols + k)
+                            hit = tsym == sym
+                            if USES_ANY:
+                                hit = hit or (tsym == ANY_ID)
+                            if hit:
+                                t = tl.load(sym_targets + k)
+                                twi = t >> 6
+                                tbit = one << (t & 63)
+                                tl.store(nxt + twi, tl.load(nxt + twi) | tbit)
+                # epsilon closure on nxt
+                for _ in range(NUM_STATES):
+                    for s in range(NUM_STATES):
+                        wi = s >> 6
+                        bit = one << (s & 63)  # int64 mask (int32 literals truncate bits >=32)
+                        if (tl.load(nxt + wi) & bit) != 0:
+                            lo = tl.load(eps_row_ptr + s)
+                            hi = tl.load(eps_row_ptr + s + 1)
+                            for k in range(lo, hi):
+                                t = tl.load(eps_targets + k)
+                                twi = t >> 6
+                                tbit = one << (t & 63)
+                                tl.store(nxt + twi, tl.load(nxt + twi) | tbit)
+                for w in range(NWORDS):
+                    tl.store(cur + w, tl.load(nxt + w))
+                m = 0
+                for w in range(NWORDS):
+                    if (tl.load(cur + w) & tl.load(accept_words + w)) != 0:
+                        m = 1
+                if m == 1:
+                    out_f = 1
+                    out_l = pos + 1
+                    done = 1
+
+        tl.store(out_flag, out_f)
+        tl.store(out_len, out_l)
+
+    def _pack_accept(nfa: NFA, nwords: int) -> np.ndarray:
+        words = np.zeros(nwords, dtype=np.int64)
+        for s in range(nfa.num_states):
+            if nfa.accept[s]:
+                words[s >> 6] |= np.int64(1) << np.int64(s & 63)
+        return words
+
+    class TritonBitpackedExecutor:
+        def __init__(self, nfa: NFA, technique: str = "bitpacked") -> None:
+            self.nfa = nfa
+            self.technique = technique
+            self._nwords = (nfa.num_states + _WORD_BITS - 1) // _WORD_BITS
+            dev = torch.device("cuda")
+            self._dev = dev
+            self._sym_row_ptr = torch.as_tensor(nfa.sym_row_ptr, device=dev)
+            self._sym_targets = torch.as_tensor(nfa.sym_targets, device=dev)
+            self._sym_symbols = torch.as_tensor(nfa.sym_symbols, device=dev)
+            self._eps_row_ptr = torch.as_tensor(nfa.eps_row_ptr, device=dev)
+            self._eps_targets = torch.as_tensor(nfa.eps_targets, device=dev)
+            self._accept_words = torch.as_tensor(_pack_accept(nfa, self._nwords), device=dev)
+            self._cur = torch.zeros(self._nwords, dtype=torch.int64, device=dev)
+            self._nxt = torch.zeros(self._nwords, dtype=torch.int64, device=dev)
+
+        def run(self, input_bytes: bytes) -> Result:
+            import numpy as np
+
+            dev = self._dev
+            t0 = time.perf_counter()
+            syms = np.frombuffer(input_bytes, dtype=np.uint8).astype(np.int32)
+            inp = torch.as_tensor(syms, device=dev)
+            transfer_ms = (time.perf_counter() - t0) * 1000.0
+
+            flag = torch.zeros(1, dtype=torch.int32, device=dev)
+            mlen = torch.zeros(1, dtype=torch.int32, device=dev)
+
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            _bitpacked_kernel[(1,)](
+                self._sym_row_ptr,
+                self._sym_targets,
+                self._sym_symbols,
+                self._eps_row_ptr,
+                self._eps_targets,
+                self._accept_words,
+                inp,
+                flag,
+                mlen,
+                self._cur,
+                self._nxt,
+                int(syms.size),
+                int(self.nfa.start_state),
+                NUM_STATES=int(self.nfa.num_states),
+                NWORDS=int(self._nwords),
+                ANY_ID=int(ANY_SYMBOL),
+                USES_ANY=bool(self.nfa.uses_any_symbol),
+            )
+            end.record()
+            torch.cuda.synchronize()
+            kernel_ms = float(start.elapsed_time(end))
+            return Result(
+                accepted=bool(flag.item()),
+                match_len=int(mlen.item()),
+                kernel_ms=kernel_ms,
+                total_ms=kernel_ms + transfer_ms,
+                transfer_ms=transfer_ms,
+            )
+
+    @register(Backend.TRITON, "bitpacked")
+    def _make_triton_bitpacked(nfa: NFA, technique: str) -> TritonBitpackedExecutor:
+        return TritonBitpackedExecutor(nfa, technique)
 
 
 register_availability(Backend.TRITON, _triton_available)
