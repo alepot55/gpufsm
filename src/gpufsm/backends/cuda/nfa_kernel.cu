@@ -14,11 +14,23 @@
 #include <pybind11/stl.h>
 
 #include <cuda_runtime.h>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace py = pybind11;
 
 static constexpr int ANY_SYMBOL = 256;
+
+#define CUDA_CHECK(call)                                                       \
+    do {                                                                      \
+        cudaError_t _err = (call);                                           \
+        if (_err != cudaSuccess) {                                            \
+            throw std::runtime_error(std::string("CUDA error at ") +          \
+                __FILE__ ":" + std::to_string(__LINE__) + " -> " +            \
+                cudaGetErrorString(_err));                                    \
+        }                                                                     \
+    } while (0)
 
 // One thread simulates the whole single stream (baseline). Working sets are
 // int8 device buffers (one slot per state), mirroring the reference algorithm.
@@ -107,15 +119,17 @@ static std::tuple<bool, int, float> run_dense(
 
     signed char *d_cur, *d_nxt;
     int *d_flag, *d_len;
-    cudaMalloc(&d_cur, num_states); cudaMalloc(&d_nxt, num_states);
-    cudaMalloc(&d_flag, sizeof(int)); cudaMalloc(&d_len, sizeof(int));
+    CUDA_CHECK(cudaMalloc(&d_cur, num_states)); CUDA_CHECK(cudaMalloc(&d_nxt, num_states));
+    CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int))); CUDA_CHECK(cudaMalloc(&d_len, sizeof(int)));
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
     cudaEventRecord(start);
     dense_nfa_kernel<<<1, 1>>>(d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, input_len,
                                num_states, start_state, uses_any, d_cur, d_nxt, d_flag, d_len);
+    CUDA_CHECK(cudaGetLastError());
     cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
     float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
 
     int h_flag = 0, h_len = 0;

@@ -21,13 +21,24 @@ if(NOT CMAKE_CUDA_COMPILER)
     return()
 endif()
 
+# Architecture default MUST be set before enable_language(CUDA): that call seeds
+# its own CMAKE_CUDA_ARCHITECTURES default, after which a `NOT DEFINED` guard is
+# always false. Real SASS only (no embedded PTX) for Turing..Ada.
+# Rationale: when the CUDA *toolkit* is newer than the max CUDA version the
+# installed *driver* supports, any embedded PTX is rejected at module load
+# ("the provided PTX was compiled with an unsupported toolchain"), even when
+# matching SASS is present. Real-arch cubins still load under CUDA minor-version
+# compatibility. The "-real" suffix suppresses PTX generation. Note: bare numbers
+# ("89") and the "native" keyword DO embed PTX and would re-trigger the error on a
+# toolkit/driver mismatch. Override with -DCMAKE_CUDA_ARCHITECTURES to add arches.
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75-real 80-real 86-real 89-real)
+endif()
+
 enable_language(CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89)
-endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
