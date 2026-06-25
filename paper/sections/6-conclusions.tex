@@ -1,0 +1,12 @@
+\section{Conclusion}\label{sec:conclusion}
+
+In this paper, we presented a workload-driven performance analysis comparing OpenAI Triton and NVIDIA CUDA. We sought to determine if a modern block-based DSL could replace low-level code across diverse computational domains.
+
+Our study leads to a nuanced conclusion: the optimal programming model depends on workload regularity.
+\begin{itemize}
+    \item \textbf{Structured Workloads:} Triton achieves performance parity with cuBLAS and offers significant productivity advantages. For dense algebra, the abstraction cost is effectively zero.
+    \item \textbf{Irregular Workloads:} The abstraction breaks down. Block-based semantics introduce significant overhead for latency-bound, pointer-chasing algorithms. CUDA kernels outperform Triton by 10--30$\times$.
+\end{itemize}
+
+We identify this as \textit{Abstraction Regret}: the features that make Triton productive (block abstraction) prevent the expression of micro-optimizations required for irregular domains.
+Future work should explore extending Triton's IR to support scalar intrinsics and worklist semantics, potentially bridging this gap.

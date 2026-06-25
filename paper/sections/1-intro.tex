@@ -1,0 +1,21 @@
+\section{Introduction}\label{sec:intro}
+
+GPUs have become an indispensable driving force behind a wide range of applications. NVIDIA's CUDA \cite{cuda} has dominated this environment for over a decade, providing a programming model that exposes low-level hardware details. This results in maximum theoretical performance but presents a significant barrier to entry due to its complexity.
+
+In response to this productivity challenge, higher-level abstractions have emerged. Among the most popular is Triton \cite{triton}, a Python-based DSL developed by OpenAI. Triton seeks to democratize GPU programming by allowing developers to write computations on data blocks, letting its JIT compiler handle memory coalescing and shared memory management.
+While Triton has proven successful for dense neural network layers, this poses a challenging question: \textit{To what extent can a high-level block-based abstraction rival the performance of low-level CUDA across different computational problems?}
+
+This paper addresses this question through a workload-driven comparative study. We benchmark two radically different types of workloads:
+\begin{itemize}
+    \item \textbf{Structured Workloads:} Problems like Matrix Multiplication, characterized by uniform data access and deterministic control flow.
+    \item \textbf{Irregular Workloads:} Problems like Finite State Machine (FSM) simulation, characterized by sparse memory accesses (pointer-chasing) and divergent control flow.
+\end{itemize}
+
+The main contributions of this paper are:
+\begin{enumerate}
+    \item A performance comparison of Triton and CUDA kernels on both structured (MatMul) and irregular (FSM) computational domains.
+    \item An implementation of specialized FSM kernels in Triton (Bitmap, CSR, DFS) compared against CUDA approaches.
+    \item An analysis of the performance gap observed in irregular workloads, relating them to the programming model design.
+\end{enumerate}
+
+Our principal thesis is that the optimal programming model is workload-dependent. While Triton achieves performance parity for structured computations, the low-level control offered by CUDA is essential for irregular workloads. We show that for FSM simulation, CUDA kernels outperform Triton by 10--30$\times$ due to the latter's inability to efficiently handle fine-grained latency-bound operations.

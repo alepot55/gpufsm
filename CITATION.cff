@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use gpufsm in academic work, please cite it."
+title: "gpufsm: A workload-driven study and portable framework for GPU finite-state-machine processing"
+authors:
+  - family-names: Potenza
+    given-names: Alessandro
+version: 0.1.0
+date-released: 2026-01-01
+license: MIT
+repository-code: "https://github.com/alepot55/gpufsm"
+keywords:
+  - GPU
+  - automata
+  - NFA
+  - Triton
+  - CUDA

@@ -1,0 +1,35 @@
+\usepackage{ifthen}
+\usepackage{amssymb}
+
+\newboolean{showcomments}
+\setboolean{showcomments}{true}
+
+% use \setboolean{showcomments}{false} anywhere in your document after
+% importing this to disable the comments
+
+\makeatletter
+\newcommand{\mynote}[3]{%
+  \ifthenelse{\boolean{showcomments}}{%
+   \fbox{\bfseries\sffamily\scriptsize#1}%
+   {\small$\blacktriangleright$\textsf{\emph{\color{#3}{#2}}}$\blacktriangleleft$}}%
+  {%
+   % these two lines ensure that there is no blank space inserted
+   \@bsphack
+   \@esphack
+  }%
+}
+\makeatother
+
+\newcommand{\rebuttal}[2]{\textcolor{#2}{#1}}
+
+% One command per author:
+\definecolor{asparagus}{rgb}{0.53, 0.66, 0.42}
+
+\newcommand{\pone}[1]{\mynote{person1}{#1}{orange}}
+\newcommand{\ptwo}[1]{\mynote{person2}{#1}{ForestGreen}}
+\newcommand{\pthree}[1]{\mynote{person3}{#1}{Plum}}
+\newcommand{\pfour}[1]{\mynote{person4}{#1}{BrickRed}}
+%%%command to illustrate some good practice
+%%% some are from https://www.youtube.com/watch?v=QYbAvOPcy0s
+\newcommand{\goodpractice}[1]{\mynote{Goodpractice}{#1}{BrickRed}}
+\newcommand{\prsop}[1]{\mynote{Personal Opinion}{#1}{Fuchsia}}

@@ -1,0 +1,34 @@
+\section{Background}\label{sec:background}
+
+To understand the performance analysis presented in this work, it is essential to first grasp the fundamental differences between the programming models under investigation and the characteristics of the workloads used for evaluation.
+
+\subsection{GPU Programming Models}
+
+\subsubsection{CUDA C++ (The Baseline)}
+NVIDIA's CUDA \cite{cuda} adopts a Single Instruction Multiple Thread (SIMT) execution model. It grants developers direct and explicit control over the GPU architecture. Programmers manage the thread hierarchy (grid, blocks, and warps), handle memory transfers between host and device, and manually optimize memory access patterns to maximize bandwidth (e.g., ensuring coalesced global memory reads).
+This fine-grained control allows for sophisticated optimizations, such as using \textit{Warp Shuffle} primitives for register-level communication or managing Shared Memory to reduce global traffic. However, this comes at the cost of high code verbosity and complexity.
+
+\subsubsection{OpenAI Triton (The Abstraction)}
+Triton \cite{triton} introduces a block-based programming model. Instead of writing code for a single thread (as in CUDA), the developer writes operations on blocks of data (tensors). The Triton compiler automatically handles the complex tasks of multi-threading, shared memory allocation, and synchronization barriers.
+While this abstraction simplifies the development of dense matrix operations, it hides the concept of an individual thread ID. This makes it difficult to express algorithms that require per-thread logic or random access patterns, as operations must be defined over entire blocks.
+
+\subsection{Workload Characterization}
+
+The success of a GPU programming model relies significantly on the nature of the target workload. We classify our benchmarks into two broad categories:
+
+\subsubsection{Structured Workloads}
+These applications represent the classical use case for GPUs, such as Dense Neural Network layers and Matrix Multiplication. They are characterized by:
+\begin{itemize}
+    \item \textbf{Predictable Memory Access:} Threads read memory in contiguous sequences, enabling fully coalesced loads.
+    \item \textbf{High Arithmetic Intensity:} A high ratio of compute operations to memory references.
+    \item \textbf{Uniform Control Flow:} All threads in a warp typically follow the same execution path.
+\end{itemize}
+These characteristics map perfectly to Triton's block-level semantics.
+
+\subsubsection{Irregular Workloads}
+This class of problems exposes the limits of parallel architectures. We utilize Finite State Machine (FSM) simulation as our representative irregular workload. FSM processing is characterized by:
+\begin{itemize}
+    \item \textbf{Pointer Chasing:} To evaluate the next state, the algorithm must read a value from a memory location determined by the current state ($S_{t+1} = \delta(S_t, Input)$). This results in scattered, non-coalesced memory accesses.
+    \item \textbf{Sequential Dependency:} The next state depends entirely on the previous one, creating a strict latency-bound chain that is hard to pipeline.
+    \item \textbf{Divergent Control Flow:} Different input strings may lead to different states, causing threads in a warp to diverge and serialize execution.
+\end{itemize}

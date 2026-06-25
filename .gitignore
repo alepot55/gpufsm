@@ -1,0 +1,126 @@
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# =============================================================================
+# IDE & Editors
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.code-workspace
+
+# =============================================================================
+# CUDA & Compilation
+# =============================================================================
+*.o
+*.obj
+*.a
+*.lib
+*.cubin
+*.ptx
+*.fatbin
+
+# =============================================================================
+# Caches
+# =============================================================================
+.cache/
+.cache_bitgen/
+.pytest_cache/
+.triton/
+*.cache
+.mypy_cache/
+.ruff_cache/
+
+# =============================================================================
+# Logs & Temporary
+# =============================================================================
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+.env
+.env.*
+
+# =============================================================================
+# Data (download via manage.sh)
+# =============================================================================
+data/automata_zoo/
+
+# =============================================================================
+# Results (regenerated via tests)
+# =============================================================================
+result/
+results/
+
+# =============================================================================
+# LaTeX auxiliary files
+# =============================================================================
+experiments/report/*.aux
+experiments/report/*.bbl
+experiments/report/*.blg
+experiments/report/*.fdb_latexmk
+experiments/report/*.fls
+experiments/report/*.out
+experiments/report/*.synctex.gz
+experiments/report/*.toc
+experiments/report/*.lof
+experiments/report/*.lot
+experiments/report/*.nav
+experiments/report/*.snm
+experiments/report/*.vrb
+
+# =============================================================================
+# Jupyter
+# =============================================================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# =============================================================================
+# OS files
+# =============================================================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =============================================================================
+# Project-specific exclusions
+# =============================================================================
+# Claude Code settings (user-specific)
+.claude/
+
+# Generated symlinks
+generated_code
+
+# Legacy directories (root only)
+/notebook/
+/report/
+
+# Archive directories
+experiments/notebooks/archive/
+
+# Private files
+private/

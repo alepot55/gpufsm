@@ -1,0 +1,73 @@
+\section{Methodology}\label{sec:method}
+
+This section details the experimental setup, the system configuration, and the specific algorithms implemented to compare the programming models.
+
+\subsection{System Configuration}
+All benchmarks were executed on a consistent hardware platform to ensure fair comparisons.
+\begin{itemize}
+    \item \textbf{GPU:} NVIDIA GeForce RTX 4070 (Ada Lovelace, 12GB GDDR6X).
+    \item \textbf{Software Stack:} CUDA Toolkit 12.3, PyTorch 2.1, Triton 2.1.
+    \item \textbf{Environment:} A strictly controlled Docker container to ensure reproducibility of the Python/C++ build environment.
+\end{itemize}
+
+\subsection{Algorithm Implementation Details}
+
+Our core investigation focuses on the contrast between high-level and low-level implementations of FSM simulation.
+
+\subsubsection{Triton Implementation (High-Level)}
+The Triton kernel adopts a ``dense'' approach to fit the block-based programming model. It tracks active states using a boolean tensor or sparse list, but relies on masked loads to handle the irregularity of the transition table.
+As shown in Algorithm \ref{alg:triton}, the absence of per-thread branching forces the compiler to emit predicated instructions that execute both the memory load and the validity check, often reading unnecessary data (over-fetching).
+
+\begin{algorithm}[h]
+\caption{Triton CSR Kernel Logic (Simplified)}
+\label{alg:triton}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $state\_id, input\_char$
+\STATE $row\_start \leftarrow \textbf{tl.load}(row\_ptr + state\_id)$
+\STATE $row\_end \leftarrow \textbf{tl.load}(row\_ptr + state\_id + 1)$
+\STATE $curr \leftarrow row\_start$
+\WHILE{$curr < row\_end$}
+    \STATE \textit{// Masked Load required for irregular access}
+    \STATE $sym \leftarrow \textbf{tl.load}(data + curr, \textbf{mask}=curr < row\_end)$
+    \STATE $target \leftarrow \textbf{tl.load}(indices + curr, \textbf{mask}=curr < row\_end)$
+    \IF{$sym == input\_char$}
+        \STATE \textbf{tl.atomic\_store}(next\_state, target)
+    \ENDIF
+    \STATE $curr \leftarrow curr + 1$
+\ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{CUDA Implementation (Low-Level)}
+The CUDA kernel implements the \textit{ngAP} (N-Grams Automata Processor) strategy \cite{ngap}. It utilizes a global worklist to balance load and specialized hardware intrinsics.
+As shown in Algorithm \ref{alg:cuda}, we explicitly manage the cache hierarchy using the `\_\_ldg` intrinsic (read-only cache) and reduce global memory contention by aggregating atomic updates at the warp level using `\_\_ballot\_sync`.
+
+\begin{algorithm}[h]
+\caption{CUDA ngAP Kernel Logic (Optimized)}
+\label{alg:cuda}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $worklist$ (Shared Memory / Global)
+\STATE $state\_id \leftarrow \text{pop\_work\_item}(worklist)$
+\STATE \textit{// Read-Only Cache Optimization}
+\STATE $row\_start \leftarrow \textbf{\_\_ldg}(row\_ptr + state\_id)$
+\STATE \FOR{$i \leftarrow row\_start$ \textbf{to} $row\_end$}
+    \STATE $sym \leftarrow \textbf{\_\_ldg}(data + i)$
+    \IF{$sym == input\_char$}
+        \STATE $next \leftarrow \textbf{\_\_ldg}(indices + i)$
+        \STATE \textit{// Warp Aggregation to reduce global atomics}
+        \STATE $vote \leftarrow \textbf{\_\_ballot\_sync}(FULL\_MASK, true)$
+        \IF{lane\_id == \textbf{\_\_ffs}(vote) - 1}
+            \STATE \textbf{atomicAdd}(global\_queue, popc(vote))
+        \ENDIF
+    \ENDIF
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Benchmark Metrics}
+We evaluate performance using the following metrics:
+\begin{itemize}
+    \item \textbf{Kernel Execution Time (ms):} The raw time spent by the GPU to execute the compute kernel.
+    \item \textbf{System Overhead:} The time spent in driver latency, JIT compilation, and data movement, calculated as $T_{Total} - T_{Kernel}$.
+    \item \textbf{Speedup:} Defined as $T_{Triton} / T_{CUDA}$.
+\end{itemize}

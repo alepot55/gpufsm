@@ -1,0 +1,28 @@
+\section{Related Work}\label{sec:soa}
+
+Our research bridges two bodies of literature: high-level GPU programming models and algorithmic optimization of automata processing.
+
+\subsection{High-Level GPU Abstractions}
+
+The complexity of CUDA has driven research into Domain-Specific Languages (DSLs).
+\textbf{Triton}~\cite{triton} simplifies writing high-performance neural network kernels through a tile-based semantics where the compiler manages memory coalescing and shared memory allocation.
+While Tillet et al.\ demonstrated Triton's effectiveness for matrix multiplications, their analysis was confined to dense linear algebra. Our work extends this evaluation to irregular, latency-bound algorithms.
+
+\subsection{Parallel FSM Processing on GPUs}
+
+Mapping Finite State Machines to GPUs is difficult due to sequential data dependencies.
+
+\subsubsection{Speculative Approaches}
+Mytkowicz et al.~\cite{mytkowicz2014} proposed enumeration-based parallelism, speculatively executing the FSM for all possible starting states. While effective on CPUs with SIMD, this approach has high overhead for single-stream processing.
+
+\subsubsection{Memory-Centric Approaches}
+Yaneva et al.~\cite{yaneva2017} analyzed memory layouts for FSM traversal, contrasting CSR against dense Transition Matrices. Our Triton implementation builds on these findings with both Bitmap and CSR variants.
+
+\subsubsection{Worklist-Based Approaches}
+Ge et al.\ proposed \textbf{ngAP}~\cite{ngap}, a non-blocking queue-based architecture using warp-level primitives for load balancing. We include ngAP-inspired implementations as a baseline, showing that the required hardware primitives (\texttt{warp\_shuffle}, fine-grained shared memory) are inexpressible in Triton.
+
+\subsubsection{Bit-Parallel Approaches}
+Recent work has explored bit-parallel methods that transform regex into bitstream programs.
+\textbf{HybridSA}~\cite{hybridsa} (OOPSLA 2024) demonstrated CPU-GPU parallel engines using bit parallelism for NFA simulation, reducing irregular memory accesses.
+\textbf{BitGen}~\cite{bitgen} (MICRO 2025) introduced interleaved bitstream execution, keeping intermediate data in registers rather than global memory. BitGen reports 19.5$\times$ speedup over ngAP by transforming the workload from memory-bound to compute-bound.
+We evaluate BitGen in our benchmark suite to understand how bit-parallel approaches compare to traditional graph-traversal methods across different automata structures.
