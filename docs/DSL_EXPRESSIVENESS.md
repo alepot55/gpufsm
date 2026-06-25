@@ -27,6 +27,14 @@ This is scalar, branch-heavy, scatter-heavy work — the opposite of dense tile/
 | **NVIDIA Warp** | high (Python, **thread-SIMT**) | **Yes** | `warp/multistream` passes (≤64 states, register `uint64`) | Python productivity *and* a thread model that expresses per-state control flow + bit ops |
 | **Triton** | high (Python, **tile/SPMD**) | **Partially** — only as a single unrolled program | `dense`, `bitpacked`, `multistream` pass, but: `return` forbidden in loops (needs a `done`-latch rewrite); int literals truncate to int32 (bit masks must be `int64` scalars); cannot place CSR in shared memory (compiler-owned) | Works but fights the model; no explicit memory-layout control |
 | **Gluon** (Triton experimental low-level) | mid (tile + **explicit layouts/shared mem**) | **No** (for this kernel) | see probe below | Exposes layout/shared-mem control Triton hides, but still tile-only: **no scalar load**, so data-dependent control flow over loaded CSR values is inexpressible |
+
+Update (work-efficient worklist): Triton **can** express the work-efficient active-set
+kernel too — `libdevice.ffs` + a data-dependent `while` loop iterate set bits — and it is
+validated against the oracle. But it still pays **~9× regret vs CUDA** on that kernel
+(CUDA worklist 221–286 Gbps vs Triton worklist 26–29 Gbps at ≤64 states), versus 15.7× on
+the full-scan kernel. So for Triton **expressibility ≠ efficiency**: even when it expresses
+the right algorithm, the tile/SPMD model imposes a large constant penalty on scalar,
+data-dependent automata work. Gluon, by contrast, cannot express it at all.
 | **Tensor-only DSLs** (cuTile/Tile IR, CUTLASS CuTe DSL, ThunderKittens, JAX/Pallas, TileLang) | high (tile/tensor) | **No** | not attempted — dense-tile/tensor-core model; automata scatter/branch must be faked as masked dense ops | Off-axis for irregular automata; discuss in related work, do not benchmark |
 
 ## Gluon probe (concrete evidence)

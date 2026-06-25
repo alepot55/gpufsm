@@ -35,6 +35,7 @@ if _triton_available():  # pragma: no cover - requires GPU
     import torch
     import triton
     import triton.language as tl
+    from triton.language.extra import libdevice
 
     @triton.jit
     def _dense_kernel(
@@ -565,6 +566,186 @@ if _triton_available():  # pragma: no cover - requires GPU
     @register(Backend.TRITON, "multistream")
     def _make_triton_multistream(nfa: NFA, technique: str) -> TritonMultistreamExecutor:
         return TritonMultistreamExecutor(nfa, technique)
+
+    # ------------------------------------------------------------------
+    # Work-efficient WORKLIST technique (≤64 states, scalar int64 working set).
+    # Proof that Triton *can* express the active-set kernel (unlike Gluon): iterate
+    # only set bits via libdevice.ffs in a data-dependent while loop, frontier-based
+    # epsilon-closure. Lets us quantify the abstraction regret on the kernel that
+    # matters (work-efficient), not just the O(n^2) full scan.
+    # ------------------------------------------------------------------
+    TRITON_WORKLIST_MAX_STATES = 64
+
+    @triton.jit
+    def _worklist_kernel(
+        sym_row_ptr,
+        sym_targets,
+        sym_symbols,
+        eps_row_ptr,
+        eps_targets,
+        accept_word,
+        input_data,
+        input_offsets,
+        num_strings,
+        out_flags,
+        out_lens,
+        start_state,
+        ANY_ID: tl.constexpr,
+        USES_ANY: tl.constexpr,
+    ):
+        pid = tl.program_id(0)
+        if pid < num_strings:
+            in_lo = tl.load(input_offsets + pid)
+            input_len = tl.load(input_offsets + pid + 1) - in_lo
+            one = tl.full((), 1, tl.int64)
+            zero = tl.full((), 0, tl.int64)
+
+            cur = one << start_state
+            # frontier epsilon-closure on cur
+            frontier = cur
+            while frontier != zero:
+                newb = zero
+                bits = frontier
+                while bits != zero:
+                    s = libdevice.ffs(bits) - 1
+                    bits = bits & (bits - 1)
+                    for k in range(tl.load(eps_row_ptr + s), tl.load(eps_row_ptr + s + 1)):
+                        newb = newb | (one << tl.load(eps_targets + k))
+                newb = newb & (cur ^ (zero - one))  # newb &= ~cur  (xor -1 == bitwise not)
+                cur = cur | newb
+                frontier = newb
+
+            out_f = 0
+            out_l = 0
+            done = 0
+            if (cur & accept_word) != zero:
+                out_f = 1
+                done = 1
+
+            for pos in range(input_len):
+                if done == 0:
+                    sym = tl.load(input_data + in_lo + pos)
+                    nxt = zero
+                    bits = cur
+                    while bits != zero:
+                        s = libdevice.ffs(bits) - 1
+                        bits = bits & (bits - 1)
+                        for k in range(tl.load(sym_row_ptr + s), tl.load(sym_row_ptr + s + 1)):
+                            tsym = tl.load(sym_symbols + k)
+                            hit = tsym == sym
+                            if USES_ANY:
+                                hit = hit or (tsym == ANY_ID)
+                            if hit:
+                                nxt = nxt | (one << tl.load(sym_targets + k))
+                    # frontier epsilon-closure on nxt
+                    frontier = nxt
+                    while frontier != zero:
+                        newb = zero
+                        bits = frontier
+                        while bits != zero:
+                            s = libdevice.ffs(bits) - 1
+                            bits = bits & (bits - 1)
+                            for k in range(tl.load(eps_row_ptr + s), tl.load(eps_row_ptr + s + 1)):
+                                newb = newb | (one << tl.load(eps_targets + k))
+                        newb = newb & (nxt ^ (zero - one))  # newb &= ~nxt
+                        nxt = nxt | newb
+                        frontier = newb
+                    cur = nxt
+                    if (cur & accept_word) != zero:
+                        out_f = 1
+                        out_l = pos + 1
+                        done = 1
+
+            tl.store(out_flags + pid, out_f)
+            tl.store(out_lens + pid, out_l)
+
+    class TritonWorklistExecutor:
+        """Work-efficient Triton worklist (≤64 states, scalar int64 working set)."""
+
+        def __init__(self, nfa: NFA, technique: str = "worklist") -> None:
+            if nfa.num_states > TRITON_WORKLIST_MAX_STATES:
+                raise ValueError(
+                    f"triton/worklist supports ≤{TRITON_WORKLIST_MAX_STATES} states "
+                    f"(got {nfa.num_states})"
+                )
+            self.nfa = nfa
+            self.technique = technique
+            dev = torch.device("cuda")
+            self._dev = dev
+            self._sym_row_ptr = torch.as_tensor(nfa.sym_row_ptr, device=dev)
+            self._sym_targets = torch.as_tensor(nfa.sym_targets, device=dev)
+            self._sym_symbols = torch.as_tensor(nfa.sym_symbols, device=dev)
+            self._eps_row_ptr = torch.as_tensor(nfa.eps_row_ptr, device=dev)
+            self._eps_targets = torch.as_tensor(nfa.eps_targets, device=dev)
+            acc = 0
+            for s in range(nfa.num_states):
+                if nfa.accept[s]:
+                    acc |= 1 << s
+            self._accept_word = int(acc)
+
+        def run(self, input_bytes: bytes) -> Result:
+            return self.run_batch([input_bytes])[0]
+
+        def run_batch(self, inputs: list[bytes]) -> list[Result]:
+            if not inputs:
+                return []
+            dev = self._dev
+            n = len(inputs)
+            t0 = time.perf_counter()
+            offsets = np.zeros(n + 1, dtype=np.int32)
+            for i, b in enumerate(inputs):
+                offsets[i + 1] = offsets[i] + len(b)
+            data_np = (
+                np.frombuffer(b"".join(inputs), dtype=np.uint8).astype(np.int32)
+                if offsets[-1] > 0
+                else np.zeros(0, dtype=np.int32)
+            )
+            data = torch.as_tensor(data_np, device=dev)
+            off = torch.as_tensor(offsets, device=dev)
+            transfer_ms = (time.perf_counter() - t0) * 1000.0
+
+            flags = torch.zeros(n, dtype=torch.int32, device=dev)
+            lens = torch.zeros(n, dtype=torch.int32, device=dev)
+
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+            start.record()
+            _worklist_kernel[(n,)](
+                self._sym_row_ptr,
+                self._sym_targets,
+                self._sym_symbols,
+                self._eps_row_ptr,
+                self._eps_targets,
+                self._accept_word,
+                data,
+                off,
+                n,
+                flags,
+                lens,
+                int(self.nfa.start_state),
+                ANY_ID=int(ANY_SYMBOL),
+                USES_ANY=bool(self.nfa.uses_any_symbol),
+            )
+            end.record()
+            torch.cuda.synchronize()
+            kernel_ms = float(start.elapsed_time(end))
+
+            flags_h = flags.cpu().numpy()
+            lens_h = lens.cpu().numpy()
+            return [
+                Result(
+                    accepted=bool(flags_h[i]),
+                    match_len=int(lens_h[i]),
+                    kernel_ms=kernel_ms if i == 0 else 0.0,
+                    total_ms=(kernel_ms + transfer_ms) if i == 0 else 0.0,
+                    transfer_ms=transfer_ms if i == 0 else 0.0,
+                )
+                for i in range(n)
+            ]
+
+    @register(Backend.TRITON, "worklist")
+    def _make_triton_worklist(nfa: NFA, technique: str) -> TritonWorklistExecutor:
+        return TritonWorklistExecutor(nfa, technique)
 
 
 register_availability(Backend.TRITON, _triton_available)

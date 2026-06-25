@@ -153,8 +153,13 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   symbol-set classes/ranges/negation/wildcard) + exporter `to_anml`; validato con fixture + round-trip (4 test).
   ⚠️ Manca solo il **download dei dati ANMLZoo reali** (DATASETS vuoto, serve SHA pinnato da mirror fidato — non
   bypassare la safety). Con i dati → numeri su automi reali (forte per i reviewer).
-- TODO rimasti: **worklist Triton** (probabile "can't express" come Gluon, da confermare); **worklist warp/block-parallel**
-  (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità); migrare DRAFT.md → LaTeX; pin SHA ANMLZoo + run suite.
+- ✅ **Worklist Triton FATTO** (≤64 stati): Triton **PUÒ** esprimere il kernel work-efficient via `libdevice.ffs`
+  + while-loop data-dependent (a differenza di Gluon che non ha scalar load). MA paga **~9× di regret vs CUDA**
+  sul kernel work-efficient (cuda 221–286 Gbps, triton 26–29 Gbps), vs 15.7× sul full-scan → **espressività ≠
+  efficienza**: anche esprimendo l'algoritmo giusto, il modello tile/SPMD impone un penalty costante grosso sul
+  lavoro scalare data-dependent. (Finding forte per il paper.)
+- TODO rimasti: **worklist warp/block-parallel** (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità);
+  migrare DRAFT.md → LaTeX; pin SHA ANMLZoo + run suite; aggiungere worklist al sweep/figure.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
   + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
 
