@@ -122,12 +122,31 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   `.venv/bin/pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`.
   ⚠️ `GPUFSM_BUILD_CUDA=ON` come env var NON basta: scikit-build-core legge il define dal pyproject → va
   passato via `--config-settings`.
-- ⚠️ Nota perf/scope: `dense` resta la baseline single-program non ottimizzata (l'esempio di abstraction
-  regret). `bitpacked`/`multistream` sono i primi due assi dell'ablation. Mancano ancora gli assi
-  **global→shared CSR** e **sync→async transfer** (pinned + cudaMemcpyAsync), e una versione
-  **bit-parallela coalescizzata** (thread cooperanti per parola, stile iNFAnt) che è dove il contributo (B)
-  deve battere il multi-stream banale e avvicinarsi a ngAP/CUDA. CUDA bitpacked/multistream limitati a ≤512
-  stati (BITPACKED_MAX_WORDS=8); la suite paper arriva a 500 → ok, ma estendere se serve.
+- **Assi ablation FATTI**: byte→bit (`bitpacked`), single→multi-stream (`multistream`), global→shared CSR
+  (`multistream_shared`), sync→async (`multistream_async`). CUDA limitato a ≤512 stati (BITPACKED_MAX_WORDS=8).
+- **Multi-DSL FATTO**: backend **Warp** (thread-SIMT, ≤64 stati). **Gluon** provato → non esprime il kernel
+  (no scalar load) — `docs/DSL_EXPRESSIVENESS.md`.
+- **Cost model FATTO** (`gpufsm.costmodel` + `scripts/calibrate_costmodel.py` + `paper/data/costmodel_rtx4070.csv`).
+
+### ⚠️ FINDING CHIAVE che riformula la roadmap (vedi `docs/RESULTS_COSTMODEL.md`)
+1. **I kernel attuali sono COMPUTE-bound, non memory-bound.** L'eps-closure è O(n²)/simbolo (n passi × n
+   stati) + scan O(n) → throughput ∝ 1/n². Prova: `multistream_shared` (traffic CSR = 0) **pareggia**
+   `multistream` (traffic > 0) a ogni dimensione. ⇒ In questo regime **il layout di memoria non conta**.
+   Gli assi memory (byte→bit, shared-CSR, async) mordono SOLO con un kernel **work-efficient**
+   (active-set/worklist, stile ngAP) che porti il kernel nel regime memory-bound.
+2. **L'abstraction regret è quantificata e NON è l'altezza dell'astrazione, è il PARADIGMA di esecuzione.**
+   Costo compute vs CUDA (stesso algoritmo): **Triton (tile/SPMD) 15.7×, CUDA 1.0×, Warp (thread-SIMT) 0.62×**
+   (batte la CUDA scritta a mano). Due DSL Python di pari livello agli estremi → conta tile/SPMD vs thread-SIMT.
+
+### TODO prossima sessione (riformulato dai finding)
+- **Priorità #1 per contributo (B): kernel WORK-EFFICIENT** (active-set/worklist, niente full-scan O(n²)).
+  È il prerequisito perché la tesi memory-centric (e gli assi già implementati) mostrino valore: porta il
+  kernel nel regime memory-bound dove byte→bit/shared-CSR/async contano. Poi battere il multistream banale e
+  avvicinarsi a ngAP/CUDA.
+- Profiling Nsight + roofline (task #6) per provare empiricamente compute-bound→memory-bound.
+- Sweep rigoroso multi-tecnica + multi-GPU (task #7), figure (task #9), ANML suite (task #8), paper (task #10).
+- **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
+  + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime). Basta per il preprint.
 
 ### Fatto e verde (CPU) — sessione 1
 - Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,
