@@ -166,10 +166,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - ✅ **`worklist_global` FATTO**: kernel work-efficient con working-set in **global memory**, **nessun cap stati**
   (il register worklist è ≤512). Validato vs oracolo fino a **5000 stati**. register ~4–5× più veloce del global
   a parità n (residency) → altro data point thesis; global è il path di scalabilità per automi ANMLZoo-scale.
-- **Piano settimana (ordine di leva):** (a) ✅ scalare i kernel (worklist_global) → fatto; (b) **dati ANMLZoo reali**:
-  auto-pin SHA da sorgente pubblica fidata (github jackwadden/ANMLZoo), parsare con `io/anml`, girare la suite →
-  numeri su automi reali (forte per reviewer); (c) ottimizzazione occupancy worklist (register pressure); (d) espandere
-  il paper LaTeX a lunghezza piena con risultati reali; (e) opzionale: warp/block-parallel, 2ª GPU (serve hardware).
+- **Piano settimana — progresso (26 giu mattina, ~41 commit su PR #1):**
+  - (a) ✅ `worklist_global` (working-set globale, nessun cap) — validato fino a 42661 stati.
+  - (b) ✅ **suite ANMLZoo reale**: Levenshtein (2787), Hamming (11349, 2.1M tr), Brill (42661, 4.4M tr), tutti
+    puri-STE, SHA auto-pinnati da github jackwadden/ANMLZoo, **GPU(`worklist_global`)==reference**. Fix semantica
+    all-input/start-of-data in `io/anml`. Script `scripts/run_anmlzoo.py` + test gpu network-gated.
+  - (c) ✅ **ottimizzazione occupancy**: `__launch_bounds__(256, NWORDS≤2?6:1)` sul worklist → **170 Gbps @32
+    (era 142), 2× a batch 4096**; neutro sui grandi. Sweep/figure/paper rigenerati (range 15–170 Gbps).
+  - (d) espandere paper LaTeX a lunghezza piena; (e) opzionale: più automi pinnati, block-parallel, 2ª GPU (hardware).
 - Note: il lavoro DEVE girare in questa sessione (GPU locale) → loop ScheduleWakeup, non cron cloud.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
   + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
