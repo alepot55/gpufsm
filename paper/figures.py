@@ -162,6 +162,29 @@ def fig_costmodel_fit(cm: pd.DataFrame) -> None:
     _save(fig, "fig_costmodel_fit")
 
 
+def fig_dfa_memory_bound(dfa: pd.DataFrame) -> None:
+    """DFA (memory-bound face): CUDA/Warp drop as the table crosses L2; Triton stays flat."""
+    sizes = sorted(dfa["num_states"].unique())
+    backends = ["cuda", "warp", "triton"]
+    fig, ax = plt.subplots()
+    width = 0.25
+    for j, be in enumerate(backends):
+        ys = [
+            dfa[(dfa.backend == be) & (dfa.num_states == n)]["throughput_gbps"].iloc[0]
+            for n in sizes
+        ]
+        xs = [i + (j - 1) * width for i in range(len(sizes))]
+        ax.bar(xs, ys, width=width, label=be)
+    ax.set_xticks(range(len(sizes)))
+    ax.set_xticklabels([f"{n}\n({'in L2' if n * 1024 <= 6_000_000 else '>> L2'})" for n in sizes])
+    ax.set_xlabel("DFA states (table size vs 6MB L2)")
+    ax.set_ylabel("Throughput (Gbps)")
+    ax.set_yscale("log")
+    ax.set_title("DFA memory-bound face: CUDA/Warp drop past L2; Triton flat (model-bound)")
+    ax.legend(loc="best")
+    _save(fig, "fig_dfa_memory_bound")
+
+
 def main() -> None:
     sweep = pd.read_csv(DATA / "sweep_techniques.csv")
     fig_throughput_vs_states(sweep)
@@ -170,6 +193,8 @@ def main() -> None:
     fig_abstraction_regret(sweep)
     cm = pd.read_csv(DATA / "costmodel_rtx4070.csv")
     fig_costmodel_fit(cm)
+    dfa = pd.read_csv(DATA / "dfa_regret_rtx4070.csv")
+    fig_dfa_memory_bound(dfa)
     print(f"\nfigures written to {FIGS}")
 
 
