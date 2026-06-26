@@ -106,21 +106,41 @@ a CPU reference oracle, median+CI95 sweeps, and figures regenerated only from ve
 CSVs.
 
 \section{Background}
-NFA simulation maintains an active-state set and, per input symbol, applies the
-transition relation and an epsilon-closure. GPU engines since iNFAnt~\cite{infant} store
-transitions in symbol-indexed / CSR form and represent the active set as a bit-vector.
-The modern frontier---AsyncAP~\cite{asyncap}, ngAP~\cite{ngap} (non-blocking +
-memoization + privatization), HybridSA~\cite{hybridsa} (bit-parallel),
-BitGen~\cite{bitgen} (Parabix bitstreams)---wins by reorganizing or reducing irregular
-memory traffic, yet each frames its contribution as a new algorithm and bundles the
-memory effects in. Hyperscan~\cite{hyperscan} is the CPU baseline; ANMLZoo~\cite{anmlzoo}
-and AutomataZoo are the standard suites. A \emph{DFA} trades the NFA's parallel active set
-for a single dense transition table indexed once per input byte; it is the deterministic,
-\emph{memory-bound} dual of the NFA and the second face we study. Crucially, every GPU
-automata engine above is CUDA-only: \textbf{no prior work compares modern GPU kernel DSLs
-(Triton/Gluon vs CUDA vs Warp) on an irregular workload}---published GPU-DSL benchmarks target
-dense tensor kernels, and no irregular-workload suite exercises these kernel DSLs. We close that
-gap and frame the resulting performance difference as an expressibility cost.
+\textbf{Automata, and their two faces.} An \emph{NFA} maintains a set of active states; per
+input symbol it applies the transition relation (each active state's out-edges labelled by that
+symbol) and then an epsilon-closure (following label-free edges to fixpoint). GPU engines since
+iNFAnt~\cite{infant} store the transitions in CSR form---symbol- and epsilon-edge arrays indexed
+by per-state row pointers---and represent the active set as a bit-vector. The work per symbol is
+data-dependent (which states are active, how many out-edges each has) and scatter-heavy: this is
+the \emph{control-flow-bound} face. A \emph{DFA} is the deterministic dual: a single dense
+transition table $T[\textit{state},\textit{symbol}]$ ($n\times256$) with no active set, walked by
+one random gather $T[s\!\cdot\!256+c]$ per input byte. For large $n$ the table exceeds cache, so
+the DFA is the \emph{memory-bound} face. The two faces stress disjoint hardware limits, which is
+why we study both. We use the standard ANMLZoo~\cite{anmlzoo}/AutomataZoo benchmark families;
+Hyperscan~\cite{hyperscan} is the CPU baseline.
+
+\textbf{GPU automata engines} from iNFAnt to AsyncAP~\cite{asyncap}, ngAP~\cite{ngap}
+(non-blocking + memoization + privatization), HybridSA~\cite{hybridsa} (bit-parallel),
+BitGen~\cite{bitgen} (Parabix bitstreams) and ANG~\cite{ang} win by reorganizing or reducing
+irregular memory traffic---each a new \emph{algorithm}, hand-written in CUDA, that bundles the
+memory effects in. None isolates what a programming \emph{abstraction} costs.
+
+\textbf{Two GPU execution paradigms} (the axis we study). A \emph{thread-SIMT} DSL (CUDA, and
+NVIDIA Warp) is written from one thread's point of view: scalars, data-dependent branches,
+per-thread loops, bit manipulation and a register-resident working set are all native, so the
+NFA's per-state traversal maps directly. A \emph{tile-SPMD} DSL (Triton, and its low-level
+frontend Gluon) operates on whole \emph{tiles} (blocks) of data, with the compiler owning the
+intra-tile layout and thread mapping; this is ideal for dense, uniform tensor algebra but a
+per-element scalar gather or a data-dependent inner loop must be emulated, not expressed.
+Crucially, \emph{abstraction height} (how much the DSL hides) is \emph{orthogonal} to the
+paradigm: Warp is high-level yet thread-SIMT, while Gluon is low-level yet tile-SPMD. Our $2\times2$
+study exploits exactly this orthogonality to separate the two candidate causes of the regret.
+
+\textbf{The gap.} Every GPU automata engine above is CUDA-only, and \textbf{no prior work
+compares modern GPU kernel DSLs (Triton/Gluon vs CUDA vs Warp) on an irregular workload}:
+published GPU-DSL benchmarks target dense tensor kernels, and no irregular-workload suite
+exercises these kernel DSLs. We close that gap and frame the resulting difference as an
+expressibility cost.
 
 \section{Abstraction regret and the cost model}\label{sec:cost}
 We model per-symbol time as a roofline-style sum:
@@ -547,11 +567,24 @@ never the bottleneck. The remaining gap to SOTA absolute throughput (ngAP-class)
 processing---not memory residency or worklist representation. That is the next step.
 
 \section{Conclusion}
-For irregular automata the GPU-DSL promise breaks along a measurable axis we call
-abstraction regret, governed by expressibility---of memory layout and, more sharply here,
-of data-dependent control flow---not by abstraction height. The memory-organization thesis
-holds, but only once the algorithm is work-efficient enough to be memory-bound, which our
-worklist engine achieves.
+On irregular automata the GPU-DSL promise breaks along a measurable axis we call
+\emph{abstraction regret}: the performance a DSL forecloses at a fixed algorithm. Across the two
+faces of automata---the control-flow-bound NFA and the memory-bound DFA---the regret is large for
+tile-SPMD DSLs (Triton $6$--$8\times$) and absent for thread-SIMT ones (Warp $\le$1$\times$). A
+$2\times2$ (height $\times$ paradigm) factorial localizes the cause to the \emph{execution
+paradigm}, not abstraction height; a controlled same-stack Triton$\leftrightarrow$Gluon pair and a
+within-Triton $16\times$ tile-vs-scalar cliff make that attribution causal and rule out tuning; and
+both faces reduce to a \emph{single} missing IR primitive.
+
+The takeaway is constructive and actionable. ``Abstraction regret'' is not an argument against
+high-level GPU DSLs---Warp shows a high-level DSL can match hand CUDA on exactly this irregular
+workload---but a diagnosis with a falsifiable, named cure: \textbf{give a tile/SPMD IR a
+first-class scalar gather within a tile} (and the data-dependent loop it implies), and our map
+predicts the regret on \emph{both} the control-flow and memory faces should collapse. The method
+generalizes beyond automata: hold the algorithm fixed, vary the DSL across a controlled pair, and
+attribute the residual to a named, missing primitive. We release the framework, oracle, kernels,
+and versioned data so the prediction can be tested as such a primitive lands---and so the same
+diagnosis can be run on the next irregular workload.
 
 \section*{Artifact availability}
 All code, the CPU reference oracle, the versioned result CSVs, and the figure generator are
