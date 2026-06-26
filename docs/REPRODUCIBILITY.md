@@ -56,6 +56,10 @@ gpufsm verify             # cross-backend agreement on the example suite (0 fail
 | DSL expressibility (CUDA/Warp express; Triton strains; Gluon cannot) | `python scripts/gluon_probe.py` (falsifiable: exits 0 on expected compile-failure, 1 if Gluon ever compiles it) | `docs/DSL_EXPRESSIVENESS.md` |
 | DFA memory-bound L2 knee (CUDA peaks ~6MB then ~2.4x drop; Triton flat) | `python scripts/sweep_dfa.py` | `paper/data/dfa_regret_rtx4070.csv`, `fig_dfa_memory_bound` |
 | Block-parallel warp worklist 3-9x vs single-thread (real automata, saturating batch; batch-dependent) | `python scripts/bench_worklist_warp.py` | `paper/data/worklist_warp{,_batch}_rtx4070.csv` |
+| CAUSAL: scalar-control cliff in Triton (tile 1320 vs scalar ~81 Gbps = 16x) | `python scripts/ablate_scalar_control.py` | `paper/data/scalar_ablation_rtx4070.csv` |
+| Regret is multi-seed robust (Triton 7.1x med, Warp 0.85x med; 5 seeds x 3 sizes) | `python scripts/regret_multiseed.py` | `paper/data/regret_multiseed_rtx4070.csv` |
+| Real-automata throughput (warp 1.4-27x over single-thread; absolute low = SOTA gap) | (measured on the 6 pinned families) | `paper/data/real_automata_throughput_rtx4070.csv` |
+| Shared-mem working-set is inert vs warp (0.99-1.10x => layout not the bottleneck) | `python scripts/bench_worklist_shared.py` | `paper/data/worklist_shared_rtx4070.csv` |
 
 Figures depend **only** on committed CSVs, so the paper rebuilds deterministically. The
 sweep/calibration scripts skip unsupported (backend, technique, size) cells (e.g. Triton/Warp
