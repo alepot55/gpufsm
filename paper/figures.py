@@ -163,24 +163,22 @@ def fig_costmodel_fit(cm: pd.DataFrame) -> None:
 
 
 def fig_dfa_memory_bound(dfa: pd.DataFrame) -> None:
-    """DFA (memory-bound face): CUDA/Warp drop as the table crosses L2; Triton stays flat."""
-    sizes = sorted(dfa["num_states"].unique())
+    """DFA (memory-bound face): CUDA/Warp peak at the L2 size then drop as the table
+    crosses L2; Triton stays flat (scalar-gather-bound, never reaching the memory regime).
+    Line plot over a fine table-size grid makes the L2 knee visible."""
     backends = ["cuda", "warp", "triton"]
+    markers = {"cuda": "o", "warp": "s", "triton": "^"}
     fig, ax = plt.subplots()
-    width = 0.25
-    for j, be in enumerate(backends):
-        ys = [
-            dfa[(dfa.backend == be) & (dfa.num_states == n)]["throughput_gbps"].iloc[0]
-            for n in sizes
-        ]
-        xs = [i + (j - 1) * width for i in range(len(sizes))]
-        ax.bar(xs, ys, width=width, label=be)
-    ax.set_xticks(range(len(sizes)))
-    ax.set_xticklabels([f"{n}\n({'in L2' if n * 1024 <= 6_000_000 else '>> L2'})" for n in sizes])
-    ax.set_xlabel("DFA states (table size vs 6MB L2)")
+    for be in backends:
+        sub = dfa[dfa.backend == be].sort_values("num_states")
+        mb = sub["table_kb"].to_numpy() / 1024.0  # table size in MB
+        ax.plot(mb, sub["throughput_gbps"], marker=markers[be], label=be)
+    ax.axvline(6.0, color="0.5", ls="--", lw=1)
+    ax.text(6.0, ax.get_ylim()[1] * 0.96, " 6 MB L2", color="0.4", va="top", fontsize=8)
+    ax.set_xscale("log")
+    ax.set_xlabel("DFA transition-table size (MB, log scale)")
     ax.set_ylabel("Throughput (Gbps)")
-    ax.set_yscale("log")
-    ax.set_title("DFA memory-bound face: CUDA/Warp drop past L2; Triton flat (model-bound)")
+    ax.set_title("DFA memory-bound face: CUDA/Warp peak at L2 then drop; Triton flat")
     ax.legend(loc="best")
     _save(fig, "fig_dfa_memory_bound")
 

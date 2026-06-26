@@ -384,6 +384,176 @@ __global__ void worklist_global_kernel(
     out_flags[i] = out_f; out_lens[i] = out_l;
 }
 
+// ---- Block-parallel (warp-per-string) work-efficient worklist ----------------------
+// One *warp* (32 lanes) cooperates on one string instead of one thread. The 32 lanes
+// partition the nwords words of the working set (lane handles words w with w%32==lane);
+// cross-word transition/epsilon scatter uses atomicOr into the shared global next-set.
+// Rationale: the 1-thread/string worklist under-utilizes the GPU at small batch (Nsight:
+// 17% occupancy, 2 blocks) and issues one string's loads serially. A warp spreads those
+// loads across 32 lanes -> more memory-level parallelism, the path toward the memory-bound
+// regime for large (ANMLZoo-scale) automata. Same latch-first-match verdict as the oracle.
+
+// Warp-cooperative frontier epsilon-closure over a GLOBAL bitset. All 32 lanes active.
+__device__ __forceinline__ void eps_closure_warp(
+    unsigned long long* S, unsigned long long* F, unsigned long long* B, int nwords,
+    const int* eps_row_ptr, const int* eps_targets, int lane) {
+    for (int w = lane; w < nwords; w += 32) F[w] = S[w];
+    __syncwarp();
+    bool any = true;
+    while (any) {
+        for (int w = lane; w < nwords; w += 32) B[w] = 0ULL;
+        __syncwarp();
+        for (int w = lane; w < nwords; w += 32) {
+            unsigned long long b = F[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
+                    int t = eps_targets[k];
+                    atomicOr(&B[t >> 6], (1ULL << (t & 63)));
+                }
+            }
+        }
+        __syncwarp();
+        int any_local = 0;
+        for (int w = lane; w < nwords; w += 32) {
+            unsigned long long nb = B[w] & ~S[w];
+            S[w] |= nb;
+            F[w] = nb;
+            if (nb) any_local = 1;
+        }
+        any = __any_sync(0xffffffffu, any_local) != 0;
+        __syncwarp();
+    }
+}
+
+__global__ void worklist_warp_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int start_state, int uses_any, int nwords,
+    unsigned long long* cur, unsigned long long* nxt,
+    unsigned long long* frontier, unsigned long long* newb,
+    int* out_flags, int* out_lens) {
+    int warp = (blockIdx.x * blockDim.x + threadIdx.x) >> 5;
+    int lane = threadIdx.x & 31;
+    if (warp >= num_strings) return;
+    size_t off = (size_t)warp * nwords;
+    unsigned long long* C = cur + off;
+    unsigned long long* N = nxt + off;
+    unsigned long long* F = frontier + off;
+    unsigned long long* B = newb + off;
+    const int* input_symbols = input_data + input_offsets[warp];
+    int input_len = input_offsets[warp + 1] - input_offsets[warp];
+
+    for (int w = lane; w < nwords; w += 32) C[w] = 0ULL;
+    __syncwarp();
+    if (lane == 0) C[start_state >> 6] |= (1ULL << (start_state & 63));
+    __syncwarp();
+    eps_closure_warp(C, F, B, nwords, eps_row_ptr, eps_targets, lane);
+
+    int out_f = 0, out_l = 0, done = 0, acc_local = 0;
+    for (int w = lane; w < nwords; w += 32) if (C[w] & accept_words[w]) acc_local = 1;
+    if (__any_sync(0xffffffffu, acc_local)) { out_f = 1; out_l = 0; done = 1; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        for (int w = lane; w < nwords; w += 32) N[w] = 0ULL;
+        __syncwarp();
+        for (int w = lane; w < nwords; w += 32) {
+            unsigned long long b = C[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                    int tsym = sym_symbols[k];
+                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                        int t = sym_targets[k];
+                        atomicOr(&N[t >> 6], (1ULL << (t & 63)));
+                    }
+                }
+            }
+        }
+        __syncwarp();
+        eps_closure_warp(N, F, B, nwords, eps_row_ptr, eps_targets, lane);
+        for (int w = lane; w < nwords; w += 32) C[w] = N[w];
+        __syncwarp();
+        int m_local = 0;
+        for (int w = lane; w < nwords; w += 32) if (C[w] & accept_words[w]) m_local = 1;
+        if (__any_sync(0xffffffffu, m_local)) { out_f = 1; out_l = pos + 1; done = 1; }
+    }
+    if (lane == 0) { out_flags[warp] = out_f; out_lens[warp] = out_l; }
+}
+
+// ---- Shared-memory block-cooperative worklist -------------------------------------
+// Same warp-per-string scheme as worklist_warp, but the per-string working set
+// (cur/nxt/frontier/newb, 4*nwords words) lives in DYNAMIC SHARED memory instead of
+// global. This privatizes the working-set traffic the warp kernel issues to global:
+// a test of whether memory-layout privatization helps once the kernel is work-efficient
+// (it did NOT in the compute-bound full-scan regime; see multistream_shared). Requires
+// warps_per_block * 4 * nwords * 8 bytes of shared memory; the launcher picks
+// warps_per_block to fit 48 KB and the technique is only offered when 1 warp/block fits.
+__global__ void worklist_shared_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int start_state, int uses_any, int nwords,
+    int* out_flags, int* out_lens) {
+    extern __shared__ unsigned long long wl_smem[];
+    int warps_per_block = blockDim.x >> 5;
+    int warp_in_block = threadIdx.x >> 5;
+    int lane = threadIdx.x & 31;
+    int warp = blockIdx.x * warps_per_block + warp_in_block;
+    if (warp >= num_strings) return;
+    unsigned long long* base = wl_smem + (size_t)warp_in_block * 4 * nwords;
+    unsigned long long* C = base;
+    unsigned long long* N = base + nwords;
+    unsigned long long* F = base + 2 * nwords;
+    unsigned long long* B = base + 3 * nwords;
+    const int* input_symbols = input_data + input_offsets[warp];
+    int input_len = input_offsets[warp + 1] - input_offsets[warp];
+
+    for (int w = lane; w < nwords; w += 32) C[w] = 0ULL;
+    __syncwarp();
+    if (lane == 0) C[start_state >> 6] |= (1ULL << (start_state & 63));
+    __syncwarp();
+    eps_closure_warp(C, F, B, nwords, eps_row_ptr, eps_targets, lane);
+
+    int out_f = 0, out_l = 0, done = 0, acc_local = 0;
+    for (int w = lane; w < nwords; w += 32) if (C[w] & accept_words[w]) acc_local = 1;
+    if (__any_sync(0xffffffffu, acc_local)) { out_f = 1; out_l = 0; done = 1; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        for (int w = lane; w < nwords; w += 32) N[w] = 0ULL;
+        __syncwarp();
+        for (int w = lane; w < nwords; w += 32) {
+            unsigned long long b = C[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                    int tsym = sym_symbols[k];
+                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                        int t = sym_targets[k];
+                        atomicOr(&N[t >> 6], (1ULL << (t & 63)));
+                    }
+                }
+            }
+        }
+        __syncwarp();
+        eps_closure_warp(N, F, B, nwords, eps_row_ptr, eps_targets, lane);
+        for (int w = lane; w < nwords; w += 32) C[w] = N[w];
+        __syncwarp();
+        int m_local = 0;
+        for (int w = lane; w < nwords; w += 32) if (C[w] & accept_words[w]) m_local = 1;
+        if (__any_sync(0xffffffffu, m_local)) { out_f = 1; out_l = pos + 1; done = 1; }
+    }
+    if (lane == 0) { out_flags[warp] = out_f; out_lens[warp] = out_l; }
+}
+
 // Multi-stream technique — single->multi-stream ablation axis.
 // One thread per input string (blockIdx.x*blockDim.x+threadIdx.x); strings run
 // concurrently across the SMs. Read-only CSR shared by all threads, in GLOBAL memory.
@@ -998,6 +1168,131 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global
     return {flags, lens, kernel_ms};
 }
 
+// Block-parallel (warp-per-string) worklist — same global working set as run_worklist_global,
+// but launches 32 lanes per string. Returns (flags, lens, kernel_ms).
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_warp(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    unsigned long long *d_cur, *d_nxt, *d_fr, *d_nb;
+    size_t ws = sizeof(unsigned long long) * (size_t)(num_strings ? num_strings : 1) * nwords;
+    CUDA_CHECK(cudaMalloc(&d_cur, ws)); CUDA_CHECK(cudaMalloc(&d_nxt, ws));
+    CUDA_CHECK(cudaMalloc(&d_fr, ws)); CUDA_CHECK(cudaMalloc(&d_nb, ws));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256;  // 8 warps/block
+        int blocks = (num_strings * 32 + threads - 1) / threads;
+        worklist_warp_kernel<<<blocks, threads>>>(
+            d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off, num_strings,
+            start_state, uses_any, nwords, d_cur, d_nxt, d_fr, d_nb, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_fr); cudaFree(d_nb);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
+// Shared-memory block-cooperative worklist. Working set in dynamic shared memory; the
+// launcher picks warps_per_block so warps_per_block*4*nwords*8 fits 48 KB. Raises if even
+// one warp's working set (4*nwords*8 bytes) exceeds 48 KB. Returns (flags, lens, kernel_ms).
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_shared(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+    const size_t SMEM_CAP = 48 * 1024;  // bytes
+    size_t per_warp = (size_t)4 * nwords * sizeof(unsigned long long);
+    if (per_warp > SMEM_CAP) {
+        throw std::runtime_error(
+            "worklist_shared: working set (" + std::to_string(per_warp) +
+            " B) exceeds 48 KB shared memory; use worklist_warp/worklist_global for "
+            "num_states > ~1536.");
+    }
+    int warps_per_block = 1;
+    while (warps_per_block < 8 && (warps_per_block + 1) * per_warp <= SMEM_CAP) warps_per_block++;
+    int threads = warps_per_block * 32;
+    size_t shared_bytes = (size_t)warps_per_block * per_warp;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int blocks = (num_strings + warps_per_block - 1) / warps_per_block;
+        worklist_shared_kernel<<<blocks, threads, shared_bytes>>>(
+            d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off, num_strings,
+            start_state, uses_any, nwords, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
 // DFA simulation — the MEMORY-bound automata workload. One thread per string walks a
 // dense transition table: cur = trans[cur*256 + symbol] per byte (a random global lookup;
 // for large DFAs the table exceeds cache -> memory-bound). latch-first-match.
@@ -1084,6 +1379,12 @@ PYBIND11_MODULE(_cuda, m) {
     m.def("run_worklist_global", &run_worklist_global,
           "Work-efficient worklist with a global working set — no state-count cap; "
           "returns (flags, lens, kernel_ms).");
+    m.def("run_worklist_warp", &run_worklist_warp,
+          "Block-parallel (warp-per-string) work-efficient worklist; no state-count cap; "
+          "returns (flags, lens, kernel_ms).");
+    m.def("run_worklist_shared", &run_worklist_shared,
+          "Shared-memory block-cooperative worklist (working set in dynamic shared mem; "
+          "num_states up to ~1536); returns (flags, lens, kernel_ms).");
     m.def("run_dfa", &run_dfa,
           "DFA simulation (dense transition-table lookup per byte, memory-bound); "
           "returns (flags, lens, kernel_ms).");

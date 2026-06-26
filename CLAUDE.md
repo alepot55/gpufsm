@@ -95,7 +95,39 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] AUDIT COST-MODEL + typografia + artifact statement.** (a) Claim "<1% error at
+- **[Iter più recente] #2 DEEP CONCLUSO (shared-mem worklist) — finding onesto.** `worklist_shared`:
+  working set in shared memory dinamica (warps/block adattivo per stare in 48KB; ≤1536 stati), vs il global
+  di `worklist_warp`. Validato == warp bit-for-bit (9 test verdi). **FINDING:** shared **pareggia** warp
+  (0.99–1.10×, `paper/data/worklist_shared_rtx4070.csv`) → una volta che il kernel è work-efficient il
+  **layout del working-set NON è più il collo di bottiglia** (specchia il risultato compute-bound
+  `multistream_shared`); il gap residuo verso SOTA assoluto (ngAP-class) è **algoritmico** (memoization/
+  non-blocking), non residency. Documentato in Implementation+Limitations. ⇒ #2 chiuso onestamente (warp 3-9× @batch saturante
+  è la vera vincita; ngAP-style memoization sarebbe "competere con SOTA", fuori scope = positioning non benchmark).
+  **STATO: #2,#3,#4,#5 TUTTI FATTI. Resta solo #1 (2ª GPU) che richiede hardware dall'utente.**
+- **[Iter -1] #5 (AE packaging) + #4 (SOTA table) FATTI.** #5: `docs/ARTIFACT_APPENDIX.md`
+  (SIGPLAN-style check-list/install/claims→commands→expected + piano Zenodo-DOI-al-release), `CITATION.cff`
+  arricchito (titolo two-faces, abstract, keywords), `REPRODUCIBILITY.md` aggiornato (6 famiglie non 2, .tex
+  canonico non "migration pending", +righe DFA-sweep/warp-speedup), Artifact Availability nel .tex punta
+  all'appendix. #4: tabella positioning SOTA (iNFAnt/AsyncAP/ngAP/HybridSA/BitGen) in related work — ESPLICITO
+  che le cifre sono speedup sul LORO baseline/hardware (NON comparabili in Gbps assoluti), tutti algoritmi
+  CUDA-only, il nostro asse (espressività DSL, algoritmo fisso) è ortogonale; match ngAP-class = future work.
+  6 famiglie reali già bastano → non aggiunte altre (SPM 100k/24M troppo lento all'oracolo, marginale). Paper
+  5pp pulito. RESTA: #2 deep (shared-mem block-cooperative per throughput assoluto SOTA), #1 (2ª GPU) dopo.
+- **[Iter -1] #2 KERNEL BLOCK-PARALLEL FATTO (warp-per-string worklist).** `worklist_warp`:
+  un warp (32 lane) per stringa; le lane partizionano le parole di stato e scatterano transizioni/eps-closure
+  via `atomicOr` nel next-set globale condiviso, con `__any_sync` per frontier-empty/accept. Risolve la
+  sotto-utilizzazione del worklist 1-thread su automi grandi. Validato bit-for-bit vs oracle (1252 stringhe,
+  0 mismatch) + == worklist_global su NFA >64 stati (`tests/test_worklist_warp.py`, 5 verdi). Bench
+  (`scripts/bench_worklist_warp.py`): ⚠️ **speedup BATCH-DEPENDENTE (audit 26 giu).** A batch saturante (4096
+  stringhe, GPU piena): **real automi 3-9×** (levenshtein 3.7×, fermi 3.1×, brill 8.9×), sintetici densi ~12×.
+  A batch piccolo (256) saliva a 12-180× perché global 1-thread non riempie la GPU → il 12-17× iniziale era un
+  artefatto di batch. Il numero ONESTO/conservativo = 3-9× @batch saturante. CSV: `worklist_warp_rtx4070.csv`
+  (+ `worklist_warp_batch_rtx4070.csv` documenta la sensibilità al batch). Driver = densità active-set × words,
+  non size. Paper (Implementation+Limitations) corretto a 3-9×. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
+  + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
+- **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).
+- **[Iter -2] AUDIT COST-MODEL + typografia + artifact statement.** (a) Claim "<1% error at
   large n" era sovrastimato: errore reale predicted-vs-measured = **<1% solo a n=256** (CUDA 0.3%, Triton
   0.6%), ~2%(CUDA)/~13%(Triton) a n=128, 20–60% a n=32/64 (launch overhead). Warp fit esatto = 2pt/2par
   (non è segnale di qualità). Prosa riconciliata in .tex/DRAFT/RESULTS_COSTMODEL/PROFILING. (b) 3 tabelle
@@ -166,10 +198,12 @@ capability-vs-costo** su 2 workload × spettro DSL (CUDA/Triton/Gluon/Warp). Pia
 il paper attorno alle due facce + tabella capability. Aumentare gradualmente, tutto a discrezione.
 - **Progresso v2:** ✅ DFA core + oracolo + `dfa_api` (cpu/cuda/triton/warp); ✅ kernel DFA **CUDA/Triton/Warp**
   tutti validati vs oracolo; ✅ regret memory-bound misurato + figura (`paper/data/dfa_regret_rtx4070.csv`,
-  `fig_dfa_memory_bound`). **Risultati two-faces:** DFA memory-bound — cuda 443→213 Gbps (cala oltre L2), warp
-  147→107 (regret 2–3×), **triton ~29 flat** (non raggiunge il regime memory-bound, model-bound). Quindi Triton
-  paga regret grosso su ENTRAMBE le facce (NFA control-flow 9–15× + DFA memory 7–15×) → **è il modello tile/SPMD,
-  non il workload**; Warp (thread) vicino a CUDA su entrambe. 43 test verdi.
+  `fig_dfa_memory_bound`). **Risultati two-faces (sweep fine 1–100 MB, `scripts/sweep_dfa.py`):** DFA memory-bound —
+  cuda **picco 345 Gbps esattamente a 6 MB (= L2) → crolla 2.4× a plateau DRAM ~150–175 Gbps**, warp stessa forma
+  a metà (160→97), **triton piatto 29–32 Gbps** su tutto il range (non raggiunge mai il regime memory-bound).
+  Regret DFA: triton 5–12× (max dove cuda picca a L2), warp 1.5–2.2×. Quindi Triton paga regret su ENTRAMBE le
+  facce (NFA control-flow 6–8×/10× fit + DFA memory 5–12×) → **è il modello tile/SPMD, non il workload**; Warp
+  (thread) vicino a CUDA su entrambe. Figura ora è una CURVA col knee L2 visibile (line plot, non più 2 punti).
 ### 🎯 META-OBIETTIVO (utente, 26 giu): UNICA cosa che conta = **pubblicazione al venue più alto possibile**.
 Ragionare/agire da ricercatore autonomo verso quello; cambiare scope/esperimenti/direzione liberamente; niente
 validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (vedi `docs/NOVELTY_POSITIONING.md`):
