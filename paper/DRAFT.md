@@ -98,7 +98,11 @@ so comparisons are apples-to-apples. Correctness is gated against a CPU referenc
   O(active), no O(n²)). A `worklist_global` variant keeps the working set in global memory
   (dynamic word count), removing the 512-state register cap so the engine scales to
   ANMLZoo-sized automata (thousands of states); register residency costs it ~4–5× vs the
-  capped register kernel — itself a memory-layout data point.
+  capped register kernel — itself a memory-layout data point. A **`worklist_warp`** variant is
+  *block-parallel*: one warp per string, the 32 lanes partition the state-words and scatter
+  transitions via `atomicOr`, spreading one string's loads across the warp — 12–17× faster
+  than the single-thread global kernel on real ANMLZoo automata (up to ~165× on dense
+  synthetic NFAs; `paper/data/worklist_warp_rtx4070.csv`).
 - **Triton**: `dense`, `bitpacked`, `multistream`. The tile/SPMD model forbids `return`
   inside loops (forcing a done-latch rewrite) and truncates integer literals to 32 bits
   (bit masks must be int64 scalars); it cannot place the CSR in shared memory.
@@ -242,9 +246,11 @@ irregular workload.
   reading; and (ii) the absolute regret factors (cost-model constants are fits that may
   rescale). The whole sweep regenerates from one command, so it is a re-run, not a
   re-implementation.
-- The worklist kernel is one thread/string; a cooperative warp/block-parallel version
-  (iNFAnt/ngAP-style) is needed to approach SOTA absolute throughput and to make the memory
-  axes bite — this is the path for contribution (B) to land at MICRO/ASPLOS strength.
+- The single-thread worklist under-utilizes the GPU on large automata; the **`worklist_warp`**
+  block-parallel kernel (one warp/string, 32 lanes partitioning the state-words) addresses this
+  — 12–17× faster on real ANMLZoo automata (up to ~165× on dense synthetic NFAs). Closing the
+  remaining gap to SOTA absolute throughput (ngAP-class) is the next step: a block-cooperative
+  active-set with shared-memory frontier privatization — the path for (B) to land at MICRO/ASPLOS strength.
 - Nsight Compute counters are admin-gated on the test host (`docs/PROFILING.md`); the
   compute-bound claim is established by controlled ablation instead, with counters as
   confirmatory follow-up.

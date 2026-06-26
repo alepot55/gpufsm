@@ -119,9 +119,13 @@ executable spec.
 words), \texttt{multistream} (one thread/string), \texttt{multistream\_shared} (CSR staged
 in shared memory---a layout Triton cannot express), \texttt{multistream\_async} (pinned +
 streamed overlap), and \texttt{worklist} (active-bit iteration via \texttt{\_\_ffsll} +
-frontier eps-closure; $O(\text{active})$, no $O(n^2)$), and \texttt{worklist\_global}
+frontier eps-closure; $O(\text{active})$, no $O(n^2)$), \texttt{worklist\_global}
 (global working set, dynamic word count, no 512-state cap --- scales to ANMLZoo-sized
-automata; register residency costs $\sim$4--5$\times$ vs the capped kernel).
+automata; register residency costs $\sim$4--5$\times$ vs the capped kernel), and
+\texttt{worklist\_warp} (\emph{block-parallel}: one warp per string, the 32 lanes partition
+the state-words and scatter transitions via \texttt{atomicOr}---it spreads one string's loads
+across the warp, $12$--$17\times$ faster than the single-thread global kernel on real
+ANMLZoo automata, \S\ref{sec:results}).
 \textbf{Triton}: \texttt{dense}, \texttt{bitpacked}, \texttt{multistream},
 \texttt{worklist} ($\le 64$ states, via \texttt{libdevice.ffs} + a data-dependent
 \texttt{while} loop). \textbf{Warp}: \texttt{multistream} (thread-SIMT Python).
@@ -340,9 +344,13 @@ DFA memory-bound knee, which should shift to a larger table size on a bigger L2 
 falsifiable prediction of the memory-bound reading); and (ii) the absolute regret factors,
 since the per-backend cost-model constants are fits that may rescale. The entire sweep
 regenerates from one command, so the second-GPU run is a re-run, not a re-implementation.
-\emph{Kernel.} The worklist is one thread/string and, at small batches, under-utilizes the
-GPU (Nsight: 17\% occupancy, 2 blocks); a cooperative warp/block-parallel version is the path
-to SOTA absolute throughput when streams are few.
+\emph{Kernel.} The single-thread worklist under-utilizes the GPU on large automata (one
+string's many state-words processed serially; Nsight: 17\% occupancy). Our
+\texttt{worklist\_warp} kernel (one warp/string, 32 lanes partitioning the words) addresses
+this and is $12$--$17\times$ faster on real ANMLZoo automata (up to $\sim$165$\times$ on dense
+synthetic NFAs where the single-thread kernel degenerates; \texttt{paper/data/worklist\_warp\_rtx4070.csv}).
+Closing the remaining gap to SOTA absolute throughput (ngAP-class) is the next step: a
+block-cooperative active-set with shared-memory frontier privatization.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call
