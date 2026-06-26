@@ -102,9 +102,20 @@ def load_anml(path: str | Path) -> NFA:
 
     symset = {ste.get("id"): parse_symbol_set(ste.get("symbol-set", "*")) for ste in stes}
 
+    # Three synthetic start states encode ANML's two start modes correctly:
+    #   q_root (the NFA start) eps-> q_all and q_first.
+    #   q_all has a self-loop on ANY symbol, so it stays active at EVERY position ->
+    #     it seeds `all-input` STEs each step (an all-input STE may match anywhere).
+    #   q_first has no self-loop, so it is active only at position 0 -> it seeds
+    #     `start-of-data` STEs once (they may match only at the start of the input).
     b = NFABuilder()
-    start = b.add_state()
-    b.set_start(start)
+    q_root = b.add_state()
+    q_all = b.add_state()
+    q_first = b.add_state()
+    b.set_start(q_root)
+    b.add_epsilon(q_root, q_all)
+    b.add_epsilon(q_root, q_first)
+    b.add_transition(q_all, ANY_SYMBOL, q_all)  # persists every position
     ste_state = {ste.get("id"): b.add_state() for ste in stes}
 
     def add_edges_into(target_id: str, src_state: int) -> None:
@@ -117,8 +128,10 @@ def load_anml(path: str | Path) -> NFA:
             continue
         st = ste_state[sid]
         start_attr = (ste.get("start") or "none").lower()
-        if start_attr in ("start-of-data", "all-input"):
-            add_edges_into(sid, start)
+        if start_attr == "all-input":
+            add_edges_into(sid, q_all)
+        elif start_attr == "start-of-data":
+            add_edges_into(sid, q_first)
         for child in ste:
             t = _local(child.tag)
             if t == "activate-on-match":

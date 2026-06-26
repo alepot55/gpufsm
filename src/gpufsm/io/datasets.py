@@ -21,9 +21,19 @@ class Dataset:
     sha256: str
 
 
-# Known datasets. SHA-256 values must be filled in from a trusted mirror before
-# enabling automated download of the large suite (left empty = download disabled).
-DATASETS: dict[str, Dataset] = {}
+# Known datasets — SHA-256 pinned from the public ANMLZoo repo (a trusted academic
+# mirror, jackwadden/ANMLZoo). Each is a homogeneous ANML automaton loadable via
+# gpufsm.io.anml. Add more entries (with their pinned SHA) as needed.
+_ANMLZOO = "https://raw.githubusercontent.com/jackwadden/ANMLZoo/master"
+DATASETS: dict[str, Dataset] = {
+    # Levenshtein edit-distance automaton (k=24, 20x3): 2784 STEs, pure homogeneous,
+    # all-input start states. Smallest ANMLZoo .anml; validated GPU==reference on it.
+    "levenshtein": Dataset(
+        name="levenshtein_24_20x3.1chip.anml",
+        url=f"{_ANMLZOO}/Levenshtein/anml/24_20x3.1chip.anml",
+        sha256="8d6ec59d7c57a6e41112f90c244b5c393ff71124df8062ab025c8f243f6a7370",
+    ),
+}
 
 
 def sha256_file(path: str | Path, chunk: int = 1 << 20) -> str:
