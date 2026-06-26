@@ -1,0 +1,7 @@
+backend,num_states,table_kb,throughput_gbps,gpu,note
+cuda,4096,4096,442.8,RTX4070,table fits L2 (6MB)
+triton,4096,4096,28.8,RTX4070,flat -- scalar-chain limited not memory-bound
+warp,4096,4096,147.1,RTX4070,
+cuda,50000,50000,213.2,RTX4070,table >> L2 -- memory-bound drop
+triton,50000,50000,28.6,RTX4070,flat (29 Gbps) regardless of table size
+warp,50000,50000,107.3,RTX4070,

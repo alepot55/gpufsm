@@ -183,6 +183,207 @@ __global__ void bitpacked_nfa_kernel(
     *out_flag = out_f; *out_len = out_l;
 }
 
+// Work-efficient frontier epsilon-closure: expand only NEW states (set bits in
+// `frontier`) into `set`, until no new states appear. O(reachable) not O(n^2).
+template <int NWORDS>
+__device__ __forceinline__ void eps_closure_worklist(
+    unsigned long long set[NWORDS], const int* eps_row_ptr, const int* eps_targets) {
+    unsigned long long frontier[NWORDS];
+#pragma unroll
+    for (int w = 0; w < NWORDS; ++w) frontier[w] = set[w];
+    bool any = true;
+    while (any) {
+        unsigned long long nb[NWORDS];
+#pragma unroll
+        for (int w = 0; w < NWORDS; ++w) nb[w] = 0ULL;
+        for (int w = 0; w < NWORDS; ++w) {
+            unsigned long long b = frontier[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
+                    int t = eps_targets[k];
+                    nb[t >> 6] |= (1ULL << (t & 63));
+                }
+            }
+        }
+        any = false;
+#pragma unroll
+        for (int w = 0; w < NWORDS; ++w) {
+            nb[w] &= ~set[w];          // keep only genuinely new states
+            set[w] |= nb[w];
+            frontier[w] = nb[w];
+            if (nb[w]) any = true;
+        }
+    }
+}
+
+// Work-efficient single-string simulation: iterate only ACTIVE states (set bits),
+// not all num_states, and use a frontier epsilon-closure. Same verdict as
+// simulate_one (latch-first-match) but O(active) per symbol instead of O(n^2) —
+// the kernel that moves the workload toward the memory-bound regime where the
+// memory-layout techniques matter.
+template <int NWORDS>
+__device__ __forceinline__ void simulate_one_worklist(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_symbols, int input_len,
+    int num_states, int start_state, int uses_any,
+    int& out_f, int& out_l) {
+    (void)num_states;
+    unsigned long long cur[NWORDS];
+#pragma unroll
+    for (int w = 0; w < NWORDS; ++w) cur[w] = 0ULL;
+    cur[start_state >> 6] |= (1ULL << (start_state & 63));
+    eps_closure_worklist<NWORDS>(cur, eps_row_ptr, eps_targets);
+
+    out_f = 0; out_l = 0; int done = 0;
+#pragma unroll
+    for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) done = 1;
+    if (done) { out_f = 1; out_l = 0; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        unsigned long long nxt[NWORDS];
+#pragma unroll
+        for (int w = 0; w < NWORDS; ++w) nxt[w] = 0ULL;
+        for (int w = 0; w < NWORDS; ++w) {
+            unsigned long long b = cur[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                    int tsym = sym_symbols[k];
+                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                        int t = sym_targets[k];
+                        nxt[t >> 6] |= (1ULL << (t & 63));
+                    }
+                }
+            }
+        }
+        eps_closure_worklist<NWORDS>(nxt, eps_row_ptr, eps_targets);
+#pragma unroll
+        for (int w = 0; w < NWORDS; ++w) cur[w] = nxt[w];
+        int m = 0;
+#pragma unroll
+        for (int w = 0; w < NWORDS; ++w) if (cur[w] & accept_words[w]) m = 1;
+        if (m) { out_f = 1; out_l = pos + 1; done = 1; }
+    }
+}
+
+// Multi-stream worklist: one thread/string, work-efficient kernel, global CSR.
+// __launch_bounds__ raises occupancy for SMALL working sets (NWORDS<=2: cap registers
+// to fit 6 blocks/SM — the kernel is latency-bound, so more resident warps hide latency,
+// ~2x at <=64 states). For larger NWORDS the same cap forces register spills and hurts,
+// so we relax to minBlocks=1 (effectively unconstrained). NWORDS is a compile-time
+// template parameter, so the ternary is a constant expression.
+template <int NWORDS>
+__global__ void __launch_bounds__(256, (NWORDS <= 2 ? 6 : 1)) worklist_multistream_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state, int uses_any,
+    int* out_flags, int* out_lens) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    int out_f, out_l;
+    simulate_one_worklist<NWORDS>(sym_row_ptr, sym_targets, sym_symbols, eps_row_ptr, eps_targets,
+                                  accept_words, input_data + input_offsets[i],
+                                  input_offsets[i + 1] - input_offsets[i],
+                                  num_states, start_state, uses_any, out_f, out_l);
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
+// Frontier epsilon-closure over a GLOBAL-memory bitset (nwords words). S is the set
+// being closed; F (frontier) and B (new bits) are per-thread scratch slices.
+__device__ __forceinline__ void eps_closure_global(
+    unsigned long long* S, unsigned long long* F, unsigned long long* B, int nwords,
+    const int* eps_row_ptr, const int* eps_targets) {
+    for (int w = 0; w < nwords; ++w) F[w] = S[w];
+    bool any = true;
+    while (any) {
+        for (int w = 0; w < nwords; ++w) B[w] = 0ULL;
+        for (int w = 0; w < nwords; ++w) {
+            unsigned long long b = F[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
+                    int t = eps_targets[k];
+                    B[t >> 6] |= (1ULL << (t & 63));
+                }
+            }
+        }
+        any = false;
+        for (int w = 0; w < nwords; ++w) {
+            B[w] &= ~S[w];
+            S[w] |= B[w];
+            F[w] = B[w];
+            if (B[w]) any = true;
+        }
+    }
+}
+
+// Work-efficient worklist with the working set in GLOBAL memory — NO state-count cap
+// (the register worklist is capped at 512). nwords words per string; cur/nxt/frontier/
+// newb are per-string global slices. One thread per string. Same latch-first-match
+// verdict as the reference. This is what scales the engine to large (ANMLZoo-sized) automata.
+__global__ void worklist_global_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state, int uses_any, int nwords,
+    unsigned long long* cur, unsigned long long* nxt,
+    unsigned long long* frontier, unsigned long long* newb,
+    int* out_flags, int* out_lens) {
+    (void)num_states;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    size_t off = (size_t)i * nwords;
+    unsigned long long* C = cur + off;
+    unsigned long long* N = nxt + off;
+    unsigned long long* F = frontier + off;
+    unsigned long long* B = newb + off;
+    const int* input_symbols = input_data + input_offsets[i];
+    int input_len = input_offsets[i + 1] - input_offsets[i];
+
+    for (int w = 0; w < nwords; ++w) C[w] = 0ULL;
+    C[start_state >> 6] |= (1ULL << (start_state & 63));
+    eps_closure_global(C, F, B, nwords, eps_row_ptr, eps_targets);
+
+    int out_f = 0, out_l = 0, done = 0;
+    for (int w = 0; w < nwords; ++w) if (C[w] & accept_words[w]) done = 1;
+    if (done) { out_f = 1; out_l = 0; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        for (int w = 0; w < nwords; ++w) N[w] = 0ULL;
+        for (int w = 0; w < nwords; ++w) {
+            unsigned long long b = C[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                    int tsym = sym_symbols[k];
+                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                        int t = sym_targets[k];
+                        N[t >> 6] |= (1ULL << (t & 63));
+                    }
+                }
+            }
+        }
+        eps_closure_global(N, F, B, nwords, eps_row_ptr, eps_targets);
+        for (int w = 0; w < nwords; ++w) C[w] = N[w];
+        int m = 0;
+        for (int w = 0; w < nwords; ++w) if (C[w] & accept_words[w]) m = 1;
+        if (m) { out_f = 1; out_l = pos + 1; done = 1; }
+    }
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
 // Multi-stream technique — single->multi-stream ablation axis.
 // One thread per input string (blockIdx.x*blockDim.x+threadIdx.x); strings run
 // concurrently across the SMs. Read-only CSR shared by all threads, in GLOBAL memory.
@@ -663,8 +864,209 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_asy
     return {flags, lens, total_ms};
 }
 
+static void launch_worklist(
+    int nwords, int num_strings,
+    const int* srp, const int* st, const int* ss, const int* erp, const int* et,
+    const unsigned long long* acc, const int* in, const int* off,
+    int num_states, int start_state, int uses_any, int* flags, int* lens) {
+    int threads = 256;
+    int blocks = (num_strings + threads - 1) / threads;
+#define LAUNCH_WL(NW) worklist_multistream_kernel<NW><<<blocks, threads>>>( \
+        srp, st, ss, erp, et, acc, in, off, num_strings, num_states, start_state, uses_any, flags, lens)
+    switch (nwords) {
+        case 1: LAUNCH_WL(1); break;
+        case 2: LAUNCH_WL(2); break;
+        case 3: LAUNCH_WL(3); break;
+        case 4: LAUNCH_WL(4); break;
+        case 5: LAUNCH_WL(5); break;
+        case 6: LAUNCH_WL(6); break;
+        case 7: LAUNCH_WL(7); break;
+        case 8: LAUNCH_WL(8); break;
+        default:
+            throw std::runtime_error("worklist: num_states > " +
+                std::to_string(BITPACKED_MAX_WORDS * 64) + " not supported (nwords=" +
+                std::to_string(nwords) + ")");
+    }
+#undef LAUNCH_WL
+}
+
+// Work-efficient multi-stream. Returns (flags, lens, kernel_ms).
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        launch_worklist(nwords, num_strings, d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off,
+                        num_states, start_state, uses_any, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
+// Work-efficient worklist with a GLOBAL working set — no state-count cap. Returns
+// (flags, lens, kernel_ms). accept_words has nwords = ceil(num_states/64) entries.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    unsigned long long *d_cur, *d_nxt, *d_fr, *d_nb;
+    size_t ws = sizeof(unsigned long long) * (size_t)(num_strings ? num_strings : 1) * nwords;
+    CUDA_CHECK(cudaMalloc(&d_cur, ws)); CUDA_CHECK(cudaMalloc(&d_nxt, ws));
+    CUDA_CHECK(cudaMalloc(&d_fr, ws)); CUDA_CHECK(cudaMalloc(&d_nb, ws));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256, blocks = (num_strings + threads - 1) / threads;
+        worklist_global_kernel<<<blocks, threads>>>(
+            d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off, num_strings,
+            num_states, start_state, uses_any, nwords, d_cur, d_nxt, d_fr, d_nb, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_fr); cudaFree(d_nb);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
+// DFA simulation — the MEMORY-bound automata workload. One thread per string walks a
+// dense transition table: cur = trans[cur*256 + symbol] per byte (a random global lookup;
+// for large DFAs the table exceeds cache -> memory-bound). latch-first-match.
+__global__ void dfa_kernel(
+    const int* trans, const signed char* accept,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state,
+    int* out_flags, int* out_lens) {
+    (void)num_states;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    const int* in = input_data + input_offsets[i];
+    int len = input_offsets[i + 1] - input_offsets[i];
+    int cur = start_state, out_f = 0, out_l = 0;
+    if (accept[cur]) {
+        out_f = 1;
+    } else {
+        for (int p = 0; p < len; ++p) {
+            cur = trans[cur * 256 + in[p]];
+            if (accept[cur]) { out_f = 1; out_l = p + 1; break; }
+        }
+    }
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
+// Returns (flags, lens, kernel_ms) for a batch over a DFA.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_dfa(
+    py::array_t<int> trans, py::array_t<signed char> accept,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state) {
+
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+    std::vector<void*> frees;
+    const int* d_trans = dev_copy(trans, frees);
+    const signed char* d_acc = dev_copy(accept, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256, blocks = (num_strings + threads - 1) / threads;
+        dfa_kernel<<<blocks, threads>>>(d_trans, d_acc, d_in, d_off, num_strings,
+                                        num_states, start_state, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
 PYBIND11_MODULE(_cuda, m) {
-    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR/async] NFA kernels)";
+    m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR/async/worklist] NFA kernels)";
     m.def("run_dense", &run_dense,
           "Simulate an NFA (CSR, int8 working set) over an input; returns (accepted, match_len, kernel_ms).");
     m.def("run_bitpacked", &run_bitpacked,
@@ -676,4 +1078,13 @@ PYBIND11_MODULE(_cuda, m) {
     m.def("run_multistream_async", &run_multistream_async,
           "Multi-stream with pinned host staging + streamed async H2D/kernel/D2H overlap; "
           "returns (flags, lens, total_ms).");
+    m.def("run_worklist", &run_worklist,
+          "Work-efficient multi-stream (iterate active states + frontier eps-closure); "
+          "returns (flags, lens, kernel_ms).");
+    m.def("run_worklist_global", &run_worklist_global,
+          "Work-efficient worklist with a global working set — no state-count cap; "
+          "returns (flags, lens, kernel_ms).");
+    m.def("run_dfa", &run_dfa,
+          "DFA simulation (dense transition-table lookup per byte, memory-bound); "
+          "returns (flags, lens, kernel_ms).");
 }

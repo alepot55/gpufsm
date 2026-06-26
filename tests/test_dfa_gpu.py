@@ -1,0 +1,32 @@
+"""DFA CUDA kernel correctness vs the reference oracle (gpu-marked; skips without CUDA)."""
+
+from __future__ import annotations
+
+import random
+
+import pytest
+
+pytestmark = pytest.mark.gpu
+
+
+def _cuda_dfa_available() -> bool:
+    try:
+        import gpufsm.backends.cuda._cuda as c  # noqa: F401
+
+        return hasattr(c, "run_dfa")
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _cuda_dfa_available(), reason="needs CUDA _cuda.run_dfa")
+def test_cuda_dfa_matches_reference():
+    from gpufsm.dfa import random_dfa, simulate_dfa
+    from gpufsm.dfa_api import run_dfa_batch
+
+    rng = random.Random(0)
+    for n in (16, 256, 4096):
+        dfa = random_dfa(n, accept_prob=0.02, seed=n)
+        batch = [bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 40))) for _ in range(48)]
+        refs = [simulate_dfa(dfa, b) for b in batch]
+        got = [(r.accepted, r.match_len) for r in run_dfa_batch(dfa, batch, backend="cuda")]
+        assert got == refs, f"DFA mismatch at n={n}"
