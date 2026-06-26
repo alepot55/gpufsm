@@ -38,7 +38,7 @@ Automata expose \textbf{two complementary faces}: an NFA active-set traversal th
 throughput halves as the table crosses L2). On both faces the regret is large for the
 tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $5$--$13\times$ versus CUDA
 across the two faces, while Warp, an equally high-level \emph{Python} DSL, matches or beats
-hand CUDA on the NFA ($0.6$--$0.9\times$) and stays within $\sim$2$\times$ on the DFA. So
+hand CUDA on the NFA ($0.6$--$0.9\times$) and pays only $1.4$--$2.3\times$ on the DFA. So
 regret is set by the execution \emph{paradigm}, not by how
 high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
 Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
@@ -396,7 +396,7 @@ Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
 Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
 \midrule
 NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
-DFA regret (memory)        & $1\times$ & $1.5$--$2.1\times$ & $5$--$13\times$ & --- \\
+DFA regret (memory)        & $1\times$ & $1.4$--$2.3\times$ & $5$--$13\times$ & --- \\
 \bottomrule
 \end{tabular}}
 \end{table}
