@@ -6,6 +6,9 @@
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \graphicspath{{figures/}}
+\newcommand{\cmark}{\checkmark}
+\newcommand{\xmark}{$\times$}
+\newcommand{\tmark}{$\sim$}
 
 % gpufsm — working preprint draft, generated from paper/DRAFT.md.
 % All numbers trace to paper/data/*.csv on an RTX 4070 (sm_89); see docs/REPRODUCIBILITY.md.
@@ -23,29 +26,27 @@ ap.alessandro.potenza@gmail.com}}
 \maketitle
 
 \begin{abstract}
-GPU domain-specific languages (DSLs) such as OpenAI Triton promise near-CUDA
-performance at far lower programming effort, a promise borne out on \emph{regular}
-tensor algebra. We ask whether it holds for an \emph{irregular} workload---
-non-deterministic finite automata (NFA) processing---and find that it does not, in an
-instructive way. We introduce \emph{abstraction regret}: the performance a DSL
-forecloses because its abstraction cannot express the memory layout \emph{or the
-control flow} a workload needs. We make it measurable with a two-parameter cost model
-and a controlled, constant-algorithm ablation across four memory axes
-(byte$\rightarrow$bit working set, global$\rightarrow$shared CSR, sync$\rightarrow$async
-transfer, single$\rightarrow$multi-stream) and three DSLs (CUDA, Triton, NVIDIA Warp),
-plus a feasibility study of Triton's Gluon frontend. Two findings stand out. First, on a
-faithful full-scan NFA kernel the bottleneck is \emph{compute}, not memory: staging the
-transition table into shared memory (zero global traffic) leaves throughput unchanged,
-and throughput scales as $1/n^2$ with state count---so memory-layout techniques cannot
-help until the algorithm is made work-efficient. We then build a work-efficient
-active-set kernel that is $250\times$--$10^4\times$ faster and reaches 15--170~Gbps.
-Second, the Triton$\leftrightarrow$CUDA gap is a per-DSL constant ($\approx 15.7\times$
-on this kernel) that no traffic/compute term explains, while Warp---an equally
-high-level \emph{Python} DSL---matches or beats hand-written CUDA ($0.62\times$).
-Abstraction regret is therefore set by the execution \emph{paradigm} (tile/SPMD vs
-thread-SIMT), not by how high-level the DSL looks; and expressibility does not buy
-efficiency: Triton \emph{can} express the work-efficient kernel yet still pays
-$\approx 9\times$ there.
+GPU domain-specific languages (DSLs) such as OpenAI Triton deliver near-CUDA performance
+at far lower effort on \emph{regular} tensor algebra. We ask what that abstraction costs on
+\emph{irregular} workloads and answer it with a metric we call \emph{abstraction regret}:
+the performance a DSL forecloses---with the algorithm held fixed---because it cannot express
+the memory layout or control flow a workload needs. We decompose regret along these two
+capability axes and instantiate it on finite automata across the paradigm axis CUDA and
+NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-SPMD).
+Automata expose \textbf{two complementary faces}: an NFA active-set traversal that is
+\emph{control-flow bound}, and a DFA dense-table walk that is \emph{memory bound} (its
+throughput halves as the table crosses L2). On both faces the regret is large for the
+tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $9$--$15\times$ versus CUDA
+while Warp, an equally high-level \emph{Python} DSL, matches or beats hand CUDA
+($0.62$--$1\times$). So regret is set by the execution \emph{paradigm}, not by how
+high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
+Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
+explicit layout/shared-memory control): Gluon \emph{still} cannot express the kernel, so the
+binding constraint is the paradigm, not tuning or layout. A two-parameter cost model predicts
+the regret and names the missing IR primitives (scalar gather in a tile, register-resident
+bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
+($250\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
+against a CPU oracle on real ANMLZoo automata up to 42k states).
 \end{abstract}
 
 \section{Introduction}
@@ -76,8 +77,13 @@ memoization + privatization), HybridSA~\cite{hybridsa} (bit-parallel),
 BitGen~\cite{bitgen} (Parabix bitstreams)---wins by reorganizing or reducing irregular
 memory traffic, yet each frames its contribution as a new algorithm and bundles the
 memory effects in. Hyperscan~\cite{hyperscan} is the CPU baseline; ANMLZoo~\cite{anmlzoo}
-and AutomataZoo are the standard suites. No prior GPU-automata work uses Triton, isolates
-the memory axes at constant algorithm, or frames the DSL gap as an expressibility cost.
+and AutomataZoo are the standard suites. A \emph{DFA} trades the NFA's parallel active set
+for a single dense transition table indexed once per input byte; it is the deterministic,
+\emph{memory-bound} dual of the NFA and the second face we study. Crucially, every GPU
+automata engine above is CUDA-only: \textbf{no prior work compares modern GPU kernel DSLs
+(Triton/Gluon vs CUDA vs Warp) on an irregular workload}---existing DSL benchmarks
+(KernelBench, TritonBench) are dense-tensor-only, and the one irregular suite (ParEval)
+excludes these DSLs. We close that gap and frame the resulting gap as an expressibility cost.
 
 \section{Abstraction regret and the cost model}\label{sec:cost}
 We model per-symbol time as a roofline-style sum:
@@ -115,6 +121,9 @@ automata; register residency costs $\sim$4--5$\times$ vs the capped kernel).
 \textbf{Gluon} (Triton's experimental low-level frontend): \texttt{gl.load} always returns
 a layout-typed tensor (no scalar load), so the data-dependent CSR inner loop is
 inexpressible.
+\textbf{DFA (the memory-bound face):} a \texttt{dfa} kernel walks a dense
+$\textit{states}\times256$ table, one random lookup per byte, implemented identically in
+CUDA, Triton and Warp (one program/thread per string); all match the DFA oracle.
 
 \section{Methodology}
 Throughput is measured on a fixed batch ($2048\times256$~B) as total input bits per batch
@@ -198,6 +207,44 @@ Triton 25~Gbps at $\le 64$ states), versus $15.7\times$ on the full scan. Even e
 the right algorithm, the tile/SPMD model imposes a large constant penalty on scalar,
 data-dependent automata work.
 
+\textbf{The second face: DFA is memory-bound, and the regret persists.} The DFA dense-table
+walk is the memory-bound dual of the NFA: CUDA throughput \emph{halves} as the table crosses
+the 6\,MB L2 (496~Gbps at 4096 states, 207 at 200k; Fig.~\ref{fig:dfa}), the memory-bound
+signature. Yet the cross-DSL pattern is unchanged: Warp pays $2$--$3\times$ vs CUDA, while
+\textbf{Triton is flat at $\approx29$~Gbps regardless of table size}---it never reaches the
+memory-bound regime because its tile/SPMD codegen bottlenecks the scalar gather first (regret
+$7$--$15\times$). So on \emph{both} faces---control-flow-bound (NFA) and memory-bound
+(DFA)---the regret tracks the execution paradigm, not the workload's bottleneck: it is an
+intrinsic property of the DSL, not of where the kernel happens to be limited.
+
+\textbf{Capability $\to$ cost.} Table~\ref{tab:cap} maps the capabilities each kernel needs to
+whether a DSL expresses them and the resulting regret. The thread-SIMT DSLs (CUDA, Warp)
+express all of scalar load, data-dependent loops, register-resident bitsets and explicit
+shared-memory layout; the tile-SPMD DSLs cannot express a scalar element load at all (Gluon)
+or only via a strained single program (Triton), which is exactly what the regret measures.
+
+\begin{table}[t]
+\centering
+\caption{Capability $\to$ cost. \cmark\ expressible, \tmark\ only as a strained single
+program, \xmark\ inexpressible. Regret is throughput vs CUDA on each face.}
+\label{tab:cap}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Capability (paradigm) & CUDA & Warp & Triton & Gluon \\
+ & \multicolumn{2}{c}{thread-SIMT} & \multicolumn{2}{c}{tile-SPMD} \\
+\midrule
+Scalar element load        & \cmark & \cmark & \tmark & \xmark \\
+Data-dependent loop        & \cmark & \cmark & \tmark & \tmark \\
+Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
+Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
+\midrule
+NFA regret (control-flow)  & $1\times$ & $0.6\times$ & $9$--$15\times$ & n/a (\xmark) \\
+DFA regret (memory)        & $1\times$ & $2$--$3\times$ & $7$--$15\times$ & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig_throughput_vs_states.pdf}
 \caption{Throughput vs NFA size (log scale). Worklist dominates; full-scan techniques
@@ -218,17 +265,31 @@ every size---compute-bound regime, memory layout irrelevant.}\label{fig:mem}\end
 \caption{Throughput relative to CUDA: Triton (tile) $\ll$ Warp (thread) $\approx$ CUDA.
 Regret is the execution paradigm, not abstraction height.}\label{fig:regret}\end{figure}
 
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{fig_dfa_memory_bound.pdf}
+\caption{DFA (memory-bound face): CUDA/Warp throughput drops as the table crosses L2;
+Triton stays flat---model-bound, never reaching the memory regime.}\label{fig:dfa}\end{figure}
+
 \section{Related work}
-Performance portability~\cite{pennycook} measures efficiency across a \emph{hardware set};
-abstraction regret measures efficiency across an \emph{abstraction axis at fixed hardware},
-attributed to expressibility. The Halide~\cite{halide} lineage established that abstraction
-constrains the schedule space; we show the analogous constraint on control flow + memory
-layout for irregular automata. SpMV format selection and Gunrock~\cite{gunrock} establish
-that layout dominates irregular GPU performance; we add the DSL-expressibility axis. We
-rebut the autotuning counter-thesis: our gap is layout/control-flow expressibility, not
-tuning---Triton cannot express the shared-CSR layout at any tuning. SOTA automata engines
-(ngAP, HybridSA, BitGen) are baselines our worklist engine approaches; our contribution is
-the framing + cost model + the multi-DSL expressibility study.
+\textbf{Naming.} We deliberately invert ``abstraction \emph{without} regret''
+(LMS~\cite{lms}): staging removes call/dispatch overhead, but cannot manufacture a layout or
+control-flow pattern the surface abstraction forbids---which is precisely the residual we
+measure. \textbf{Closest quantitative prior, Hexcute}~\cite{hexcute} ablates the
+Triton$\leftrightarrow$CUDA gap into layout-synthesis vs dataflow, but as a \emph{compiler}
+on \emph{dense tensor} kernels; we contribute a \emph{metric} decomposed by \emph{capability}
+(control-flow vs memory), on \emph{irregular} automata, with an expressibility (not
+autotuning) framing and a falsifiable Triton$\leftrightarrow$Gluon control.
+\textbf{Tawa}~\cite{tawa} (warp specialization) and \textbf{Descend}~\cite{descend} argue
+\emph{qualitatively} that a DSL's execution model forecloses patterns; we quantify it
+cross-DSL. \textbf{Performance portability}~\cite{pennycook} decomposes efficiency across a
+\emph{hardware set}; we decompose across the \emph{expressible-capability} axis at fixed
+hardware. The Halide~\cite{halide} lineage established abstraction constrains the schedule
+space; SpMV format selection and Gunrock~\cite{gunrock} that layout dominates irregular GPU
+performance---we add the DSL-expressibility axis. We rebut the autotuning counter-thesis: our
+gap is expressibility, not tuning---Gluon, the explicit-control sibling on the same compiler
+stack, still cannot express the kernel. SOTA automata engines (ngAP, HybridSA, BitGen) are
+CUDA-only baselines; our contribution is the metric + cost model + the first multi-DSL
+expressibility study of an irregular workload.
 
 \section{Threats to validity}
 \emph{Construct.} Most throughput points use randomly generated NFAs, which may not
@@ -282,6 +343,14 @@ Portability,'' \emph{PMBS@SC / FGCS}, 2016/2019.
 optimizing parallelism, locality, and recomputation,'' \emph{PLDI}, 2013.
 \bibitem{gunrock} Y. Wang \emph{et al.}, ``Gunrock: A High-Performance Graph Processing
 Library on the GPU,'' \emph{PPoPP}, 2016.
+\bibitem{lms} T. Rompf, M. Odersky, ``Lightweight Modular Staging: Abstraction Without
+Regret,'' \emph{CACM} 55(6), 2012.
+\bibitem{hexcute} X. Zhang \emph{et al.}, ``Hexcute: A Tile-based Programming Language with
+Automatic Layout and Task-Mapping Synthesis,'' arXiv:2504.16214, 2025 (preprint).
+\bibitem{tawa} Authors, ``Tawa: Automatic Warp Specialization for GPU Tile Languages,''
+\emph{CGO}, 2026 (to appear; arXiv:2510.14719).
+\bibitem{descend} B. K\"opcke, S. Gorlatch, M. Steuwer, ``Descend: A Safe GPU Systems
+Programming Language,'' \emph{PLDI}, 2024.
 \end{thebibliography}
 
 \end{document}
