@@ -55,7 +55,7 @@ gpufsm verify             # cross-backend agreement on the example suite (0 fail
 | Abstraction regret: Triton 6-8x throughput / 10.1x fit (full-scan), ~6.5x (worklist) vs CUDA; Warp 0.6-0.9x | calibrate + sweep | `fig_abstraction_regret`, `docs/RESULTS_COSTMODEL.md` |
 | DSL expressibility (CUDA/Warp express; Triton strains; Gluon cannot) | `python scripts/gluon_probe.py` (falsifiable: exits 0 on expected compile-failure, 1 if Gluon ever compiles it) | `docs/DSL_EXPRESSIVENESS.md` |
 | DFA memory-bound L2 knee (CUDA peaks ~6MB then ~2.4x drop; Triton flat) | `python scripts/sweep_dfa.py` | `paper/data/dfa_regret_rtx4070.csv`, `fig_dfa_memory_bound` |
-| Block-parallel warp worklist 12-17x vs single-thread (real automata) | `python scripts/bench_worklist_warp.py` | `paper/data/worklist_warp_rtx4070.csv` |
+| Block-parallel warp worklist 3-9x vs single-thread (real automata, saturating batch; batch-dependent) | `python scripts/bench_worklist_warp.py` | `paper/data/worklist_warp{,_batch}_rtx4070.csv` |
 
 Figures depend **only** on committed CSVs, so the paper rebuilds deterministically. The
 sweep/calibration scripts skip unsupported (backend, technique, size) cells (e.g. Triton/Warp

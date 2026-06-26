@@ -101,7 +101,7 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (0.99–1.10×, `paper/data/worklist_shared_rtx4070.csv`) → una volta che il kernel è work-efficient il
   **layout del working-set NON è più il collo di bottiglia** (specchia il risultato compute-bound
   `multistream_shared`); il gap residuo verso SOTA assoluto (ngAP-class) è **algoritmico** (memoization/
-  non-blocking), non residency. Documentato in Implementation+Limitations. ⇒ #2 chiuso onestamente (warp 12-17×
+  non-blocking), non residency. Documentato in Implementation+Limitations. ⇒ #2 chiuso onestamente (warp 3-9× @batch saturante
   è la vera vincita; ngAP-style memoization sarebbe "competere con SOTA", fuori scope = positioning non benchmark).
   **STATO: #2,#3,#4,#5 TUTTI FATTI. Resta solo #1 (2ª GPU) che richiede hardware dall'utente.**
 - **[Iter -1] #5 (AE packaging) + #4 (SOTA table) FATTI.** #5: `docs/ARTIFACT_APPENDIX.md`
@@ -118,9 +118,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   via `atomicOr` nel next-set globale condiviso, con `__any_sync` per frontier-empty/accept. Risolve la
   sotto-utilizzazione del worklist 1-thread su automi grandi. Validato bit-for-bit vs oracle (1252 stringhe,
   0 mismatch) + == worklist_global su NFA >64 stati (`tests/test_worklist_warp.py`, 5 verdi). Bench
-  (`scripts/bench_worklist_warp.py` → `paper/data/worklist_warp_rtx4070.csv`): **12–17× vs global 1-thread su
-  automi reali** (levenshtein 14.7×, fermi 12.5×, brill 17.2×), fino a ~165× su NFA sintetici densi. Paper
-  (Implementation+Limitations) aggiornato. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  (`scripts/bench_worklist_warp.py`): ⚠️ **speedup BATCH-DEPENDENTE (audit 26 giu).** A batch saturante (4096
+  stringhe, GPU piena): **real automi 3-9×** (levenshtein 3.7×, fermi 3.1×, brill 8.9×), sintetici densi ~12×.
+  A batch piccolo (256) saliva a 12-180× perché global 1-thread non riempie la GPU → il 12-17× iniziale era un
+  artefatto di batch. Il numero ONESTO/conservativo = 3-9× @batch saturante. CSV: `worklist_warp_rtx4070.csv`
+  (+ `worklist_warp_batch_rtx4070.csv` documenta la sensibilità al batch). Driver = densità active-set × words,
+  non size. Paper (Implementation+Limitations) corretto a 3-9×. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
   (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
   + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
 - **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).

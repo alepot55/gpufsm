@@ -63,7 +63,7 @@ python paper/figures.py                  # regenerate all figures from the CSVs
 | Faithful kernel is compute-bound (memory axes inert) | `scripts/sweep_techniques.py` | multistream ≈ _shared ≈ _async within CI |
 | NFA abstraction regret = paradigm | `scripts/calibrate_costmodel.py` | Triton 6–8× / 10× fit, Warp 0.6–0.9× vs CUDA |
 | DFA memory-bound L2 knee | `scripts/sweep_dfa.py` | CUDA peaks ~6 MB then ~2.4× drop; Triton flat ~30 Gbps |
-| Block-parallel warp worklist speedup | `scripts/bench_worklist_warp.py` | 12–17× vs single-thread on real automata |
+| Block-parallel warp worklist speedup | `scripts/bench_worklist_warp.py` | 3–9× vs single-thread on real automata at a saturating batch (larger at small batch) |
 | Gluon cannot express the kernel (falsifiable) | `scripts/gluon_probe.py` | "EXPECTED FAILURE … no scalar load", exit 0 |
 
 Exact figures and the full mapping are in `docs/REPRODUCIBILITY.md`; all numbers trace to

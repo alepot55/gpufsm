@@ -100,9 +100,11 @@ so comparisons are apples-to-apples. Correctness is gated against a CPU referenc
   ANMLZoo-sized automata (thousands of states); register residency costs it ~4–5× vs the
   capped register kernel — itself a memory-layout data point. A **`worklist_warp`** variant is
   *block-parallel*: one warp per string, the 32 lanes partition the state-words and scatter
-  transitions via `atomicOr`, spreading one string's loads across the warp — 12–17× faster
-  than the single-thread global kernel on real ANMLZoo automata (up to ~165× on dense
-  synthetic NFAs; `paper/data/worklist_warp_rtx4070.csv`). A **`worklist_shared`** variant
+  transitions via `atomicOr`, spreading one string's loads across the warp — **3–9× faster
+  than the single-thread global kernel on real ANMLZoo automata at a GPU-saturating batch**
+  (~12× on dense synthetic; the speedup is batch- and active-set-density-dependent, far larger
+  at small batch where the single-thread kernel cannot fill the GPU;
+  `paper/data/worklist_warp{,_batch}_rtx4070.csv`). A **`worklist_shared`** variant
   stages the working set in dynamic *shared* memory (≤1536 states) — the working-set-layout
   ablation of the work-efficient kernel; it only ties `worklist_warp` (0.99–1.10×,
   `paper/data/worklist_shared_rtx4070.csv`).
@@ -265,7 +267,10 @@ absolute throughput is explicit future work.
   re-implementation.
 - The single-thread worklist under-utilizes the GPU on large automata; the **`worklist_warp`**
   block-parallel kernel (one warp/string, 32 lanes partitioning the state-words) addresses this
-  — 12–17× faster on real ANMLZoo automata (up to ~165× on dense synthetic NFAs). We further
+  — at a GPU-saturating batch (4096 strings): **3–9× on real ANMLZoo automata**, ~12× on dense
+  synthetic; the speedup is batch- and density-dependent (up to ~180× at small batch where the
+  single-thread kernel can't fill the GPU). The warp kernel reaches its throughput plateau at a
+  far smaller batch, so it's the right choice for few-stream / low-latency use. We further
   tested shared-memory working-set privatization (**`worklist_shared`**): it only ties
   `worklist_warp` (0.99–1.10×) — once work-efficient, the working-set *layout* is no longer the
   bottleneck (mirroring the compute-bound `multistream_shared` result). So the remaining gap to
