@@ -143,9 +143,23 @@ il paper attorno alle due facce + tabella capability. Aumentare gradualmente, tu
   147→107 (regret 2–3×), **triton ~29 flat** (non raggiunge il regime memory-bound, model-bound). Quindi Triton
   paga regret grosso su ENTRAMBE le facce (NFA control-flow 9–15× + DFA memory 7–15×) → **è il modello tile/SPMD,
   non il workload**; Warp (thread) vicino a CUDA su entrambe. 43 test verdi.
-- **PROSSIMO (il payoff): RISCRIVERE IL PAPER** attorno alle due facce — nuovo titolo/abstract/struttura +
-  **tabella capability-vs-costo** (per DSL: scalar load, data-dep loop, layout esplicito, register residency,
-  bit-scan → costo misurato su NFA+DFA) + figura DFA. Da "studio NFA" a framework generale. Poi 2ª GPU, più automi.
+### 🎯 META-OBIETTIVO (utente, 26 giu): UNICA cosa che conta = **pubblicazione al venue più alto possibile**.
+Ragionare/agire da ricercatore autonomo verso quello; cambiare scope/esperimenti/direzione liberamente; niente
+validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (vedi `docs/NOVELTY_POSITIONING.md`):
+- **Tesi (difendibile, verificata vs SOTA):** "abstraction regret" = performance preclusa dal DSL perché non
+  esprime il layout/control-flow necessario, *ad algoritmo fisso*, decomposta su 2 assi (control-flow vs memory),
+  su automi irregolari (NFA control-flow-bound + DFA memory-bound) × asse paradigma **CUDA/Warp (thread-SIMT) vs
+  Triton/Gluon (tile-SPMD)**. Finding: il regret è il **paradigma di esecuzione, non l'altezza dell'astrazione**.
+- **Mossa top-venue (de-risk "non hai tunato Triton"):** coppia **Triton↔Gluon** (stesso stack MLIR, cambia solo
+  la leva di espressività) → attribuzione **falsificabile**; + tabella capability→costo con **primitiva IR mancante**
+  nominata (scalar-gather-in-tile, register-resident bitset, data-dep loop). Diagnosi→causa falsificabile.
+- **DA CITARE/DISTINGUERE (anti-desk-reject):** Hexcute (arXiv'25, decompone gap layout/dataflow su tensori densi —
+  minaccia più vicina), Tawa (CGO'26), Descend (PLDI'24), "Abstraction *without* Regret" (LMS, CACM'12, invertire),
+  Pennycook (per-hardware non per-capacità). **Gap pulito:** nessun benchmark DSL-GPU su workload irregolari.
+- **Scope deciso:** restare PROFONDI sugli automi (NFA+DFA, 4 DSL); NON espandere a BFS/SpMV (trappola solo/1-GPU).
+  Venue: IISWC/PACT onesti; CGO/ASPLOS/PLDI se la cura falsificabile (Triton↔Gluon + primitiva) regge. 2ª GPU cloud per camera-ready.
+- **PROSSIMO:** riscrivere paper attorno a questo (titolo "Two Faces…" già in `gpufsm.tex`); related-work che distingue
+  Hexcute/Tawa/Descend/LMS + bibitems; tabella capability→costo; sezione Gluon-controllo; figura DFA.
 
 ### ⚠️ FINDING CHIAVE che riformula la roadmap (vedi `docs/RESULTS_COSTMODEL.md`)
 1. **I kernel attuali sono COMPUTE-bound, non memory-bound.** L'eps-closure è O(n²)/simbolo (n passi × n
