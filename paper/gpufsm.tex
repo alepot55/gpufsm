@@ -121,7 +121,9 @@ automata; register residency costs $\sim$4--5$\times$ vs the capped kernel).
 \texttt{while} loop). \textbf{Warp}: \texttt{multistream} (thread-SIMT Python).
 \textbf{Gluon} (Triton's experimental low-level frontend): \texttt{gl.load} always returns
 a layout-typed tensor (no scalar load), so the data-dependent CSR inner loop is
-inexpressible.
+inexpressible---a runnable probe (\texttt{scripts/gluon\_probe.py}) reproduces the
+compiler error (\emph{``Value argument cannot be block type''}) and exits non-zero if a
+future Gluon ever compiles it, making the claim falsifiable.
 \textbf{DFA (the memory-bound face):} a \texttt{dfa} kernel walks a dense
 $\textit{states}\times256$ table, one random lookup per byte, implemented identically in
 CUDA, Triton and Warp (one program/thread per string); all match the DFA oracle.

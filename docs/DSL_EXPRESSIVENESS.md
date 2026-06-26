@@ -37,30 +37,29 @@ the right algorithm, the tile/SPMD model imposes a large constant penalty on sca
 data-dependent automata work. Gluon, by contrast, cannot express it at all.
 | **Tensor-only DSLs** (cuTile/Tile IR, CUTLASS CuTe DSL, ThunderKittens, JAX/Pallas, TileLang) | high (tile/tensor) | **No** | not attempted — dense-tile/tensor-core model; automata scatter/branch must be faked as masked dense ops | Off-axis for irregular automata; discuss in related work, do not benchmark |
 
-## Gluon probe (concrete evidence)
+## Gluon probe (concrete, runnable evidence)
 
-Minimal attempt at the CSR scalar scan (the core NFA inner loop) in Gluon:
-
-```python
-from triton.experimental import gluon
-from triton.experimental.gluon import language as gl
-
-@gluon.jit
-def probe(rowptr, tgt, out, NS: gl.constexpr):
-    acc = gl.zeros([1], gl.int64, layout=gl.BlockedLayout([1],[32],[1],[0]))
-    for s in range(NS):
-        lo = gl.load(rowptr + s)            # <- returns a layout-typed BLOCK, not a scalar
-        hi = gl.load(rowptr + s + 1)
-        for k in range(lo, hi):             # <- range() needs scalar ints, not blocks
-            t = gl.load(tgt + k)
-    gl.store(out, acc)
-```
-
-Compilation fails:
+The probe is a **runnable artifact**, not a transcribed snippet: `scripts/gluon_probe.py`
+attempts the CSR scalar scan (the core NFA inner loop) in Gluon and asserts on the failure
+mode. Run it on a CUDA box with Triton's experimental Gluon frontend:
 
 ```
-triton ... CompilationError: Value argument cannot be block type if pointer argument is not a block
+$ python scripts/gluon_probe.py
+EXPECTED FAILURE — Gluon cannot express the CSR scalar scan:
+CompilationError: at 12:4:
+        lo = gl.load(rowptr + s)  # layout-typed block, NOT a scalar int
+        ...
+        for _k in range(lo, hi):  # range() needs scalar ints -> cannot lower
+    ...
+Value argument cannot be block type if pointer argument is not a block
+RESULT: confirmed — no scalar element load (block-typed gl.load).
 ```
+
+Reproduced verbatim on Triton 3.5.1 / RTX 4070 (2026-06-26). The probe **exits 0 on the
+expected failure** (the failure to compile IS the positive result) and **exits 1 if a future
+Gluon ever compiles it** — so the expressibility claim is falsifiable by construction, not a
+one-time anecdote. (Aside: Gluon `@jit` kernels must live in a `.py` file — they cannot even
+be defined at a REPL/`-c` — which is itself why a committed script is the right evidence.)
 
 Root cause: Gluon's `gl.load` always returns a **layout-typed tensor** — there is no
 scalar element load. Therefore the loaded `row_ptr[s]` values cannot drive a Python
@@ -89,5 +88,6 @@ written at all.
 
 ## Reproduce
 
-`backends/warp_backend.py` (Warp, works) and the probe above (Gluon, fails to compile) are
-both runnable on this machine. The CUDA/Triton techniques are validated by `pytest -m gpu`.
+`backends/warp_backend.py` (Warp, works) and `scripts/gluon_probe.py` (Gluon, fails to
+compile with the captured root cause) are both runnable on this machine. The CUDA/Triton
+techniques are validated by `pytest -m gpu`.

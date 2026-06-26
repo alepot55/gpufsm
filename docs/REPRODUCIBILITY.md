@@ -53,7 +53,7 @@ gpufsm verify             # cross-backend agreement on the example suite (0 fail
 | Figures (throughput, worklist speedup, memory ablation, regret) | `python paper/figures.py` | `paper/figures/fig_*.pdf` / `.png` |
 | Worklist 15-170 Gbps vs full-scan; memory axes within noise | sweep CSV rows | `fig_throughput_vs_states`, `fig_memory_ablation` |
 | Abstraction regret: Triton 6-8x throughput / 10.1x fit (full-scan), ~6.5x (worklist) vs CUDA; Warp 0.6-0.9x | calibrate + sweep | `fig_abstraction_regret`, `docs/RESULTS_COSTMODEL.md` |
-| DSL expressibility (CUDA/Warp express; Triton strains; Gluon cannot) | n/a (documented + probed) | `docs/DSL_EXPRESSIVENESS.md` |
+| DSL expressibility (CUDA/Warp express; Triton strains; Gluon cannot) | `python scripts/gluon_probe.py` (falsifiable: exits 0 on expected compile-failure, 1 if Gluon ever compiles it) | `docs/DSL_EXPRESSIVENESS.md` |
 
 Figures depend **only** on committed CSVs, so the paper rebuilds deterministically. The
 sweep/calibration scripts skip unsupported (backend, technique, size) cells (e.g. Triton/Warp
