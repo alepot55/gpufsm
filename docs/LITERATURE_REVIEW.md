@@ -1,5 +1,17 @@
 # Literature Review: GPU Automata Processing & DSL Abstraction Regret
 
+> **Freshness check 2026-06-26** (web sweep, arXiv/ACM). **Verdict: novelty uncontested.**
+> No 2026 successor to ngAP (ASPLOS'24) / HybridSA (OOPSLA'24) / BitGen (MICRO'25) found, and
+> **no DSL-expressibility study on irregular automata** — the clean gap holds. The 2026 activity
+> is **LLM-driven GPU kernel auto-generation/tuning** (cuPilot arXiv:2512.16465, AutoKernel
+> 2603.21331, TritonForge 2512.09196, AutoTriton 2507.05687, GPU Kernel Scientist 2506.20807,
+> ML-Triton 2503.14985). This is *orthogonal* to our axis (what a DSL can *express* at fixed
+> algorithm) and in fact **strengthens our autotuning rebuttal**: auto-generation/tuning cannot
+> manufacture an IR primitive the paradigm forbids — the falsifiable Triton↔Gluon control shows
+> the limit is expressibility, not effort. Also noted: arXiv:2503.17893 (shared-memory atomic
+> bottleneck modeling) is relevant to our `atomicOr` worklist analysis. No action needed beyond a
+> one-line acknowledgment of the LLM-kernel-gen line in related work.
+
 Generated: 2026-06-25
 Review type: **scoping** (exploratory, to set publication direction)
 Search window: 2009–2026 (emphasis 2021–2026)

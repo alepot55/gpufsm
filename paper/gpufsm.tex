@@ -321,7 +321,10 @@ hardware. The Halide~\cite{halide} lineage established abstraction constrains th
 space; SpMV format selection and Gunrock~\cite{gunrock} that layout dominates irregular GPU
 performance---we add the DSL-expressibility axis. We rebut the autotuning counter-thesis: our
 gap is expressibility, not tuning---Gluon, the explicit-control sibling on the same compiler
-stack, still cannot express the kernel. SOTA automata engines (ngAP, HybridSA, BitGen) are
+stack, still cannot express the kernel. The same answers the recent LLM kernel
+auto-generation/tuning line (e.g.\ AutoTriton, TritonForge, 2026): automatically searching the
+Triton schedule space cannot manufacture an IR primitive (scalar gather in a tile) the paradigm
+lacks, so it cannot close a regret that is expressibility, not effort. SOTA automata engines (ngAP, HybridSA, BitGen) are
 CUDA-only baselines; our contribution is the metric + cost model + the first multi-DSL
 expressibility study of an irregular workload. Table~\ref{tab:sota} positions us against them:
 each reports a speedup over \emph{its own} baseline and hardware (not comparable in absolute
