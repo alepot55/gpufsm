@@ -175,18 +175,37 @@ future Gluon ever compiles it, making the claim falsifiable.
 $\textit{states}\times256$ table, one random lookup per byte, implemented identically in
 CUDA, Triton and Warp (one program/thread per string); all match the DFA oracle.
 
-\section{Methodology}
-Throughput is measured on a fixed batch ($2048\times256$~B) as total input bits per batch
-kernel time, reported as median + percentile-bootstrap 95\% CI over 9 runs (GPU timings
-are non-Gaussian~\cite{hoefler}), kernel and transfer time separated. We diagnose
-compute- vs memory-bound with the \emph{instruction} roofline~\cite{instrroofline,roofline},
-appropriate for these integer/transaction-dominated FSM kernels (a FLOP roofline would
-understate them). Every configuration
-is verified bit-identical to the oracle on examples and randomized fuzz/stress NFAs (up to
-500 states). Data and library versions are captured per CSV row. Hardware: NVIDIA RTX 4070
-(sm\_89, 46 SMs, 12\,GB); software: CUDA toolkit 13.x, Triton 3.5.1, Warp 1.14, PyTorch
-2.9 (cu128). Each datum is the median of 9 batch-kernel times; CSR transitions are read-only
-and shared across the batch. We additionally validate on \emph{six real} ANMLZoo automata
+\section{Methodology}\label{sec:method}
+\textbf{Fairness protocol (the crux of a DSL comparison).} Every backend consumes the
+\emph{same} CSR automaton representation and implements the \emph{same} algorithm, with kernels
+structurally mirrored line-for-line from one specification; across a comparison we vary
+\emph{only} the DSL (and, within a DSL, the technique), never the algorithm. This is what makes
+the measured gap an \emph{abstraction} cost rather than an algorithmic one, and it is enforced
+mechanically: a single registry maps a (backend, technique) pair to an executor, and a CPU
+reference oracle gates correctness.
+
+\textbf{Correctness oracle.} The oracle (\texttt{reference.py}) is the NFA/DFA semantics with
+\emph{latch-first-match} (report at the first accepting configuration). Every backend/technique
+is verified bit-identical to it---\texttt{(accepted, match\_len)} on all examples, on randomized
+fuzz/stress NFAs (up to 500 states), and on six real ANMLZoo automata (below)---so a faster
+kernel can never be a wrong kernel.
+
+\textbf{Timing and statistics.} Throughput is total input bits over the per-run batch-kernel
+time on a fixed batch ($2048\times256$~B), reported as median + percentile-bootstrap 95\% CI
+over 9 runs after warmup, with kernel and transfer time separated; GPU timings are
+non-Gaussian, so we use medians and bootstrap CIs throughout~\cite{hoefler}. The headline
+regret ratios are additionally measured over multiple random-NFA seeds (median + min--max
+spread) to rule out single-instance artifacts, and parallel-scaling comparisons use a
+GPU-saturating batch so a baseline is never starved of parallelism.
+
+\textbf{Bound diagnosis.} We classify kernels compute- vs memory-bound with the
+\emph{instruction} roofline~\cite{instrroofline,roofline}---appropriate for these
+integer/transaction-dominated FSM kernels, which a FLOP roofline would understate---and
+corroborate with Nsight Compute counters (SM\%, DRAM\%, L2 hit, achieved occupancy).
+
+\textbf{Environment.} Hardware and library versions are captured per CSV row. Hardware: NVIDIA
+RTX 4070 (sm\_89, 46 SMs, 12\,GB, 6\,MB L2); software: CUDA toolkit 13.x, Triton 3.5.1, Warp
+1.14, PyTorch 2.9 (cu128). We additionally validate on \emph{six real} ANMLZoo automata
 spanning six families: Levenshtein (2787 states), Hamming (11349, 2.1M transitions), Brill
 (42661, 4.4M), Fermi (40786, particle-physics regexes), RandomForest (33223, 6.27M
 transitions---an ML decision-forest, our densest), and CoreRings (48005, synthetic ring---our
@@ -483,10 +502,12 @@ single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFA
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
 \emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
 $6$--$15\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
-limit. Two facts argue against this: (i) the kernels are structurally mirrored from the same
-CSR spec, and (ii) \emph{Warp}---an equally high-level Python DSL written with comparable
-effort---matches or beats hand CUDA, so ``high-level $\Rightarrow$ slow'' is not the
-explanation; the tile/SPMD execution model is. \emph{External.} Results are from a single
+limit. Three facts argue against this: (i) the fairness protocol (\S\ref{sec:method}) holds the
+algorithm fixed and mirrors kernels line-for-line from one CSR spec; (ii) \emph{Warp}---an
+equally high-level Python DSL written with comparable effort---matches or beats hand CUDA, so
+``high-level $\Rightarrow$ slow'' is not the explanation; and (iii) the controlled
+Triton$\leftrightarrow$Gluon pair and the within-Triton $16\times$ tile-vs-scalar cliff show the
+gap survives where no tuning knob exists---the tile/SPMD execution model is the cause. \emph{External.} Results are from a single
 GPU (RTX 4070); the cost-model constants are per-backend fits that may differ across
 architectures, so cross-architecture generality is future work.
 
