@@ -26,10 +26,7 @@ def test_cuda_dfa_matches_reference():
     rng = random.Random(0)
     for n in (16, 256, 4096):
         dfa = random_dfa(n, accept_prob=0.02, seed=n)
-        batch = [
-            bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 40)))
-            for _ in range(48)
-        ]
+        batch = [bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 40))) for _ in range(48)]
         refs = [simulate_dfa(dfa, b) for b in batch]
         got = [(r.accepted, r.match_len) for r in run_dfa_batch(dfa, batch, backend="cuda")]
         assert got == refs, f"DFA mismatch at n={n}"

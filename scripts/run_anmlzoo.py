@@ -34,9 +34,7 @@ def main() -> None:
 
     alphabet = sorted({int(s) for s in nfa.sym_symbols if 0 <= int(s) <= 255}) or [97]
     rng = random.Random(0)
-    batch = [
-        bytes(rng.choice(alphabet) for _ in range(rng.randint(0, 40))) for _ in range(64)
-    ]
+    batch = [bytes(rng.choice(alphabet) for _ in range(rng.randint(0, 40))) for _ in range(64)]
     refs = [simulate(nfa, d) for d in batch]
     res = run_batch(nfa, batch, backend="cuda", technique="worklist_global")
     got = [(r.accepted, r.match_len) for r in res]

@@ -98,9 +98,7 @@ def test_gpu_run_batch_matches_reference():
 # Multi-word (>64 states) batch coverage for backends/techniques that support it
 # (CUDA + Triton multistream variants); Warp's single-word kernel is excluded.
 _MULTIWORD_CASES = [
-    (b, t)
-    for (b, t) in _cases()
-    if b in (_B.CUDA, _B.TRITON) and t.startswith("multistream")
+    (b, t) for (b, t) in _cases() if b in (_B.CUDA, _B.TRITON) and t.startswith("multistream")
 ]
 
 
