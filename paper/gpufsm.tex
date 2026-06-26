@@ -52,12 +52,39 @@ against a CPU oracle on six real ANMLZoo automata up to 48k states).
 \end{abstract}
 
 \section{Introduction}
-Irregular workloads---graph traversal, sparse algebra, automata---are dominated by data
-layout and data-dependent control flow rather than arithmetic. GPU DSLs raise the
-abstraction level by hiding exactly those concerns (thread indexing, memory placement,
-control flow), which is why they excel on dense tensor kernels. This paper measures what
-that hiding costs on NFA processing, a canonical irregular workload (deep-packet
-inspection, regular-expression matching, bioinformatics).
+GPU domain-specific languages such as OpenAI Triton~\cite{triton} have moved from research to
+the mainstream---Triton is the default code-generation backend for PyTorch---because they
+deliver near-CUDA performance on dense tensor algebra at a fraction of the engineering effort.
+That productivity comes from \emph{hiding} the very things a GPU programmer otherwise manages by
+hand: thread indexing, memory placement, and control flow. On \emph{regular} workloads---dense
+matrix and tensor kernels with static, coalesced access and uniform control---this hiding is
+essentially free, which is precisely why these DSLs succeed.
+
+\emph{Irregular} workloads are the opposite regime. Graph traversal, sparse algebra, and finite
+automata are dominated by data layout and data-dependent control flow rather than
+arithmetic~\cite{burtscher}, and decades of evidence show that the \emph{representation}, at a
+fixed algorithm, swings their GPU performance by an order of magnitude~\cite{bestsf,sparsetir}.
+What, then, does a GPU DSL's hiding \emph{cost} on irregular workloads---and what, exactly,
+causes that cost? The question is open: DSL benchmarks are dense-tensor-only, and the GPU
+automata engines that define the state of the art---iNFAnt~\cite{infant}, ngAP~\cite{ngap},
+HybridSA~\cite{hybridsa}, BitGen~\cite{bitgen}, ANG~\cite{ang}---are uniformly single-stack CUDA,
+framed as faster \emph{algorithms}, never as what a programming abstraction forecloses. No prior
+work compares modern GPU kernel DSLs on an irregular workload.
+
+We answer the question on finite-automata simulation, a canonical irregular workload
+(deep-packet inspection, regular-expression matching, bioinformatics) with \emph{two
+complementary faces}: an NFA active-set traversal that is control-flow-bound, and a DFA
+dense-table walk that is memory-bound. We name the cost \emph{abstraction regret}---the
+performance a DSL forecloses, with the algorithm held fixed, because it cannot express the
+memory layout or control flow a workload needs---and find it is large (Triton pays $6$--$8\times$
+versus CUDA). The central, and initially counter-intuitive, result is \emph{what causes it}:
+not how high-level the DSL is, but its \emph{execution paradigm}. A clean $2\times2$
+(abstraction-height $\times$ paradigm) factorial over four real DSLs shows the thread-SIMT
+column (low-level CUDA and \emph{high-level} Warp) sits at $\approx$1$\times$ while the tile-SPMD
+column (high-level Triton and \emph{low-level} Gluon) fails. We make the attribution causal---a
+controlled same-MLIR-stack Triton$\leftrightarrow$Gluon pair, plus a $16\times$ tile-vs-scalar
+cliff measured \emph{within} one DSL---and actionable: both faces reduce to a \emph{single}
+missing IR primitive, a scalar gather within a tile.
 
 \textbf{Contributions.}
 \textbf{(A)} \emph{Abstraction regret, operationalized and falsified to a cause}: we show the
@@ -91,9 +118,9 @@ and AutomataZoo are the standard suites. A \emph{DFA} trades the NFA's parallel 
 for a single dense transition table indexed once per input byte; it is the deterministic,
 \emph{memory-bound} dual of the NFA and the second face we study. Crucially, every GPU
 automata engine above is CUDA-only: \textbf{no prior work compares modern GPU kernel DSLs
-(Triton/Gluon vs CUDA vs Warp) on an irregular workload}---existing DSL benchmarks
-(KernelBench, TritonBench) are dense-tensor-only, and the one irregular suite (ParEval)
-excludes these DSLs. We close that gap and frame the resulting gap as an expressibility cost.
+(Triton/Gluon vs CUDA vs Warp) on an irregular workload}---published GPU-DSL benchmarks target
+dense tensor kernels, and no irregular-workload suite exercises these kernel DSLs. We close that
+gap and frame the resulting performance difference as an expressibility cost.
 
 \section{Abstraction regret and the cost model}\label{sec:cost}
 We model per-symbol time as a roofline-style sum:
