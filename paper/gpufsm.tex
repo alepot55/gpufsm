@@ -36,9 +36,9 @@ NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-S
 Automata expose \textbf{two complementary faces}: an NFA active-set traversal that is
 \emph{control-flow bound}, and a DFA dense-table walk that is \emph{memory bound} (its
 throughput halves as the table crosses L2). On both faces the regret is large for the
-tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $6$--$15\times$ versus CUDA
+tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $5$--$12\times$ versus CUDA
 across the two faces, while Warp, an equally high-level \emph{Python} DSL, matches or beats
-hand CUDA on the NFA ($0.6$--$0.9\times$) and stays within $2$--$3\times$ on the DFA. So
+hand CUDA on the NFA ($0.6$--$0.9\times$) and stays within $\sim$2$\times$ on the DFA. So
 regret is set by the execution \emph{paradigm}, not by how
 high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
 Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
@@ -226,15 +226,16 @@ full scan. Even expressing the right algorithm, the tile/SPMD model imposes a la
 penalty on scalar, data-dependent automata work.
 
 \textbf{The second face: DFA is memory-bound, and the regret persists.} The DFA dense-table
-walk is the memory-bound dual of the NFA: CUDA throughput \emph{halves} as the table crosses
-the 6\,MB L2 (443~Gbps at a 4\,MB table / 4096 states, 213 at 50\,MB / 50k states;
-Fig.~\ref{fig:dfa}), the memory-bound signature. Yet the cross-DSL pattern is unchanged: Warp
-pays $2$--$3\times$ vs CUDA, while \textbf{Triton is flat at $\approx29$~Gbps regardless of
-table size}---it never reaches the
-memory-bound regime because its tile/SPMD codegen bottlenecks the scalar gather first (regret
-$7$--$15\times$). So on \emph{both} faces---control-flow-bound (NFA) and memory-bound
-(DFA)---the regret tracks the execution paradigm, not the workload's bottleneck: it is an
-intrinsic property of the DSL, not of where the kernel happens to be limited.
+walk is the memory-bound dual of the NFA. A fine table-size sweep (Fig.~\ref{fig:dfa}) makes
+the signature explicit: CUDA throughput rises to a peak \emph{exactly} at the L2 capacity
+($345$~Gbps at the 6\,MB table) and then falls $2.4\times$ to a DRAM-bound plateau
+($\sim$150--175~Gbps) once the table far exceeds L2. Warp tracks the same shape at about half
+($160\!\rightarrow\!97$~Gbps). \textbf{Triton, by contrast, is flat at $29$--$32$~Gbps across
+the entire 1--100\,MB range}---it never enters the memory-bound regime because its tile/SPMD
+codegen bottlenecks the scalar gather first (DFA regret $5$--$12\times$, largest where CUDA
+peaks at L2). So on \emph{both} faces---control-flow-bound (NFA) and memory-bound (DFA)---the
+regret tracks the execution paradigm, not the workload's bottleneck: it is an intrinsic
+property of the DSL, not of where the kernel happens to be limited.
 
 \textbf{Capability $\to$ cost.} Table~\ref{tab:cap} maps the capabilities each kernel needs to
 whether a DSL expresses them and the resulting regret. The thread-SIMT DSLs (CUDA, Warp)
@@ -261,7 +262,7 @@ Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
 Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
 \midrule
 NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
-DFA regret (memory)        & $1\times$ & $2$--$3\times$ & $7$--$15\times$ & --- \\
+DFA regret (memory)        & $1\times$ & $1.5$--$2.2\times$ & $5$--$12\times$ & --- \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -288,8 +289,9 @@ Regret is the execution paradigm, not abstraction height.}\label{fig:regret}\end
 
 \begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig_dfa_memory_bound.pdf}
-\caption{DFA (memory-bound face): CUDA/Warp throughput drops as the table crosses L2;
-Triton stays flat---model-bound, never reaching the memory regime.}\label{fig:dfa}\end{figure}
+\caption{DFA (memory-bound face), throughput vs table size (log $x$): CUDA/Warp peak at the
+6\,MB L2 then drop $2.4\times$ to a DRAM plateau; Triton stays flat (29--32~Gbps)---scalar-
+gather-bound, never reaching the memory regime.}\label{fig:dfa}\end{figure}
 
 \section{Related work}
 \textbf{Naming.} We deliberately invert ``abstraction \emph{without} regret''

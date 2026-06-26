@@ -18,9 +18,9 @@ on finite automata across the paradigm axis CUDA and NVIDIA Warp (thread-SIMT) v
 its low-level Gluon frontend (tile-SPMD). Automata expose **two complementary faces**: an NFA
 active-set traversal that is *control-flow bound*, and a DFA dense-table walk that is *memory
 bound* (throughput halves as the table crosses L2). On both faces the regret is large for the
-tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 6–15× vs CUDA across the two
+tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 5–12× vs CUDA across the two
 faces while Warp, an equally high-level *Python* DSL, matches or beats hand CUDA on the NFA
-(0.6–0.9×) and stays within 2–3× on the DFA — so regret is set by the
+(0.6–0.9×) and stays within ~2× on the DFA — so regret is set by the
 execution **paradigm**, not by how high-level the DSL looks. We make the attribution
 **falsifiable** with the Triton↔Gluon controlled pair (identical MLIR compiler stack; Gluon
 only adds explicit layout/shared-memory control): Gluon *still* cannot express the kernel, so
@@ -164,15 +164,16 @@ algorithm, its tile/SPMD model imposes a large constant penalty on scalar, data-
 automata work — expressibility does not buy efficiency.
 
 **6.5 The second face: DFA is memory-bound, and the regret persists.** The DFA dense-table
-walk is the memory-bound dual of the NFA: CUDA throughput *halves* as the table crosses the
-6 MB L2 (443 Gbps at a 4 MB table / 4096 states → 213 Gbps at 50 MB / 50k states; Fig. `fig_dfa_memory_bound`,
-`paper/data/dfa_regret_rtx4070.csv`) — the memory-bound signature. Yet the cross-DSL pattern
-is unchanged: Warp pays 2–3× vs CUDA, while **Triton is flat at ≈29 Gbps regardless of table
-size** — it never reaches the memory-bound regime because its tile/SPMD codegen bottlenecks
-the scalar gather first (regret 7–15×). So on *both* faces — control-flow-bound (NFA) and
-memory-bound (DFA) — the regret tracks the execution **paradigm**, not the workload's
-bottleneck: it is an intrinsic property of the DSL, not of where the kernel happens to be
-limited.
+walk is the memory-bound dual of the NFA. A fine table-size sweep (Fig. `fig_dfa_memory_bound`,
+`paper/data/dfa_regret_rtx4070.csv`) makes the signature explicit: CUDA throughput rises to a
+peak *exactly* at the L2 capacity (345 Gbps at the 6 MB table) and then falls **2.4×** to a
+DRAM-bound plateau (~150–175 Gbps) once the table far exceeds L2. Warp tracks the same shape at
+about half (160→97 Gbps). **Triton, by contrast, is flat at 29–32 Gbps across the entire
+1–100 MB range** — it never enters the memory-bound regime because its tile/SPMD codegen
+bottlenecks the scalar gather first (DFA regret 5–12×, largest where CUDA peaks at L2). So on
+*both* faces — control-flow-bound (NFA) and memory-bound (DFA) — the regret tracks the execution
+**paradigm**, not the workload's bottleneck: it is an intrinsic property of the DSL, not of
+where the kernel happens to be limited.
 
 **6.6 Capability → cost.** The table below maps the capabilities each kernel needs to whether
 a DSL expresses them and the resulting regret (✓ expressible, ◐ only as a strained single
@@ -188,7 +189,7 @@ or only via a strained single program (Triton) — exactly what the regret measu
 | Register-resident bitset     | ✓ | ✓ | ✗ | ✗ |
 | Explicit shared-mem layout   | ✓ | ✗ | ✗ | ✓ |
 | **NFA regret (control-flow)** | 1× | 0.6–0.9× | 6–10× | n/a (✗) |
-| **DFA regret (memory)**       | 1× | 2–3× | 7–15× | — |
+| **DFA regret (memory)**       | 1× | 1.5–2.2× | 5–12× | — |
 
 ## 7. Related work
 

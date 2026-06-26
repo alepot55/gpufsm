@@ -166,10 +166,12 @@ capability-vs-costo** su 2 workload × spettro DSL (CUDA/Triton/Gluon/Warp). Pia
 il paper attorno alle due facce + tabella capability. Aumentare gradualmente, tutto a discrezione.
 - **Progresso v2:** ✅ DFA core + oracolo + `dfa_api` (cpu/cuda/triton/warp); ✅ kernel DFA **CUDA/Triton/Warp**
   tutti validati vs oracolo; ✅ regret memory-bound misurato + figura (`paper/data/dfa_regret_rtx4070.csv`,
-  `fig_dfa_memory_bound`). **Risultati two-faces:** DFA memory-bound — cuda 443→213 Gbps (cala oltre L2), warp
-  147→107 (regret 2–3×), **triton ~29 flat** (non raggiunge il regime memory-bound, model-bound). Quindi Triton
-  paga regret grosso su ENTRAMBE le facce (NFA control-flow 9–15× + DFA memory 7–15×) → **è il modello tile/SPMD,
-  non il workload**; Warp (thread) vicino a CUDA su entrambe. 43 test verdi.
+  `fig_dfa_memory_bound`). **Risultati two-faces (sweep fine 1–100 MB, `scripts/sweep_dfa.py`):** DFA memory-bound —
+  cuda **picco 345 Gbps esattamente a 6 MB (= L2) → crolla 2.4× a plateau DRAM ~150–175 Gbps**, warp stessa forma
+  a metà (160→97), **triton piatto 29–32 Gbps** su tutto il range (non raggiunge mai il regime memory-bound).
+  Regret DFA: triton 5–12× (max dove cuda picca a L2), warp 1.5–2.2×. Quindi Triton paga regret su ENTRAMBE le
+  facce (NFA control-flow 6–8×/10× fit + DFA memory 5–12×) → **è il modello tile/SPMD, non il workload**; Warp
+  (thread) vicino a CUDA su entrambe. Figura ora è una CURVA col knee L2 visibile (line plot, non più 2 punti).
 ### 🎯 META-OBIETTIVO (utente, 26 giu): UNICA cosa che conta = **pubblicazione al venue più alto possibile**.
 Ragionare/agire da ricercatore autonomo verso quello; cambiare scope/esperimenti/direzione liberamente; niente
 validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (vedi `docs/NOVELTY_POSITIONING.md`):
