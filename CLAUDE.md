@@ -95,7 +95,18 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] AUDIT COST-MODEL + typografia + artifact statement.** (a) Claim "<1% error at
+- **[Iter più recente] #2 KERNEL BLOCK-PARALLEL FATTO (warp-per-string worklist).** `worklist_warp`:
+  un warp (32 lane) per stringa; le lane partizionano le parole di stato e scatterano transizioni/eps-closure
+  via `atomicOr` nel next-set globale condiviso, con `__any_sync` per frontier-empty/accept. Risolve la
+  sotto-utilizzazione del worklist 1-thread su automi grandi. Validato bit-for-bit vs oracle (1252 stringhe,
+  0 mismatch) + == worklist_global su NFA >64 stati (`tests/test_worklist_warp.py`, 5 verdi). Bench
+  (`scripts/bench_worklist_warp.py` → `paper/data/worklist_warp_rtx4070.csv`): **12–17× vs global 1-thread su
+  automi reali** (levenshtein 14.7×, fermi 12.5×, brill 17.2×), fino a ~165× su NFA sintetici densi. Paper
+  (Implementation+Limitations) aggiornato. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
+  + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
+- **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).
+- **[Iter -2] AUDIT COST-MODEL + typografia + artifact statement.** (a) Claim "<1% error at
   large n" era sovrastimato: errore reale predicted-vs-measured = **<1% solo a n=256** (CUDA 0.3%, Triton
   0.6%), ~2%(CUDA)/~13%(Triton) a n=128, 20–60% a n=32/64 (launch overhead). Warp fit esatto = 2pt/2par
   (non è segnale di qualità). Prosa riconciliata in .tex/DRAFT/RESULTS_COSTMODEL/PROFILING. (b) 3 tabelle
