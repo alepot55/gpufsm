@@ -435,7 +435,7 @@ ANG (ICCD'25)           & multi-level fine-grained par.   & $11.7\times$ avg \\
 represent production automata; we mitigate this by also validating on six real ANMLZoo
 automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
 reference oracle bit-for-bit, and the block-parallel kernel gives $1.4$--$27\times$ over the
-single-thread baseline on them (\texttt{paper/data/real\_automata\_throughput\_rtx4070.csv}).
+single-thread baseline on them (CSV in \texttt{paper/data/}).
 \emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
 Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
 algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
