@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] RIGORE NUMERI + suite reale allargata.** (a) DRAFT.md riconciliato col .tex (two faces,
+- **[Iter più recente] PROBE GLUON FALSIFICABILE + claim sharpening.** (a) `scripts/gluon_probe.py`:
+  artefatto runnabile (non snippet) che riproduce l'errore esatto `Value argument cannot be block type
+  if pointer argument is not a block` su Triton 3.5.1 — exit 0 sul fallimento atteso, exit 1 se un Gluon
+  futuro lo compila → claim falsificabile per costruzione. Citato da gpufsm.tex/DSL_EXPRESSIVENESS/REPRODUCIBILITY.
+  ⚠️ Gluon `@jit` DEVE stare in un file .py (no REPL/-c). (b) Contributo (A) ora front-loada le 2 facce + il
+  controllo Triton↔Gluon + capability→cost table come novelty di testa. (c) Limitations: piano 2ª-GPU concreto
+  (claim qualitativi = proprietà del compilatore arch-independent; il knee DFA L2 e i fattori di regret assoluti
+  = run camera-ready su A100/H100 ≥40MB L2, framed come predizione falsificabile + re-run a un comando). Paper
+  ricompila pulito (5pp, no undefined refs).
+- **[Iter precedente] RIGORE NUMERI + suite reale allargata.** (a) DRAFT.md riconciliato col .tex (two faces,
   DFA second face §6.5, capability table §6.6, Hexcute/LMS/Tawa/Descend in related work). (b) **Audit numeri**:
   tutte le cifre citate ora tracciano ai `paper/data/*.csv` — corretti stale: regret NFA 15.7×→6–8× misurato /
   10.1× fit; Warp 0.62×→0.6–0.9×; worklist speedup 250×/1148×/7147×→332×@32..≈10⁴×@500; worklist regret 9×/142 Gbps→
