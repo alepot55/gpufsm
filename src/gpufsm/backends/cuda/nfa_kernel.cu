@@ -384,6 +384,87 @@ __global__ void worklist_global_kernel(
     out_flags[i] = out_f; out_lens[i] = out_l;
 }
 
+// ---- Compacted active-ID worklist (one thread/string) ------------------------------
+// The bitmap worklist iterates all nwords words per symbol even when the active set is
+// tiny (measured: brill averages ~1.5 active states over 667 words -> ~99.8% wasted scan).
+// This kernel keeps the active set as a COMPACTED array of state IDs (frontier), so per
+// symbol it does O(active) work, not O(nwords). A per-string `visited` bitmap dedups the
+// next frontier; we clear only the touched bits (O(active)), never the whole bitmap, so the
+// per-symbol cost is independent of num_states. One thread per string (isolates the
+// compaction effect vs worklist_global; both are 1-thread/string). Same latch-first-match.
+// frontier_a/frontier_b are int32[num_states] per string; visited is ull[nwords] per string.
+__device__ __forceinline__ int eps_closure_compact(
+    int* F, int nf, unsigned long long* V,
+    const int* eps_row_ptr, const int* eps_targets) {
+    // BFS expansion in place: F[0..nf) is the queue; appends grow nf. V dedups.
+    for (int j = 0; j < nf; ++j) {
+        int s = F[j];
+        for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
+            int t = eps_targets[k];
+            if (!((V[t >> 6] >> (t & 63)) & 1ULL)) {
+                V[t >> 6] |= (1ULL << (t & 63));
+                F[nf++] = t;
+            }
+        }
+    }
+    return nf;
+}
+
+__global__ void worklist_compact_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state, int uses_any, int nwords,
+    int* frontier_a, int* frontier_b, unsigned long long* visited,
+    int* out_flags, int* out_lens) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    int* FA = frontier_a + (size_t)i * num_states;
+    int* FB = frontier_b + (size_t)i * num_states;
+    unsigned long long* V = visited + (size_t)i * nwords;
+    const int* input_symbols = input_data + input_offsets[i];
+    int input_len = input_offsets[i + 1] - input_offsets[i];
+
+    for (int w = 0; w < nwords; ++w) V[w] = 0ULL;  // one-time O(nwords) zero
+    int nf = 0;
+    V[start_state >> 6] |= (1ULL << (start_state & 63));
+    FA[nf++] = start_state;
+    nf = eps_closure_compact(FA, nf, V, eps_row_ptr, eps_targets);
+
+    int out_f = 0, out_l = 0, done = 0;
+    for (int j = 0; j < nf && !done; ++j)
+        if ((accept_words[FA[j] >> 6] >> (FA[j] & 63)) & 1ULL) { out_f = 1; out_l = 0; done = 1; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        // clear visited bits of the current frontier (O(active)) -> V all-zero
+        for (int j = 0; j < nf; ++j) V[FA[j] >> 6] &= ~(1ULL << (FA[j] & 63));
+        int nfb = 0;
+        for (int j = 0; j < nf; ++j) {
+            int s = FA[j];
+            for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                int tsym = sym_symbols[k];
+                if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                    int t = sym_targets[k];
+                    if (!((V[t >> 6] >> (t & 63)) & 1ULL)) {
+                        V[t >> 6] |= (1ULL << (t & 63));
+                        FB[nfb++] = t;
+                    }
+                }
+            }
+        }
+        nfb = eps_closure_compact(FB, nfb, V, eps_row_ptr, eps_targets);
+        for (int j = 0; j < nfb; ++j)
+            if ((accept_words[FB[j] >> 6] >> (FB[j] & 63)) & 1ULL) {
+                out_f = 1; out_l = pos + 1; done = 1; break;
+            }
+        int* tmp = FA; FA = FB; FB = tmp;  // swap frontiers
+        nf = nfb;
+    }
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
 // ---- Block-parallel (warp-per-string) work-efficient worklist ----------------------
 // One *warp* (32 lanes) cooperates on one string instead of one thread. The 32 lanes
 // partition the nwords words of the working set (lane handles words w with w%32==lane);
@@ -1227,6 +1308,64 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_warp(
     return {flags, lens, kernel_ms};
 }
 
+// Compacted active-ID worklist (one thread/string): O(active) per symbol, not O(nwords).
+// Returns (flags, lens, kernel_ms).
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_compact(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens, *d_fa, *d_fb;
+    unsigned long long* d_vis;
+    int ns1 = num_strings ? num_strings : 1;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * ns1));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * ns1));
+    CUDA_CHECK(cudaMalloc(&d_fa, sizeof(int) * (size_t)ns1 * num_states));
+    CUDA_CHECK(cudaMalloc(&d_fb, sizeof(int) * (size_t)ns1 * num_states));
+    CUDA_CHECK(cudaMalloc(&d_vis, sizeof(unsigned long long) * (size_t)ns1 * nwords));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256, blocks = (num_strings + threads - 1) / threads;
+        worklist_compact_kernel<<<blocks, threads>>>(
+            d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off, num_strings,
+            num_states, start_state, uses_any, nwords, d_fa, d_fb, d_vis, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens); cudaFree(d_fa); cudaFree(d_fb); cudaFree(d_vis);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
 // Shared-memory block-cooperative worklist. Working set in dynamic shared memory; the
 // launcher picks warps_per_block so warps_per_block*4*nwords*8 fits 48 KB. Raises if even
 // one warp's working set (4*nwords*8 bytes) exceeds 48 KB. Returns (flags, lens, kernel_ms).
@@ -1382,6 +1521,9 @@ PYBIND11_MODULE(_cuda, m) {
     m.def("run_worklist_warp", &run_worklist_warp,
           "Block-parallel (warp-per-string) work-efficient worklist; no state-count cap; "
           "returns (flags, lens, kernel_ms).");
+    m.def("run_worklist_compact", &run_worklist_compact,
+          "Compacted active-ID worklist (one thread/string; O(active) per symbol, no "
+          "O(nwords) bitmap scan); returns (flags, lens, kernel_ms).");
     m.def("run_worklist_shared", &run_worklist_shared,
           "Shared-memory block-cooperative worklist (working set in dynamic shared mem; "
           "num_states up to ~1536); returns (flags, lens, kernel_ms).");

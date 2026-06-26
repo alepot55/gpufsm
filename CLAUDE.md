@@ -129,7 +129,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   resta L2-resident. Spiega perché worklist_shared è inerte (working set già in L2) e perché il gap SOTA è
   **algoritmico** (worklist compatto active-ID, meno atomicOr/syncwarp, ngAP non-blocking), non memory.
   Dati in `paper/data/nsight_rtx4070.csv` + `docs/PROFILING.md`. PROSSIMO: prototipo worklist compatto (array
-  di ID attivi) vs bitmap-scan O(nwords) — l'esperimento che potrebbe alzare il throughput assoluto. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  di ID attivi) vs bitmap-scan O(nwords) — l'esperimento che potrebbe alzare il throughput assoluto.
+  **FATTO + RISULTATO (26 giu): IPOTESI CONFUTATA.** `worklist_compact` (1-thread, frontier compatto O(active)
+  + visited bitmap, clear O(active)) validato vs oracle (1200 stringhe, 0 mismatch). MA: vs global 1-thread
+  appena **0.8–1.5×** (levenshtein 0.8× PEGGIO, fermi 1.0-1.2×, brill 1.5×), e vs warp **0.1–0.4×** (molto
+  più lento). Perché: saltare una parola vuota nel bitmap-scan è 1 load+branch (economico) + accesso coalescizzato,
+  mentre il frontier compatto ha load sparsi + dedup test-and-set per transizione → il word-scan NON era il collo
+  di bottiglia. Tenuto come ablation validata (come worklist_shared). Premessa: automi reali sparsissimi (brill
+  mean 1.5 attivi/667 words). ⇒ Né layout (shared) né work-reduction (compact) è la leva; lo è il **parallelismo**
+  (warp, già fatto). Gap SOTA = **ridondanza algoritmica cross-string/symbol** (memoization, non-blocking ngAP).
+  Knowledge base: `docs/KERNEL_EXPERIMENTS.md` (log vivo degli esperimenti kernel + esiti). Paper corretto. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
   (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
   + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
 - **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).

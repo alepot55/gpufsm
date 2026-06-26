@@ -390,9 +390,14 @@ bottleneck (mirroring the compute-bound \texttt{multistream\_shared} result). Ns
 the cause: \texttt{worklist\_warp} fixes the single-thread kernel's occupancy ($17\!\rightarrow\!57\%$)
 but is \emph{latency-bound}, not memory-bound---DRAM $\le$2.25\% and L2 hit $\ge$97.6\% even for
 brill's 17\,MB CSR (far above the 6\,MB L2), since all strings share the CSR and only a hot row
-subset is touched (\texttt{paper/data/nsight\_rtx4070.csv}). So the remaining gap to SOTA absolute
-throughput (ngAP-class) is \emph{algorithmic}---fewer instructions/serialization: a compacted
-active-ID worklist, memoization, non-blocking multi-symbol---not memory residency. That is the next step.
+subset is touched (\texttt{paper/data/nsight\_rtx4070.csv}). We also tested the natural
+work-reduction fix---a \emph{compacted active-ID worklist} ($O(\text{active})$ instead of the
+$O(\text{words})$ bitmap scan)---but it barely beats the bitmap kernel ($0.8$--$1.5\times$,
+\texttt{docs/KERNEL\_EXPERIMENTS.md}): skipping an empty word is already cheap and the bitmap's
+coalesced access offsets compaction's scattered loads and dedup overhead, so word-scanning was
+never the bottleneck. The remaining gap to SOTA absolute throughput (ngAP-class) is therefore
+\emph{algorithmic redundancy across strings/symbols}---memoization, non-blocking multi-symbol
+processing---not memory residency or worklist representation. That is the next step.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call

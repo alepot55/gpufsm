@@ -273,9 +273,15 @@ absolute throughput is explicit future work.
   far smaller batch, so it's the right choice for few-stream / low-latency use. We further
   tested shared-memory working-set privatization (**`worklist_shared`**): it only ties
   `worklist_warp` (0.99–1.10×) — once work-efficient, the working-set *layout* is no longer the
-  bottleneck (mirroring the compute-bound `multistream_shared` result). So the remaining gap to
-  SOTA absolute throughput (ngAP-class) is **algorithmic** (memoization / non-blocking
-  multi-symbol), not memory residency — the path for (B) to land at MICRO/ASPLOS strength.
+  bottleneck (mirroring the compute-bound `multistream_shared` result). We also tested a
+  **compacted active-ID worklist** (O(active) vs the O(words) bitmap scan): it barely beats the
+  bitmap kernel (0.8–1.5×; `docs/KERNEL_EXPERIMENTS.md`) — skipping an empty word is already
+  cheap and the bitmap's coalesced access offsets compaction's scattered loads, so word-scanning
+  was never the bottleneck. Nsight confirms `worklist_warp` is latency-bound, not memory-bound
+  (DRAM ≤2.25%, L2 hit ≥97.6% even for brill's 17 MB CSR). So the remaining gap to SOTA absolute
+  throughput (ngAP-class) is **algorithmic redundancy across strings/symbols** (memoization /
+  non-blocking multi-symbol), not memory residency or worklist representation — the path for (B)
+  to land at MICRO/ASPLOS strength.
 - Nsight Compute counters are admin-gated on the test host (`docs/PROFILING.md`); the
   compute-bound claim is established by controlled ablation instead, with counters as
   confirmatory follow-up.
