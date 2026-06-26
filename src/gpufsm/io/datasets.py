@@ -33,6 +33,12 @@ DATASETS: dict[str, Dataset] = {
         url=f"{_ANMLZOO}/Levenshtein/anml/24_20x3.1chip.anml",
         sha256="8d6ec59d7c57a6e41112f90c244b5c393ff71124df8062ab025c8f243f6a7370",
     ),
+    # Hamming-distance automaton (93, 20X3): 11346 STEs, pure homogeneous, all-input.
+    "hamming": Dataset(
+        name="hamming_93_20X3.1chip.anml",
+        url=f"{_ANMLZOO}/Hamming/anml/93_20X3.1chip.anml",
+        sha256="6005437dac4581223c30c9d039b08e6a6a856e821507b300023665995f91170b",
+    ),
 }
 
 
