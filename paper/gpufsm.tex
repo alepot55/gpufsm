@@ -120,8 +120,12 @@ is verified bit-identical to the oracle on examples and randomized fuzz/stress N
 \textbf{The faithful kernel is compute-bound; memory layout is irrelevant there.}
 \texttt{multistream}, \texttt{multistream\_shared} (modeled CSR traffic $=0$), and
 \texttt{multistream\_async} tie to within the bootstrap CI at every size
-(Fig.~\ref{fig:mem}), and throughput scales as $1/n^2$ (Fig.~\ref{fig:thr}). The memory
-axes cannot help until the algorithm is work-efficient.
+(Fig.~\ref{fig:mem}), and throughput scales as $1/n^2$ (Fig.~\ref{fig:thr}). Nsight Compute
+counters confirm this at the hardware level: the full-scan kernel sustains $\approx$19\% of
+peak SM throughput but only \textbf{0.01\%} of peak DRAM throughput, and
+\texttt{multistream\_shared} shows identical SM\%, DRAM\% and occupancy---only the L2 hit
+rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot help until
+the algorithm is work-efficient.
 
 \textbf{The work-efficient kernel unlocks the regime.} The \texttt{worklist} kernel is
 $250\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$;
@@ -175,9 +179,9 @@ the framing + cost model + the multi-DSL expressibility study.
 
 \section{Limitations and future work}
 Single GPU architecture so far; a second architecture is needed for generality. The
-worklist is one thread/string; a cooperative warp/block-parallel version is the path to
-SOTA absolute throughput. Nsight Compute counters were admin-gated on the test host, so the
-compute-bound claim rests on controlled ablation, with counters as confirmatory follow-up.
+worklist is one thread/string and, at small batches, under-utilizes the GPU (Nsight: 17\%
+occupancy, 2 blocks); a cooperative warp/block-parallel version is the path to SOTA
+absolute throughput when streams are few.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call

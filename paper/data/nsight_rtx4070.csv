@@ -1,0 +1,5 @@
+kernel,num_states,n_strings,sm_throughput_pct,dram_throughput_pct,l2_hit_pct,achieved_occupancy_pct
+multistream,128,8192,19.44,0.01,79.19,16.67
+multistream_shared,128,8192,19.60,0.01,93.02,16.67
+worklist,256,16384,5.43,6.30,95.63,23.43
+worklist,256,512,0.23,4.48,80.31,16.61

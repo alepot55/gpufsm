@@ -1,6 +1,41 @@
 # Profiling notes (Nsight)
 
-## Status: Nsight Compute counters BLOCKED on this host (permissions)
+## Measured results (RTX 4070, ncu via sudo) — confirm the compute-bound claim
+
+Nsight Compute counters (collected with `sudo /usr/local/cuda/bin/ncu`, single clean
+launch via `scripts/profile_target.py`):
+
+| kernel (n=128, 8192 strings) | SM thrpt % | DRAM thrpt % | L2 hit % | achieved occ % |
+|---|---|---|---|---|
+| `multistream` (full-scan) | **19.44** | **0.01** | 79.19 | 16.67 |
+| `multistream_shared` | 19.60 | 0.01 | **93.02** | 16.67 |
+
+**Interpretation (hardware-level confirmation of the cost-model finding):**
+- Full-scan is **compute-bound, not memory-bound**: SM throughput (≈19%) exceeds DRAM
+  throughput (0.01%) by ~3 orders of magnitude. The O(n²) eps-closure dominates.
+- `multistream_shared` (CSR in shared memory) has **identical SM%, DRAM% and occupancy**;
+  only the L2 hit rate rises (79→93%). Since DRAM is not the bottleneck, that locality win
+  does not move runtime — exactly why the memory-layout axes are inert in this regime
+  (matches `multistream_shared` tying `multistream` in the throughput sweep).
+- Absolute SM% is modest because occupancy is ~17% (one program per thread); the *ratio*
+  SM≫DRAM is the load-bearing observation.
+
+The work-efficient `worklist` (n=256, 16384 strings) profiles at SM 5.4% / DRAM 6.3% /
+L2 95.6% / occ 23.4% — roughly balanced and *under-utilized* (it does far less work), i.e.
+latency/occupancy-bound at this scale. At a small batch (512 strings, 2 blocks) occupancy
+is only 16.6% with SM 0.23% / DRAM 4.5% — strongly under-utilized. **This motivates the
+block-parallel (warp-cooperative) worklist** as future work: with few strings, one
+thread/string cannot fill the GPU.
+
+So the compute-bound claim is now **measured**, not only inferred from the ablation.
+
+## Enabling ncu (this host: sudo works passwordless)
+
+Per-session: `sudo /usr/local/cuda/bin/ncu ...` (note the absolute path — sudo's PATH lacks
+`/usr/local/cuda/bin`). Permanent (non-sudo) profiling needs
+`NVreg_RestrictProfilingToAdminUsers=0` + reboot.
+
+## (historical) Counter permission gate
 
 `ncu` (Nsight Compute) is installed (`/usr/local/cuda/bin/ncu`) but collecting hardware
 counters fails with:

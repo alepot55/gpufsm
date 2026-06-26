@@ -116,8 +116,12 @@ are captured in `paper/data/sweep_techniques.csv`.
 `multistream`, `multistream_shared` (modeled CSR traffic = 0), and `multistream_async` tie
 to within the bootstrap CI at every size (Fig. `fig_memory_ablation`), and throughput scales
 as 1/n² (Fig. `fig_throughput_vs_states`). The cost model fits this to <1% relative error at
-large n with a negligible memory term. Conclusion: the memory axes (byte→bit, shared CSR,
-async) cannot help until the algorithm is work-efficient.
+large n with a negligible memory term. Nsight Compute counters confirm it at the hardware
+level (`paper/data/nsight_rtx4070.csv`): the full-scan kernel sustains ~19% of peak SM
+throughput but only **0.01%** of peak DRAM throughput — compute exceeds memory by ~3 orders
+of magnitude — and `multistream_shared` shows identical SM%, DRAM% and occupancy, raising
+only the L2 hit rate (79→93%) without moving runtime. Conclusion: the memory axes (byte→bit,
+shared CSR, async) cannot help until the algorithm is work-efficient.
 
 **6.2 The work-efficient kernel unlocks the regime.** The `worklist` kernel is 250×–10⁴×
 faster than full-scan (the speedup grows with n: 1148× at 64 states, 7147× at 500) and

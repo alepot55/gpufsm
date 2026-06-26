@@ -32,10 +32,12 @@ def random_nfa(n: int, seed: int = 1):
 
 def main() -> None:
     backend, technique, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    n_strings = int(sys.argv[4]) if len(sys.argv) > 4 else 16384  # default saturates ~46 SMs
+    slen = 256
     nfa = random_nfa(n)
     rng = np.random.default_rng(0)
-    flat = rng.integers(ord("a"), ord("a") + 5, size=2048 * 256, dtype=np.uint8).tobytes()
-    batch = [flat[i * 256 : (i + 1) * 256] for i in range(2048)]
+    flat = rng.integers(ord("a"), ord("a") + 5, size=n_strings * slen, dtype=np.uint8).tobytes()
+    batch = [flat[i * slen : (i + 1) * slen] for i in range(n_strings)]
     run_batch(nfa, batch, backend=backend, technique=technique)  # the single profiled launch
 
 

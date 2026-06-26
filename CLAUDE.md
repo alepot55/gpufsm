@@ -148,8 +148,11 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - ✅ **Figure FATTE** (task #9): `paper/figures.py` (4 figure dai CSV versionati; supera la legacy generate_figures.py).
 - ✅ **Paper FATTO** (task #10): `paper/DRAFT.md` (prosa) + **`paper/gpufsm.tex` (IEEEtran, compila → PDF 3pp, 4 figure)**
   + `docs/REPRODUCIBILITY.md` (guida artifact AE-style, mappa claim→comando). Resta solo: Zenodo DOI (release) + espansione contenuti.
-- ⛔ **Nsight (task #6) BLOCCATO**: `ERR_NVGPUCTRPERM` (counter admin-gated, serve sudo/`NVreg_RestrictProfilingToAdminUsers=0`+reboot).
-  Fix + alternativa in `docs/PROFILING.md`. La tesi compute-bound è già provata dall'ablation (shared-CSR pareggia) → ncu è confermativo.
+- ✅ **Nsight (task #6) FATTO** (l'utente ha dato sudo passwordless; `sudo /usr/local/cuda/bin/ncu`):
+  full-scan **SM 19.4% vs DRAM 0.01%** → compute-bound confermato a livello hardware; `multistream_shared`
+  SM/DRAM/occupancy identici (solo L2 hit 79→93%) → layout memoria inerte nel regime compute-bound. Worklist
+  a batch piccolo sotto-utilizzato (occ 16.6%, 2 blocchi) → motiva block-parallel. Dati: `paper/data/nsight_rtx4070.csv`,
+  interpretazione in `docs/PROFILING.md`. Tesi compute-bound ora **misurata**, non solo inferita.
 - ✅ **ANML loader FATTO** (task #8, parser): `io/anml.py` parsa il sottoinsieme ANML (homogeneous→edge-labelled,
   symbol-set classes/ranges/negation/wildcard) + exporter `to_anml`; validato con fixture + round-trip (4 test).
   ⚠️ Manca solo il **download dei dati ANMLZoo reali** (DATASETS vuoto, serve SHA pinnato da mirror fidato — non
