@@ -998,6 +998,73 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global
     return {flags, lens, kernel_ms};
 }
 
+// DFA simulation — the MEMORY-bound automata workload. One thread per string walks a
+// dense transition table: cur = trans[cur*256 + symbol] per byte (a random global lookup;
+// for large DFAs the table exceeds cache -> memory-bound). latch-first-match.
+__global__ void dfa_kernel(
+    const int* trans, const signed char* accept,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state,
+    int* out_flags, int* out_lens) {
+    (void)num_states;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    const int* in = input_data + input_offsets[i];
+    int len = input_offsets[i + 1] - input_offsets[i];
+    int cur = start_state, out_f = 0, out_l = 0;
+    if (accept[cur]) {
+        out_f = 1;
+    } else {
+        for (int p = 0; p < len; ++p) {
+            cur = trans[cur * 256 + in[p]];
+            if (accept[cur]) { out_f = 1; out_l = p + 1; break; }
+        }
+    }
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
+// Returns (flags, lens, kernel_ms) for a batch over a DFA.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_dfa(
+    py::array_t<int> trans, py::array_t<signed char> accept,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state) {
+
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+    std::vector<void*> frees;
+    const int* d_trans = dev_copy(trans, frees);
+    const signed char* d_acc = dev_copy(accept, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256, blocks = (num_strings + threads - 1) / threads;
+        dfa_kernel<<<blocks, threads>>>(d_trans, d_acc, d_in, d_off, num_strings,
+                                        num_states, start_state, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
 PYBIND11_MODULE(_cuda, m) {
     m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR/async/worklist] NFA kernels)";
     m.def("run_dense", &run_dense,
@@ -1016,5 +1083,8 @@ PYBIND11_MODULE(_cuda, m) {
           "returns (flags, lens, kernel_ms).");
     m.def("run_worklist_global", &run_worklist_global,
           "Work-efficient worklist with a global working set — no state-count cap; "
+          "returns (flags, lens, kernel_ms).");
+    m.def("run_dfa", &run_dfa,
+          "DFA simulation (dense transition-table lookup per byte, memory-bound); "
           "returns (flags, lens, kernel_ms).");
 }
