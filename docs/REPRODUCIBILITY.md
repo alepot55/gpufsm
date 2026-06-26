@@ -61,6 +61,15 @@ Figures depend **only** on committed CSVs, so the paper rebuilds deterministical
 sweep/calibration scripts skip unsupported (backend, technique, size) cells (e.g. Triton/Warp
 worklist > 64 states) with a log line rather than failing.
 
+> **Reproducibility caveat (Warp init / CUDA-716).** On some Warp 1.14 / CUDA 12.9 runs, Warp's
+> init intermittently throws `CUDA error 716: misaligned address`, which is *sticky* — it poisons
+> the process CUDA context so every subsequent `cuda`/`warp` measurement fails. `sweep_techniques.py`
+> now detects this and aborts with a "rerun" hint (rather than emit a half-empty CSV). It is
+> intermittent: simply re-run the sweep. Re-verification (canonical generator) reproduces the
+> committed worklist throughput within ~8–12% (thermal/clock variation; shape identical) and the
+> 1/n² compute-bound exactly — the committed CSV is a valid clean-run snapshot and is not
+> overwritten by thermally-throttled re-measurements.
+
 ## Profiling (Nsight)
 
 GPU performance counters are admin-gated on the reference host; see `docs/PROFILING.md` for
