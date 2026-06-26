@@ -21,7 +21,7 @@ frontend. Two findings stand out. First, on a faithful full-scan NFA kernel the 
 is *compute*, not memory: staging the transition table into shared memory (zero global
 traffic) leaves throughput unchanged, and throughput scales as 1/n² with state count — so
 memory-layout techniques cannot help until the algorithm is made work-efficient. We then
-build a work-efficient active-set kernel that is 250×–10⁴× faster and reaches 15–142 Gbps.
+build a work-efficient active-set kernel that is 250×–10⁴× faster and reaches 15–170 Gbps.
 Second, the Triton↔CUDA gap is a per-DSL constant (≈15.7× on this kernel) that no
 traffic/compute term explains, while Warp — an equally high-level *Python* DSL — matches or
 beats hand-written CUDA (0.62×). Abstraction regret is therefore set by the execution
@@ -46,7 +46,7 @@ inspection, regex, bioinformatics).
   attribute the DSL gap to *expressible memory layout and control flow*, distinguishing it
   from generic performance-portability efficiency (Pennycook et al.) and from autotuning.
 - **(B) A work-efficient portable NFA engine.** An active-set/worklist bit-packed kernel
-  (§4) that removes the O(n²) compute wall and reaches 15–142 Gbps, the regime where the
+  (§4) that removes the O(n²) compute wall and reaches 15–170 Gbps, the regime where the
   memory axes become load-bearing.
 - **(C) A reproducible artifact.** One registry-based framework, a CPU reference oracle,
   median+CI95 sweeps, and figures regenerated only from versioned CSVs.
@@ -134,7 +134,7 @@ shared CSR, async) cannot help until the algorithm is work-efficient.
 
 **6.2 The work-efficient kernel unlocks the regime.** The `worklist` kernel is 250×–10⁴×
 faster than full-scan (the speedup grows with n: 1148× at 64 states, 7147× at 500) and
-reaches 15–142 Gbps (Fig. `fig_worklist_speedup`), moving the workload toward memory-bound
+reaches 15–170 Gbps (Fig. `fig_worklist_speedup`), moving the workload toward memory-bound
 where the §4 memory techniques become load-bearing (future work confirms with Nsight once
 counters are unblocked, `docs/PROFILING.md`).
 

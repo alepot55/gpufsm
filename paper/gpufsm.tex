@@ -37,7 +37,7 @@ faithful full-scan NFA kernel the bottleneck is \emph{compute}, not memory: stag
 transition table into shared memory (zero global traffic) leaves throughput unchanged,
 and throughput scales as $1/n^2$ with state count---so memory-layout techniques cannot
 help until the algorithm is made work-efficient. We then build a work-efficient
-active-set kernel that is $250\times$--$10^4\times$ faster and reaches 15--142~Gbps.
+active-set kernel that is $250\times$--$10^4\times$ faster and reaches 15--170~Gbps.
 Second, the Triton$\leftrightarrow$CUDA gap is a per-DSL constant ($\approx 15.7\times$
 on this kernel) that no traffic/compute term explains, while Warp---an equally
 high-level \emph{Python} DSL---matches or beats hand-written CUDA ($0.62\times$).
@@ -62,7 +62,7 @@ two-parameter cost model (\S\ref{sec:cost}), and a constant-algorithm factorial 
 control flow}, distinct from generic performance portability and from autotuning.
 \textbf{(B)} \emph{A work-efficient portable NFA engine}: an active-set/worklist
 bit-packed kernel (\S\ref{sec:impl}) that removes the $O(n^2)$ compute wall and reaches
-15--142~Gbps. \textbf{(C)} \emph{A reproducible artifact}: one registry-based framework,
+15--170~Gbps. \textbf{(C)} \emph{A reproducible artifact}: one registry-based framework,
 a CPU reference oracle, median+CI95 sweeps, and figures regenerated only from versioned
 CSVs.
 
@@ -141,11 +141,11 @@ $>64$ states unsupported by the single-word Triton/Warp kernels.}
 \toprule
 states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
 \midrule
-32  & 142.2 & 0.513 & 0.071 & 24.5 \\
-64  & 142.2 & 0.131 & 0.021 & 25.1 \\
-128 & 45.5  & 0.023 & 0.003 & --   \\
-256 & 33.9  & 0.006 & 0.001 & --   \\
-500 & 15.3  & 0.0015& 0.0002& --   \\
+32  & 170.2 & 0.513 & 0.071 & 24.4 \\
+64  & 163.8 & 0.131 & 0.021 & 25.2 \\
+128 & 47.6  & 0.023 & 0.003 & --   \\
+256 & 31.7  & 0.006 & 0.001 & --   \\
+500 & 15.5  & 0.0015& 0.0002& --   \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -181,7 +181,7 @@ the algorithm is work-efficient.
 
 \textbf{The work-efficient kernel unlocks the regime.} The \texttt{worklist} kernel is
 $250\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$;
-Fig.~\ref{fig:wl}) and reaches 15--142~Gbps, moving the workload toward memory-bound where
+Fig.~\ref{fig:wl}) and reaches 15--170~Gbps, moving the workload toward memory-bound where
 the memory techniques become load-bearing.
 
 \textbf{Abstraction regret is the execution paradigm.} On the same full-scan kernel the
