@@ -15,12 +15,18 @@ SM-count-dependent and are the camera-ready cross-arch confirmation.
    on an A100 80GB PCIe (40 MB L2): CUDA throughput stays high to ~16 MB then drops through
    32–48 MB to a DRAM plateau — the knee moved from ~6–8 MB (4070) to ~32–48 MB, i.e. ~6×, tracking
    the 6.7× larger L2. Data: `paper/data/dfa_knee_a100.csv`; integrated into §6.5 + Limitations.
-   (Triton mismatched on the pod's older Triton 3.0 image — the Triton-flat line stands from the
-   local 3.5.1 run; re-validate Triton/Warp on a Triton-3.5 stack for camera-ready.)
-2. **Regret factors may rescale but the 2×2 pattern holds.** Re-fit the cost model
-   (`scripts/calibrate_costmodel.py`) and re-measure the regret (`scripts/sweep_techniques.py`):
-   absolute Triton regret (6–8×) and Warp (0.6–0.9×) may shift with the arch, but regret must
-   still track the *paradigm column*, not the *height row*.
+   (The earlier quick run mismatched on an old Triton 3.0 image; the richer `second_gpu_rich.sh`
+   re-ran on Triton 3.7 with all three backends oracle-matching — see item 2.)
+2. **Regret factors rescale but the 2×2 pattern holds. ✅ CONFIRMED (A100, 2026-06-26).**
+   `scripts/second_gpu_rich.sh` on the A100 (current Triton 3.7 stack, Warp 1.14): NFA regret vs
+   CUDA = Triton **3.2×** (flat across 32/48/64, 3 seeds), Warp **0.80–0.83×** — rescaled from the
+   4070's 6–8× / 0.9× but the *structure* is identical (Triton tile/SPMD pays, Warp thread-SIMT
+   ≤ CUDA). DFA: Triton flat **~24–30 Gbps** across 2–128 MB (≈ the 4070's 29–32 → arch-independent
+   scalar ceiling), CUDA 73–531 Gbps exploiting the 40 MB L2 (DFA regret 3–18×). Data:
+   `paper/data/regret_a100.csv`, `paper/data/dfa_knee_rich_a100.csv`. Integrated into §6.5 + Threats
+   (External) + Limitations. This also retires the "re-validate Triton/Warp on a Triton-3.5 stack"
+   camera-ready caveat — done on Triton 3.7. The cost-model *constants* rescale (per-backend fits),
+   but the *relative* regret (the claim) reproduces.
 3. **Causal ablation cliff persists.** `scripts/ablate_scalar_control.py` — the Triton
    tile-vs-scalar cliff (16× on the 4070) should remain large; CUDA/Warp scalar-recurrence should
    remain ceiling-free.

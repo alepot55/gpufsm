@@ -358,9 +358,12 @@ scalar \emph{ceiling}, not a parallelism limit: sweeping batch size, Triton satu
 $\approx$29~Gbps by $\sim$4k strings while CUDA keeps scaling past 400~Gbps with the memory
 idle. So on \emph{both} faces---control-flow-bound (NFA) and memory-bound (DFA)---the
 regret tracks the execution paradigm, not the workload's bottleneck: it is an intrinsic
-property of the DSL, not of where the kernel happens to be limited. The memory-bound reading is
-not a single-GPU artifact: on an A100 (40\,MB L2) the CUDA knee shifts to $\approx$32--48\,MB
-(vs $\approx$6--8\,MB on the 4070's 6\,MB L2), moving with L2 as predicted (\S\ref{sec:limits}).
+property of the DSL, not of where the kernel happens to be limited. This is not a single-GPU
+artifact: on an A100 (40\,MB L2, current Triton~3.7) the CUDA knee shifts to $\approx$32--48\,MB
+(vs $\approx$6--8\,MB on the 4070's 6\,MB L2) while Triton stays flat at $\approx$24--30\,Gbps
+across the whole 2--128\,MB sweep---the \emph{same} scalar ceiling as the 4070, three years and
+$6.7\times$ L2 apart, confirming it is a property of the tile/SPMD model and not the hardware
+(\S\ref{sec:limits}).
 
 \textbf{Capability $\to$ cost.} Table~\ref{tab:cap} maps the capabilities each kernel needs to
 whether a DSL expresses them and the resulting regret. The thread-SIMT DSLs (CUDA, Warp)
@@ -535,25 +538,36 @@ algorithm fixed and mirrors kernels line-for-line from one CSR spec; (ii) \emph{
 equally high-level Python DSL written with comparable effort---matches or beats hand CUDA, so
 ``high-level $\Rightarrow$ slow'' is not the explanation; and (iii) the controlled
 Triton$\leftrightarrow$Gluon pair and the within-Triton $16\times$ tile-vs-scalar cliff show the
-gap survives where no tuning knob exists---the tile/SPMD execution model is the cause. \emph{External.} Most results are from one GPU (RTX 4070); we confirmed the key L2-dependent
-prediction (the DFA knee) on a second architecture (A100, \S\ref{sec:limits}), where it shifts
-with L2 as predicted. The cost-model constants are per-backend fits that may rescale across
-architectures; full cross-architecture regret factors remain a camera-ready re-run.
+gap survives where no tuning knob exists---the tile/SPMD execution model is the cause. \emph{External.} Most results are from one GPU (RTX 4070); we re-ran the centerpiece on a second
+architecture (NVIDIA A100, \S\ref{sec:limits}) and the $2\times2$ \emph{holds}: the Triton regret
+rescales ($6$--$8\times\!\rightarrow\!3.2\times$) but stays on the tile/SPMD column, Warp remains
+$\le$CUDA ($0.80\times$), and the Triton DFA line stays flat on a \emph{current} Triton~3.7 stack.
+The cost-model constants are per-backend fits that rescale across architectures, but the
+\emph{relative} regret---which is the claim---is reproduced cross-arch.
 
 \section{Limitations and future work}\label{sec:limits}
 \emph{Generality across architectures.} Most results are from one GPU (RTX 4070, sm\_89,
 6\,MB L2); the qualitative claims are architecture-independent (the capability table is a
 property of the DSL compilers, and the Triton$\leftrightarrow$Gluon control holds at compile
-time). We tested the one quantitative, L2-dependent prediction on a \emph{second}
-architecture---an NVIDIA A100 (40\,MB L2)---and it \textbf{holds}: the DFA memory-bound knee
-shifts with L2. On the 4070 CUDA throughput falls to its DRAM plateau once the table passes
-$\approx$6--8\,MB; on the A100 it stays high to $\approx$16\,MB and drops through 32--48\,MB to
-the plateau---i.e.\ the knee moves by $\approx$6$\times$, tracking the $6.7\times$ larger L2
-(\texttt{paper/data/dfa\_knee\_a100.csv}). This confirms the memory-bound reading of the DFA
-face is not a 4070 artifact. Remaining for a full camera-ready: the cross-architecture
-\emph{regret factors} (cost-model constants may rescale) and re-validating the Triton/Warp lines
-on a stack with Triton~3.5 (the A100 image shipped an older Triton); the sweep regenerates from
-one command, so these are re-runs, not re-implementations.
+time). We re-ran the centerpiece on a \emph{second} architecture---an NVIDIA A100 (40\,MB L2),
+on a current Triton~3.7 stack---and every load-bearing claim holds. \emph{(i) The $2\times2$
+regret pattern reproduces:} the NFA regret vs CUDA is Triton $3.2\times$ (flat across 32/48/64
+states, 3 seeds) and Warp $0.80$--$0.83\times$ (\texttt{paper/data/regret\_a100.csv}). The
+absolute factors rescale from the 4070 ($6$--$8\times$ / $0.9\times$)---a bigger,
+higher-bandwidth GPU narrows the tile/SPMD penalty---but the \emph{structure} is identical:
+Triton (tile/SPMD) pays regret, Warp (thread-SIMT) matches or beats hand CUDA, so regret tracks
+the paradigm column, not abstraction height, on both architectures. \emph{(ii) The Triton DFA
+ceiling is architecture-independent:} Triton throughput stays flat at $\approx$24--30\,Gbps
+across the entire 2--128\,MB table sweep---essentially the same flat value as the 4070's
+29--32\,Gbps---never reaching the memory-bound regime, while CUDA reaches 73--531\,Gbps by
+exploiting the larger L2 (DFA regret $3$--$18\times$; \texttt{paper/data/dfa\_knee\_rich\_a100.csv}).
+That the scalar-gather ceiling is the \emph{same absolute number} on two GPUs three years and
+$6.7\times$ L2 apart is strong evidence it is a property of the tile/SPMD model, not the hardware.
+\emph{(iii) The DFA memory-bound knee shifts with L2:} in a cleaner single-backend sweep CUDA
+falls to its DRAM plateau past $\approx$6--8\,MB on the 4070 but stays high through 32--48\,MB on
+the A100---the knee moves by $\approx$6$\times$, tracking the $6.7\times$ larger L2
+(\texttt{paper/data/dfa\_knee\_a100.csv}). This closes the chief external-validity gap: the
+contribution is reproduced, not merely re-predicted, on a second architecture.
 \emph{Kernel.} The single-thread worklist under-utilizes the GPU on large automata (one
 string's many state-words processed serially; Nsight: 17\% occupancy). Our
 \texttt{worklist\_warp} kernel (one warp/string, 32 lanes partitioning the words) addresses
