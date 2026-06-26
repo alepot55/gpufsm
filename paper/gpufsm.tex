@@ -48,7 +48,9 @@ corroborates the regret (predictive for the thread model; holdout 2.7\%) and we 
 missing IR primitives (scalar gather in a tile, register-resident
 bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
 ($\approx\!330\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
-against a CPU oracle on six real ANMLZoo automata up to 48k states).
+against a CPU oracle on six real ANMLZoo automata up to 48k states). We confirm the centerpiece
+on a second GPU architecture (NVIDIA A100): the $2\times2$ regret pattern and the
+architecture-independent tile-SPMD scalar ceiling both reproduce.
 \end{abstract}
 
 \section{Introduction}
