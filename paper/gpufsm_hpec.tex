@@ -377,7 +377,7 @@ Data-dependent loop        & \cmark & \cmark & \tmark & \tmark \\
 Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
 Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
 \midrule
-NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
+NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$8\times$ & n/a (\xmark) \\
 DFA regret (memory)        & $1\times$ & $1.4$--$2.3\times$ & $5$--$13\times$ & --- \\
 \bottomrule
 \end{tabular}}
@@ -463,7 +463,7 @@ algorithmic gap we explicitly do not close, and it does not affect the cross-DSL
 single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
 \emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
-$6$--$15\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
+$5$--$13\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
 limit. Three facts argue against this: (i) the fairness protocol (\S\ref{sec:method}) holds the
 algorithm fixed and mirrors kernels line-for-line from one CSR spec; (ii) \emph{Warp}---an
 equally high-level Python DSL written with comparable effort---matches or beats hand CUDA, so
