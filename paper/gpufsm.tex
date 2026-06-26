@@ -434,7 +434,12 @@ ANG (ICCD'25)           & multi-level fine-grained par.   & $11.7\times$ avg \\
 \emph{Construct.} Most throughput points use randomly generated NFAs, which may not
 represent production automata; we mitigate this by also validating on six real ANMLZoo
 automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
-reference oracle bit-for-bit. \emph{Internal.} Every backend/technique is checked against a
+reference oracle bit-for-bit, and the block-parallel kernel gives $1.4$--$27\times$ over the
+single-thread baseline on them (\texttt{paper/data/real\_automata\_throughput\_rtx4070.csv}).
+\emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
+Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
+algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
+(a relative measure at fixed algorithm). \emph{Internal.} Every backend/technique is checked against a
 single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
 \emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
