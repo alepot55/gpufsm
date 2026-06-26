@@ -127,7 +127,7 @@ def main() -> None:
                 try:
                     m = measure(nfa, be, te, batch, total_bytes)
                 except (ValueError, RuntimeError) as e:
-                    print(f"{be.value:7}/{te:18} n={n:4d}  SKIP ({type(e).__name__}: {str(e)[:60]})")
+                    print(f"{be.value:7}/{te:18} n={n:4d}  SKIP ({type(e).__name__})")
                     continue
                 if m is None:
                     continue
