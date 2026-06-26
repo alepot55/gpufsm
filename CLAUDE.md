@@ -95,7 +95,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] HEADLINE WORKLIST RE-VERIFY (canonico) + scoperto hazard Warp-716.**
+- **[Iter più recente] VERIFICA Warp-beats-CUDA + causa Triton-DFA-flat — entrambe CONFERMATE.**
+  (1) Warp vs CUDA multistream su 3 seed × {32,48,64} stati: warp/cuda = **1.11–1.13× (regret 0.89–0.90×)**,
+  spread ±1% → robusto, non artefatto (il 0.63× era il fit del cost-model; il misurato 0.90× è l'headline).
+  (2) Triton-DFA-flat = **ceiling scalare per-program**, non memoria né parallelismo: Triton sale col batch
+  (64→1.7, 1024→18, 4096→24.7 Gbps) poi **satura ~29 Gbps** a ~4k stringhe, mentre CUDA continua a 428 Gbps
+  (16384 str). Conferma il model-bound. Aggiunto a §6.5 + `docs/KERNEL_EXPERIMENTS.md`. ⚠️ Paper ora **6pp**
+  (5→6, i caveat onesti accumulati l'hanno fatto crescere; ok per full-paper, contenuto > brevità).
+- **[Iter -1] HEADLINE WORKLIST RE-VERIFY (canonico) + scoperto hazard Warp-716.**
   Re-run del generatore canonico (`scripts/sweep_techniques.py`, random_nfa seed=1000+n): worklist riproduce
   entro **~8-12%** (152 vs 170 @32, 14 vs 16 @500 — scarto SISTEMATICO ⇒ throttling termico dopo ore di kernel,
   shape identica), multistream entro 1-8%, **1/n² compute-bound confermato** (0.51→0.13→0.02, ~4×/raddoppio).

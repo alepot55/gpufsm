@@ -46,6 +46,18 @@ loads + per-transition `visited` test-and-set dedup. So word-scanning was never 
 even for brill's 17 MB CSR (≫ 6 MB L2), because all strings share the CSR and only a hot row
 subset is touched per batch (stays L2-resident).
 
+## Claim verifications (skeptical re-checks, 2026-06-26)
+- **Warp beats hand-CUDA (NFA) is robust.** warp/cuda multistream = 1.11–1.13× (regret
+  0.89–0.90×) across 3 seeds × {32,48,64} states, spread ±1% — not an artifact of one NFA.
+  (The cost-model fit gave 0.63×; the *measured* 0.90× is the robust headline.)
+- **DFA Triton-flatness = a per-program scalar ceiling**, not memory or parallelism. Triton DFA
+  throughput ramps with batch (64→1.7, 256→6.6, 1024→18, 4096→24.7 Gbps) then **saturates at
+  ~29 Gbps** by ~4k strings (16384→28.7), while CUDA keeps scaling (16384→428 Gbps). So Triton's
+  flat ~29 Gbps regardless of table size is its tile/SPMD per-program scalar-gather ceiling
+  (enough programs to fill the GPU, memory idle) — confirming the model-bound reading.
+- **Cost model** predictive for CUDA (2.7% holdout) but not Triton (45%, unstable) — see
+  `docs/RESULTS_COSTMODEL.md`; measured throughput ratio is the primary metric.
+
 ## Where this points (path to SOTA-absolute)
 Neither memory layout (shared) nor work-reduction (compaction) is the lever; **parallelism**
 (warp) is, and it's now in. The remaining gap to ngAP-class absolute throughput is **algorithmic
