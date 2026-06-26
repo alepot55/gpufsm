@@ -127,7 +127,18 @@ def main() -> None:
                 try:
                     m = measure(nfa, be, te, batch, total_bytes)
                 except (ValueError, RuntimeError) as e:
-                    print(f"{be.value:7}/{te:18} n={n:4d}  SKIP ({type(e).__name__})")
+                    msg = str(e)
+                    print(f"{be.value:7}/{te:18} n={n:4d}  SKIP ({type(e).__name__}: {msg[:120]})")
+                    # A CUDA "misaligned address"/error-716-class fault is STICKY: it poisons
+                    # the process's CUDA context, so every later measurement is meaningless.
+                    # (Observed intermittently from Warp's init on this Warp/CUDA combo.) Abort
+                    # the sweep with a clear rerun hint rather than emit a half/empty CSV.
+                    if "misaligned" in msg or "716" in msg or "an illegal" in msg:
+                        print(
+                            "ABORT: CUDA context poisoned (sticky error) — rerun the sweep "
+                            "(intermittent, often from Warp init). Partial results discarded."
+                        )
+                        return 1
                     continue
                 if m is None:
                     continue

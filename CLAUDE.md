@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] DFA KNEE RIPRODUCIBILITÀ — confermato robusto (multi-seed).** Il sweep DFA era
+- **[Iter più recente] HEADLINE WORKLIST RE-VERIFY (canonico) + scoperto hazard Warp-716.**
+  Re-run del generatore canonico (`scripts/sweep_techniques.py`, random_nfa seed=1000+n): worklist riproduce
+  entro **~8-12%** (152 vs 170 @32, 14 vs 16 @500 — scarto SISTEMATICO ⇒ throttling termico dopo ore di kernel,
+  shape identica), multistream entro 1-8%, **1/n² compute-bound confermato** (0.51→0.13→0.02, ~4×/raddoppio).
+  Claim "15-170 Gbps" valido; NON ho sovrascritto il CSV committato (i numeri di oggi sono throttlati). **HAZARD
+  trovato:** l'init di Warp può lanciare `CUDA error 716: misaligned address` (STICKY → avvelena il contesto CUDA
+  condiviso → tutte le run cuda/warp successive falliscono); intermittente (in isolamento funziona). Non è un bug
+  nostro (codice Warp 1.14 / CUDA 12.9). Fix robustezza: `sweep_techniques.py` ora stampa il messaggio reale e
+  ABORTA con hint "rerun" su errore sticky invece di emettere un CSV mezzo-vuoto. Caveat in REPRODUCIBILITY.
+- **[Iter -1] DFA KNEE RIPRODUCIBILITÀ — confermato robusto (multi-seed).** Il sweep DFA era
   single-seed con wobble (dip a 32MB). Re-run a 3 seed (mediana) → knee PULITO e robusto: cuda picco **364
   Gbps @6MB (=L2)** poi drop MONOTONO a plateau **~163** (il dip a 32MB era rumore, sparito) = **2.2×**; warp
   177→108; triton piatto 29–32. `scripts/sweep_dfa.py` ora multi-seed (SEEDS=0,1,2). Figura rigenerata (knee da
