@@ -244,7 +244,10 @@ monotonically to a DRAM-bound plateau ($\sim$163~Gbps) once the table far exceed
 tracks the same shape at about half ($177\!\rightarrow\!108$~Gbps). \textbf{Triton, by
 contrast, is flat at $29$--$32$~Gbps across the entire 1--100\,MB range}---it never enters the
 memory-bound regime because its tile/SPMD codegen bottlenecks the scalar gather first (DFA
-regret $5$--$13\times$, largest where CUDA peaks at L2). So on \emph{both} faces---control-flow-bound (NFA) and memory-bound (DFA)---the
+regret $5$--$13\times$, largest where CUDA peaks at L2). This $\approx$29~Gbps is a per-program
+scalar \emph{ceiling}, not a parallelism limit: sweeping batch size, Triton saturates at
+$\approx$29~Gbps by $\sim$4k strings while CUDA keeps scaling past 400~Gbps with the memory
+idle. So on \emph{both} faces---control-flow-bound (NFA) and memory-bound (DFA)---the
 regret tracks the execution paradigm, not the workload's bottleneck: it is an intrinsic
 property of the DSL, not of where the kernel happens to be limited.
 
