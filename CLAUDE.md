@@ -123,7 +123,13 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   A batch piccolo (256) saliva a 12-180× perché global 1-thread non riempie la GPU → il 12-17× iniziale era un
   artefatto di batch. Il numero ONESTO/conservativo = 3-9× @batch saturante. CSV: `worklist_warp_rtx4070.csv`
   (+ `worklist_warp_batch_rtx4070.csv` documenta la sensibilità al batch). Driver = densità active-set × words,
-  non size. Paper (Implementation+Limitations) corretto a 3-9×. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  non size. Paper (Implementation+Limitations) corretto a 3-9×. **NSIGHT (26 giu):** worklist_warp fixa
+  l'occupancy (17→57%) ma è **latency-bound NON memory-bound** — DRAM ≤2.25%, L2 hit ≥97.6% anche su brill
+  (CSR 17MB ≫ L2 6MB), perché tutte le stringhe condividono la CSR e solo un hot-subset di righe è toccato →
+  resta L2-resident. Spiega perché worklist_shared è inerte (working set già in L2) e perché il gap SOTA è
+  **algoritmico** (worklist compatto active-ID, meno atomicOr/syncwarp, ngAP non-blocking), non memory.
+  Dati in `paper/data/nsight_rtx4070.csv` + `docs/PROFILING.md`. PROSSIMO: prototipo worklist compatto (array
+  di ID attivi) vs bitmap-scan O(nwords) — l'esperimento che potrebbe alzare il throughput assoluto. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
   (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
   + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
 - **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).
