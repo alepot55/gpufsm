@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] PRESSURE-TEST COST-MODEL — predittivo per CUDA, NON per Triton.** `scripts/validate_costmodel.py`:
+- **[Iter più recente] DFA KNEE RIPRODUCIBILITÀ — confermato robusto (multi-seed).** Il sweep DFA era
+  single-seed con wobble (dip a 32MB). Re-run a 3 seed (mediana) → knee PULITO e robusto: cuda picco **364
+  Gbps @6MB (=L2)** poi drop MONOTONO a plateau **~163** (il dip a 32MB era rumore, sparito) = **2.2×**; warp
+  177→108; triton piatto 29–32. `scripts/sweep_dfa.py` ora multi-seed (SEEDS=0,1,2). Figura rigenerata (knee da
+  manuale). Numeri propagati: DFA regret triton 5–13×, warp 1.5–2.1×; §6.5/caption/abstract/tabella aggiornati.
+  Cross-config: con stringhe corte (256B) cuda è monotono-decrescente (no picco) ma il DROP oltre L2 resta → la
+  parte robusta è "alto finché L2-resident poi cala ~2×"; il picco netto serve stringhe lunghe (1024B, config figura).
+  ⚠️ Re-verify headline worklist (15-170 Gbps) RINVIATO: il mio check ad-hoc usava un generatore NFA degenere
+  (early-latch, non-monotono) → inconcludente; va fatto con `scripts/sweep_techniques.py` (generatore canonico).
+- **[Iter -1] PRESSURE-TEST COST-MODEL — predittivo per CUDA, NON per Triton.** `scripts/validate_costmodel.py`:
   holdout (fit n≤128, predici n=256) → **CUDA 2.7% (predittivo), Triton 45% (fallisce)**; leave-one-out di b →
   CUDA spread 1.03× (stabile), Triton 2.46× (INSTABILE). Causa: overhead di lancio fisso di Triton a piccolo n
   mis-attribuito al termine n². ⇒ metrica di regret PRIMARIA = throughput ratio MISURATO (Triton 6-8×, robusto),

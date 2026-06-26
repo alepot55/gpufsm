@@ -18,7 +18,7 @@ on finite automata across the paradigm axis CUDA and NVIDIA Warp (thread-SIMT) v
 its low-level Gluon frontend (tile-SPMD). Automata expose **two complementary faces**: an NFA
 active-set traversal that is *control-flow bound*, and a DFA dense-table walk that is *memory
 bound* (throughput halves as the table crosses L2). On both faces the regret is large for the
-tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 5–12× vs CUDA across the two
+tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 5–13× vs CUDA across the two
 faces while Warp, an equally high-level *Python* DSL, matches or beats hand CUDA on the NFA
 (0.6–0.9×) and stays within ~2× on the DFA — so regret is set by the
 execution **paradigm**, not by how high-level the DSL looks. We make the attribution
@@ -181,11 +181,11 @@ automata work — expressibility does not buy efficiency.
 **6.5 The second face: DFA is memory-bound, and the regret persists.** The DFA dense-table
 walk is the memory-bound dual of the NFA. A fine table-size sweep (Fig. `fig_dfa_memory_bound`,
 `paper/data/dfa_regret_rtx4070.csv`) makes the signature explicit: CUDA throughput rises to a
-peak *exactly* at the L2 capacity (345 Gbps at the 6 MB table) and then falls **2.4×** to a
-DRAM-bound plateau (~150–175 Gbps) once the table far exceeds L2. Warp tracks the same shape at
-about half (160→97 Gbps). **Triton, by contrast, is flat at 29–32 Gbps across the entire
-1–100 MB range** — it never enters the memory-bound regime because its tile/SPMD codegen
-bottlenecks the scalar gather first (DFA regret 5–12×, largest where CUDA peaks at L2). So on
+peak *exactly* at the L2 capacity (364 Gbps at the 6 MB table) and then falls **2.2×**
+monotonically to a DRAM-bound plateau (~163 Gbps) once the table far exceeds L2. Warp tracks the
+same shape at about half (177→108 Gbps). **Triton, by contrast, is flat at 29–32 Gbps across the
+entire 1–100 MB range** — it never enters the memory-bound regime because its tile/SPMD codegen
+bottlenecks the scalar gather first (DFA regret 5–13×, largest where CUDA peaks at L2). So on
 *both* faces — control-flow-bound (NFA) and memory-bound (DFA) — the regret tracks the execution
 **paradigm**, not the workload's bottleneck: it is an intrinsic property of the DSL, not of
 where the kernel happens to be limited.
@@ -204,7 +204,7 @@ or only via a strained single program (Triton) — exactly what the regret measu
 | Register-resident bitset     | ✓ | ✓ | ✗ | ✗ |
 | Explicit shared-mem layout   | ✓ | ✗ | ✗ | ✓ |
 | **NFA regret (control-flow)** | 1× | 0.6–0.9× | 6–10× | n/a (✗) |
-| **DFA regret (memory)**       | 1× | 1.5–2.2× | 5–12× | — |
+| **DFA regret (memory)**       | 1× | 1.5–2.1× | 5–13× | — |
 
 ## 7. Related work
 

@@ -65,6 +65,9 @@ def _measure(dfa, batch: list[bytes], backend: str) -> float:
     return statistics.median(samples)
 
 
+SEEDS = (0, 1, 2)  # median over 3 random DFAs/size: the knee must be seed-robust, not noise
+
+
 def main() -> int:
     rng = random.Random(0)
     # one fixed timing batch (random bytes) reused across sizes for comparability
@@ -72,15 +75,20 @@ def main() -> int:
     rows: list[tuple[str, int, int, float, str, str]] = []
 
     for n in STATE_GRID:
-        dfa = random_dfa(n, accept_prob=0.02, seed=n)
-        if not _validate(dfa, random.Random(n)):
+        # validate one seed; then measure each backend's throughput as the median over SEEDS
+        # (different random DFAs) — so a reported knee reflects the table size, not one DFA.
+        if not _validate(random_dfa(n, accept_prob=0.02, seed=n), random.Random(n)):
             print(f"n={n}: validation failed, skipping")
             continue
         table_kb = n  # 256 * int32 = 1 KB/state
         cache = "fits L2" if table_kb <= 6144 else "exceeds L2"
         line = f"n={n:6d} ({table_kb / 1024:.1f} MB, {cache}): "
         for be in BACKENDS:
-            tp = _measure(dfa, timing_batch, be)
+            per_seed = [
+                _measure(random_dfa(n, accept_prob=0.02, seed=s * 1000 + n), timing_batch, be)
+                for s in SEEDS
+            ]
+            tp = statistics.median(per_seed)
             rows.append((be, n, table_kb, round(tp, 1), GPU, cache))
             line += f"{be}={tp:6.1f}  "
         print(line)
