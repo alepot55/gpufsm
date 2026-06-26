@@ -130,7 +130,8 @@ transitions), not only synthetic NFAs.
 `multistream`, `multistream_shared` (modeled CSR traffic = 0), and `multistream_async` tie
 to within the bootstrap CI at every size (Fig. `fig_memory_ablation`), and throughput scales
 as 1/n² (Fig. `fig_throughput_vs_states`). The cost model fits this to <1% relative error at
-large n with a negligible memory term. Nsight Compute counters confirm it at the hardware
+the largest size (n=256: CUDA 0.3%, Triton 0.6%) with a negligible memory term; the larger
+residual at small n is fixed launch overhead the pure-n² model omits. Nsight Compute counters confirm it at the hardware
 level (`paper/data/nsight_rtx4070.csv`): the full-scan kernel sustains ~19% of peak SM
 throughput but only **0.01%** of peak DRAM throughput — compute exceeds memory by ~3 orders
 of magnitude — and `multistream_shared` shows identical SM%, DRAM% and occupancy, raising

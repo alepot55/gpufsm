@@ -17,7 +17,7 @@ The compute term is **quadratic** because the faithful constant-algorithm kernel
 O(n) transition scan + an O(n²) epsilon-closure (n convergence passes × n states) per input
 symbol. Confirmed empirically: throughput ∝ 1/n² (n=32→64→128→256 ⇒ ÷~4 each step); a linear
 compute term mis-fits (~85% error), the n² term fits the compute-bound regime to <1% at
-large n.
+the largest size measured (n=256).
 
 ## Finding 1 — the kernels are COMPUTE-bound; memory layout is (here) irrelevant
 
@@ -51,8 +51,10 @@ this kernel:
 | **CUDA** (C++ SIMT) | 0.0102 | 1.00× (baseline) | 1.00× |
 | **Warp** (Python thread-SIMT) | 0.0065 | **0.63×** (beats hand CUDA) | 0.9× |
 
-(Per-backend rel. err is <1% at n=128/256; the ~25% at n=32/64 is fixed launch overhead the
-pure-n² model omits.)
+(Per-backend predicted-vs-measured throughput error is **<1% at n=256** — CUDA 0.3%, Triton
+0.6% — and ~2% (CUDA) / ~13% (Triton) at n=128; the larger error at n=32/64 (20–60%) is the
+fixed launch overhead the pure-n² model omits. Warp has only two points, so its fit is exact
+by construction and not a quality signal.)
 
 ## Interpretation — regret is the execution *paradigm*, not abstraction height
 

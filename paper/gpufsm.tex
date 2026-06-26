@@ -101,8 +101,9 @@ where $n$ is the state count. The compute term is \emph{quadratic} because the f
 kernel performs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure ($n$ convergence
 passes $\times\,n$ states) per symbol. The two constants are fitted per backend from
 measured throughput; the ratio of $c_2$ between two DSLs, at constant algorithm, \emph{is}
-the abstraction regret. The per-backend fit tracks the measurements closely
-(Fig.~\ref{fig:cm}).
+the abstraction regret. The per-backend fit tracks the measurements closely---within 1\% at
+the largest size (n{=}256: CUDA 0.3\%, Triton 0.6\%), the residual at small $n$ being fixed
+launch overhead the pure-$n^2$ model omits (Fig.~\ref{fig:cm}).
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.86\columnwidth]{fig_costmodel_fit.pdf}
@@ -158,6 +159,8 @@ reference oracle bit-for-bit on every input, confirming correctness at productio
 $>64$ states unsupported by the single-word Triton/Warp kernels.}
 \label{tab:throughput}
 \small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{rrrrr}
 \toprule
 states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
@@ -168,7 +171,7 @@ states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
 256 & 31.7  & 0.006 & 0.001 & --   \\
 500 & 15.5  & 0.0015& 0.0002& --   \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{table}[t]
@@ -177,6 +180,8 @@ states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
 $\Rightarrow$ compute-bound; shared-CSR is identical but for L2 hit rate.}
 \label{tab:nsight}
 \small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrr}
 \toprule
 kernel & SM\% & DRAM\% & L2 hit\% & occ\% \\
@@ -185,7 +190,7 @@ kernel & SM\% & DRAM\% & L2 hit\% & occ\% \\
 \texttt{multistream\_shared}     & 19.60 & 0.01 & 93.0 & 16.7 \\
 \texttt{worklist} (16384 str)    & 5.43  & 6.30 & 95.6 & 23.4 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 Table~\ref{tab:throughput} reports throughput; Table~\ref{tab:nsight} the Nsight counters.
@@ -243,6 +248,8 @@ or only via a strained single program (Triton), which is exactly what the regret
 program, \xmark\ inexpressible. Regret is throughput vs CUDA on each face.}
 \label{tab:cap}
 \small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccc}
 \toprule
 Capability (paradigm) & CUDA & Warp & Triton & Gluon \\
@@ -256,7 +263,7 @@ Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
 NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
 DFA regret (memory)        & $1\times$ & $2$--$3\times$ & $7$--$15\times$ & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 \begin{figure}[t]\centering
