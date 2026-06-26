@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] SOTA PROFONDA (4 agent paralleli) + ELEVAZIONE CONTRIBUTO.** Sweep verificato in 4 aree
+- **[Iter più recente] ABLATION CAUSALE — la capability→cost map ora è CAUSALE (cliff 16× in Triton).**
+  Stesso linguaggio/dati/harness/parallelismo (1 program Triton/stringa), stessi byte processati tile-vettoriale
+  vs con ricorrenza scalare data-dependent: tile scala a **1320 Gbps** (design point Triton), lo scalare satura
+  a **~81 Gbps** (ceiling per-program) → **cliff 16×** dal solo pattern di accesso/controllo. Eleva l'attribuzione
+  da correlazionale a CAUSALE: il regret appare SE E SOLO SE serve la primitiva inesprimibile (specchia il
+  DFA-Triton-flat). `scripts/ablate_scalar_control.py` + `scalar_ablation_rtx4070.csv`; aggiunto come "causal
+  control" in §6.3 + KERNEL_EXPERIMENTS.md. **MANDATO (26 giu): processo costante autonomo, mai chiedere, zero
+  imperfezione — vedi memory relentless-improvement-mandate.** Prossimo nel loop: espandere il paper a lunghezza
+  full-conference attorno al 2×2 + map causale; continuare verifica/SOTA/completezza senza fine.
+- **[Iter -1] SOTA PROFONDA (4 agent paralleli) + ELEVAZIONE CONTRIBUTO.** Sweep verificato in 4 aree
   (automi GPU, DSL/espressività, perf-portability/metodologia, workload irregolari) → bibliografia paper **15→35
   ref**, related-work ristrutturato in sotto-sezioni. **CONTRIBUTO PIÙ IMPORTANTE identificato e reso centrale:**
   i 4 DSL formano un **2×2 (altezza-astrazione × paradigma-esecuzione)** — CUDA(low/thread,1×), Warp(high/thread,
