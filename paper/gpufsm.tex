@@ -349,6 +349,14 @@ of data-dependent control flow---not by abstraction height. The memory-organizat
 holds, but only once the algorithm is work-efficient enough to be memory-bound, which our
 worklist engine achieves.
 
+\section*{Artifact availability}
+All code, the CPU reference oracle, the versioned result CSVs, and the figure generator are
+in the project repository. Every figure and table regenerates from the committed CSVs via a
+single command (\texttt{python paper/figures.py}); the CPU correctness suite runs without a
+GPU (\texttt{pytest -m "not gpu"}), and the GPU kernels and the Gluon falsifiability probe run
+on any CUDA device. A versioned snapshot with a Zenodo DOI will be minted at release for
+artifact evaluation. The claim-to-command map is in \texttt{docs/REPRODUCIBILITY.md}.
+
 \begin{thebibliography}{1}
 \bibitem{infant} N. Cascarano \emph{et al.}, ``iNFAnt: NFA pattern matching on GPGPU
 devices,'' \emph{ACM SIGCOMM CCR}, 2010.
