@@ -36,8 +36,16 @@ def run_dfa_batch(dfa: DFA, inputs: list[bytes], backend: str = "cuda") -> list[
             acc, mlen = simulate_dfa(dfa, b)
             out.append(Result(accepted=acc, match_len=mlen))
         return out
+    if backend == "triton":
+        from .dfa_backends import run_dfa_triton
+
+        return run_dfa_triton(dfa, inputs)
+    if backend == "warp":
+        from .dfa_backends import run_dfa_warp
+
+        return run_dfa_warp(dfa, inputs)
     if backend != "cuda":
-        raise ValueError(f"unknown DFA backend {backend!r} (use 'cpu' or 'cuda')")
+        raise ValueError(f"unknown DFA backend {backend!r} (use cpu/cuda/triton/warp)")
 
     import gpufsm.backends.cuda._cuda as _cuda
 
