@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] #2 KERNEL BLOCK-PARALLEL FATTO (warp-per-string worklist).** `worklist_warp`:
+- **[Iter più recente] #5 (AE packaging) + #4 (SOTA table) FATTI.** #5: `docs/ARTIFACT_APPENDIX.md`
+  (SIGPLAN-style check-list/install/claims→commands→expected + piano Zenodo-DOI-al-release), `CITATION.cff`
+  arricchito (titolo two-faces, abstract, keywords), `REPRODUCIBILITY.md` aggiornato (6 famiglie non 2, .tex
+  canonico non "migration pending", +righe DFA-sweep/warp-speedup), Artifact Availability nel .tex punta
+  all'appendix. #4: tabella positioning SOTA (iNFAnt/AsyncAP/ngAP/HybridSA/BitGen) in related work — ESPLICITO
+  che le cifre sono speedup sul LORO baseline/hardware (NON comparabili in Gbps assoluti), tutti algoritmi
+  CUDA-only, il nostro asse (espressività DSL, algoritmo fisso) è ortogonale; match ngAP-class = future work.
+  6 famiglie reali già bastano → non aggiunte altre (SPM 100k/24M troppo lento all'oracolo, marginale). Paper
+  5pp pulito. RESTA: #2 deep (shared-mem block-cooperative per throughput assoluto SOTA), #1 (2ª GPU) dopo.
+- **[Iter -1] #2 KERNEL BLOCK-PARALLEL FATTO (warp-per-string worklist).** `worklist_warp`:
   un warp (32 lane) per stringa; le lane partizionano le parole di stato e scatterano transizioni/eps-closure
   via `atomicOr` nel next-set globale condiviso, con `__any_sync` per frontier-empty/accept. Risolve la
   sotto-utilizzazione del worklist 1-thread su automi grandi. Validato bit-for-bit vs oracle (1252 stringhe,
