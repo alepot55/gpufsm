@@ -70,10 +70,14 @@ traffic = 0, ties `multistream`) and 1/n^2 scaling.
 ## Data
 
 - Small fixtures are vendored under `data/`.
-- The large ANMLZoo/AutomataZoo suite is fetched on demand via `gpufsm.io.datasets.ensure`,
-  which **verifies SHA-256** before use and refuses unverified downloads (no SharePoint).
-  Pin the mirror SHA-256 in `DATASETS` before enabling the suite. `gpufsm.io.anml.load_anml`
-  parses the supported ANML subset (validated by fixture + NFA->ANML->NFA round-trip).
+- Real ANMLZoo automata fetched on demand via `gpufsm.io.datasets.ensure`, which **verifies
+  SHA-256** and refuses unverified downloads. Pinned (public `jackwadden/ANMLZoo` mirror):
+  `levenshtein` (2787 states), `hamming` (11349 states) — pure-homogeneous, `all-input`.
+  `gpufsm.io.anml.load_anml` parses them with correct all-input/start-of-data semantics
+  (fixtures in `tests/test_anml.py`).
+- Real-suite validation: `python scripts/run_anmlzoo.py [levenshtein|hamming]` fetches, loads,
+  runs on `worklist_global`, and checks GPU == reference (0 mismatches). Also
+  `tests/test_anmlzoo_gpu.py` (gpu-marked; skips offline/CPU-only).
 
 ## Paper
 
