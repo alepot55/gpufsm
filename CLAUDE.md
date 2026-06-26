@@ -95,7 +95,15 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] ABLATION CAUSALE — la capability→cost map ora è CAUSALE (cliff 16× in Triton).**
+- **[Iter più recente] LOCAL TIER-RAISING (real-automata throughput + unificazione + 2nd-GPU TODO).**
+  (a) Throughput su 6 automi reali (`real_automata_throughput_rtx4070.csv`): warp 1.4-27× su single-thread,
+  assoluto basso (sub-Gbps..4.5) = gap algoritmico onesto, messo in threats (non intacca il regret relativo).
+  (b) **UNIFICAZIONE**: entrambe le facce della capability→cost map riconducono a UNA primitiva mancante
+  (scalar-gather-in-tile) — il DFA è scalar-gather-bound PRIMA di arrivare al regime memory (Triton flat 29 vs
+  CUDA gather 364) → root cause unica + direttiva falsificabile per DSL-designer. (c) `docs/TODO_SECOND_GPU.md`
+  creato (re-run hardware-gated: shift knee L2, rescale regret, persistenza ablation — predizioni falsificabili
+  cross-arch). Paper ora **7pp** (verso full-conference depth), 0 overfull. Prossimo: continuare espansione full-length.
+- **[Iter -1] ABLATION CAUSALE — la capability→cost map ora è CAUSALE (cliff 16× in Triton).**
   Stesso linguaggio/dati/harness/parallelismo (1 program Triton/stringa), stessi byte processati tile-vettoriale
   vs con ricorrenza scalare data-dependent: tile scala a **1320 Gbps** (design point Triton), lo scalare satura
   a **~81 Gbps** (ceiling per-program) → **cliff 16×** dal solo pattern di accesso/controllo. Eleva l'attribuzione

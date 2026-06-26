@@ -263,7 +263,12 @@ either (i) as a tile-vectorized reduction or (ii) with a carried data-dependent 
 (the automata pattern). At a GPU-saturating batch the tile kernel scales to 1320~Gbps (Triton's
 design point) while the scalar kernel hits a hard $\approx$81~Gbps per-program ceiling---a
 $16\times$ cliff from the access/control pattern alone (\texttt{paper/data/scalar\_ablation\_rtx4070.csv}).
-The regret appears \emph{iff} the inexpressible primitive is required.
+The regret appears \emph{iff} the inexpressible primitive is required. The cross-paradigm half
+confirms it: thread-SIMT runs the \emph{same} scalar data-dependent recurrence with \emph{no}
+per-program ceiling---CUDA's DFA walk (a per-byte scalar gather + state recurrence) reaches
+163--364~Gbps---whereas tile-SPMD Triton is pinned at a $\approx$29--81~Gbps scalar ceiling
+regardless of table size or batch. Same work, same hardware: the ceiling is a property of the
+paradigm.
 
 \textbf{Expressibility $\neq$ efficiency.} Triton \emph{can} express the work-efficient
 worklist (unlike Gluon), yet still pays $\approx\!6.5\times$ vs CUDA there (CUDA 164~Gbps vs
@@ -291,6 +296,15 @@ whether a DSL expresses them and the resulting regret. The thread-SIMT DSLs (CUD
 express all of scalar load, data-dependent loops, register-resident bitsets and explicit
 shared-memory layout; the tile-SPMD DSLs cannot express a scalar element load at all (Gluon)
 or only via a strained single program (Triton), which is exactly what the regret measures.
+\textbf{One root cause, both faces.} Strikingly, both faces reduce to the \emph{same} missing
+primitive---a \emph{scalar gather within a tile}. The NFA's control-flow regret is the
+data-dependent per-state scatter/gather; the DFA's memory regret is the per-byte random
+table gather $\textit{trans}[s\!\cdot\!256+c]$. A tile DSL cannot issue either as a scalar
+element op, so on the DFA Triton never even reaches the memory-bound regime---it is
+scalar-gather-bound first (hence flat at $\approx$29~Gbps while CUDA's same gather scales to
+$364$). So the capability$\to$cost map has a single actionable root: give the tile/SPMD IR a
+first-class scalar gather (and the data-dependent loop it implies), and the regret on
+\emph{both} faces should collapse---a concrete, falsifiable directive for GPU-DSL designers.
 
 \begin{table}[t]
 \centering
@@ -429,7 +443,12 @@ ANG (ICCD'25)           & multi-level fine-grained par.   & $11.7\times$ avg \\
 \emph{Construct.} Most throughput points use randomly generated NFAs, which may not
 represent production automata; we mitigate this by also validating on six real ANMLZoo
 automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
-reference oracle bit-for-bit. \emph{Internal.} Every backend/technique is checked against a
+reference oracle bit-for-bit, and the block-parallel kernel gives $1.4$--$27\times$ over the
+single-thread baseline on them (CSV in \texttt{paper/data/}).
+\emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
+Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
+algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
+(a relative measure at fixed algorithm). \emph{Internal.} Every backend/technique is checked against a
 single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
 \emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
