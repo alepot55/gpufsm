@@ -125,7 +125,9 @@ automata; register residency costs $\sim$4--5$\times$ vs the capped kernel), and
 \texttt{worklist\_warp} (\emph{block-parallel}: one warp per string, the 32 lanes partition
 the state-words and scatter transitions via \texttt{atomicOr}---it spreads one string's loads
 across the warp, $12$--$17\times$ faster than the single-thread global kernel on real
-ANMLZoo automata, \S\ref{sec:results}).
+ANMLZoo automata, \S\ref{sec:results}), and \texttt{worklist\_shared} (same scheme with the
+working set staged in dynamic \emph{shared} memory, $\le$1536 states---the working-set-layout
+ablation of the work-efficient kernel).
 \textbf{Triton}: \texttt{dense}, \texttt{bitpacked}, \texttt{multistream},
 \texttt{worklist} ($\le 64$ states, via \texttt{libdevice.ffs} + a data-dependent
 \texttt{while} loop). \textbf{Warp}: \texttt{multistream} (thread-SIMT Python).
@@ -377,8 +379,12 @@ string's many state-words processed serially; Nsight: 17\% occupancy). Our
 \texttt{worklist\_warp} kernel (one warp/string, 32 lanes partitioning the words) addresses
 this and is $12$--$17\times$ faster on real ANMLZoo automata (up to $\sim$165$\times$ on dense
 synthetic NFAs where the single-thread kernel degenerates; \texttt{paper/data/worklist\_warp\_rtx4070.csv}).
-Closing the remaining gap to SOTA absolute throughput (ngAP-class) is the next step: a
-block-cooperative active-set with shared-memory frontier privatization.
+We further tested \emph{shared-memory} working-set privatization (\texttt{worklist\_shared}):
+it only ties \texttt{worklist\_warp} ($0.99$--$1.10\times$, $\le$1536 states) ---
+i.e.\ once the kernel is work-efficient the working-set \emph{layout} is no longer the
+bottleneck (mirroring the compute-bound \texttt{multistream\_shared} result), so the remaining
+gap to SOTA absolute throughput (ngAP-class) is \emph{algorithmic}---memoization / non-blocking
+multi-symbol processing---not memory residency. That is the next step.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call

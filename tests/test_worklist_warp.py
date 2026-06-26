@@ -60,3 +60,15 @@ def test_warp_matches_global_large(n):
     g = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_global")]
     w = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_warp")]
     assert w == g
+
+
+@skip
+@pytest.mark.parametrize("n", [65, 200, 1000, 1536])
+def test_shared_matches_warp(n):
+    """worklist_shared (shared-mem working set, <=1536 states) == worklist_warp."""
+    rng = random.Random(200 + n)
+    nfa, alpha = _random_nfa(n, rng)
+    batch = [bytes(ord(rng.choice(alpha)) for _ in range(rng.randint(0, 24))) for _ in range(24)]
+    w = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_warp")]
+    s = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_shared")]
+    assert s == w

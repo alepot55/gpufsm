@@ -146,6 +146,7 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
             "worklist": "run_worklist",
             "worklist_global": "run_worklist_global",
             "worklist_warp": "run_worklist_warp",
+            "worklist_shared": "run_worklist_shared",
         }
 
         def __init__(self, nfa: NFA, technique: str = "multistream") -> None:
@@ -210,6 +211,10 @@ if _cuda is not None:  # pragma: no cover - requires compiled extension + GPU
 
     @register(Backend.CUDA, "worklist_warp")
     def _make_cuda_worklist_warp(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
+        return CUDAMultistreamExecutor(nfa, technique)
+
+    @register(Backend.CUDA, "worklist_shared")
+    def _make_cuda_worklist_shared(nfa: NFA, technique: str) -> CUDAMultistreamExecutor:
         return CUDAMultistreamExecutor(nfa, technique)
 
 
