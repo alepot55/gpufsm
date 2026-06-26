@@ -230,7 +230,10 @@ the workload toward memory-bound where the memory techniques become load-bearing
 \textbf{Abstraction regret is the execution paradigm, not abstraction height.} On the same
 full-scan kernel the directly-measured throughput ratio vs CUDA is Triton $6$--$8\times$ and
 Warp $0.9\times$ (Warp is \emph{faster}; Fig.~\ref{fig:regret}); the cost-model fit corroborates
-($c_2$ ratio Triton $10.1\times$, Warp $0.63\times$). The four DSLs form a clean $2\times2$
+($c_2$ ratio Triton $10.1\times$, Warp $0.63\times$). The ratios are stable, not single-seed
+artifacts: across 5 random NFAs $\times$ 3 sizes the Triton regret is median $7.1\times$
+(6.6--9.4) and Warp median $0.85\times$ (Warp beats CUDA in the median;
+\texttt{paper/data/regret\_multiseed\_rtx4070.csv}). The four DSLs form a clean $2\times2$
 factorial (Table~\ref{tab:twobytwo}) that separates the two candidate causes. Regret tracks the
 \emph{column} (execution paradigm), not the \emph{row} (abstraction height): the thread-SIMT
 column is $\approx$1$\times$ at \emph{both} heights (low-level CUDA and high-level Warp), while
