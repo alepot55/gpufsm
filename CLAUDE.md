@@ -95,6 +95,13 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
+- **[Iter più recente] RIGORE NUMERI + suite reale allargata.** (a) DRAFT.md riconciliato col .tex (two faces,
+  DFA second face §6.5, capability table §6.6, Hexcute/LMS/Tawa/Descend in related work). (b) **Audit numeri**:
+  tutte le cifre citate ora tracciano ai `paper/data/*.csv` — corretti stale: regret NFA 15.7×→6–8× misurato /
+  10.1× fit; Warp 0.62×→0.6–0.9×; worklist speedup 250×/1148×/7147×→332×@32..≈10⁴×@500; worklist regret 9×/142 Gbps→
+  6.5×/164 Gbps; DFA 496@4096/207@200k→443@4096(4MB)/213@50k(50MB). Propagati a docs/ + CLAUDE.md. (c) **Real-suite
+  3→6 famiglie**: +Fermi(40.8k)/RandomForest(33.2k,6.27M tr)/CoreRings(48k), tutti pure-STE, SHA pinnati, GPU
+  worklist_global==reference bit-for-bit (test_anmlzoo_gpu 6 verdi).
 - **Backend GPU validati + 2 tecniche memory-centric.** `pytest` → **23 verdi** (20 CPU + 3 GPU).
   Tecniche per backend GPU: `dense`, `bitpacked`, `multistream` (`gpufsm list`).
 - **Tecnica `bitpacked`** (asse byte→bit): working-set = bitmask packed (1 bit/stato, parole 64-bit) invece
