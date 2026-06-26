@@ -1,0 +1,617 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{figures/}}
+\newcommand{\cmark}{\checkmark}
+\newcommand{\xmark}{$\times$}
+\newcommand{\tmark}{$\sim$}
+
+% gpufsm — working preprint draft, generated from paper/DRAFT.md.
+% All numbers trace to paper/data/*.csv on an RTX 4070 (sm_89); see docs/REPRODUCIBILITY.md.
+
+\begin{document}
+
+\title{The Two Faces of Abstraction Regret:\\
+Control-Flow and Memory-Layout Limits of GPU DSLs\\
+on Irregular Automata}
+
+\author{\IEEEauthorblockN{Alessandro Potenza}
+\IEEEauthorblockA{\textit{Politecnico di Milano}\\
+Milan, Italy\\
+alessandro1.potenza@mail.polimi.it}}
+
+\maketitle
+
+\begin{abstract}
+GPU domain-specific languages (DSLs) such as OpenAI Triton deliver near-CUDA performance
+at far lower effort on \emph{regular} tensor algebra. We ask what that abstraction costs on
+\emph{irregular} workloads and answer it with a metric we call \emph{abstraction regret}:
+the performance a DSL forecloses---with the algorithm held fixed---because it cannot express
+the memory layout or control flow a workload needs. We decompose regret along these two
+capability axes and instantiate it on finite automata across the paradigm axis CUDA and
+NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-SPMD).
+Automata expose \textbf{two complementary faces}: an NFA active-set traversal that is
+\emph{control-flow bound}, and a DFA dense-table walk that is \emph{memory bound} (its
+throughput halves as the table crosses L2). On both faces the regret is large for the
+tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $5$--$13\times$ versus CUDA
+across the two faces, while Warp, an equally high-level \emph{Python} DSL, matches or beats
+hand CUDA on the NFA ($0.6$--$0.9\times$) and pays only $1.4$--$2.3\times$ on the DFA. So
+regret is set by the execution \emph{paradigm}, not by how
+high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
+Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
+explicit layout/shared-memory control): Gluon \emph{still} cannot express the kernel, so the
+binding constraint is the paradigm, not tuning or layout. A two-parameter cost model
+corroborates the regret (predictive for the thread model; holdout 2.7\%) and we name the
+missing IR primitives (scalar gather in a tile, register-resident
+bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
+($\approx\!330\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
+against a CPU oracle on six real ANMLZoo automata up to 48k states). We confirm the centerpiece
+on a second GPU architecture (NVIDIA A100): the $2\times2$ regret pattern and the
+architecture-independent tile-SPMD scalar ceiling both reproduce.
+\end{abstract}
+
+\section{Introduction}
+GPU domain-specific languages such as OpenAI Triton~\cite{triton} have moved from research to
+the mainstream---Triton is the default code-generation backend for PyTorch---because they
+deliver near-CUDA performance on dense tensor algebra at a fraction of the engineering effort.
+That productivity comes from \emph{hiding} the very things a GPU programmer otherwise manages by
+hand: thread indexing, memory placement, and control flow. On \emph{regular} workloads---dense
+matrix and tensor kernels with static, coalesced access and uniform control---this hiding is
+essentially free, which is precisely why these DSLs succeed.
+
+\emph{Irregular} workloads are the opposite regime. Graph traversal, sparse algebra, and finite
+automata are dominated by data layout and data-dependent control flow rather than
+arithmetic~\cite{burtscher}, and decades of evidence show that the \emph{representation}, at a
+fixed algorithm, swings their GPU performance by an order of magnitude~\cite{bestsf,sparsetir}.
+What, then, does a GPU DSL's hiding \emph{cost} on irregular workloads---and what, exactly,
+causes that cost? The question is open: DSL benchmarks are dense-tensor-only, and the GPU
+automata engines that define the state of the art---iNFAnt~\cite{infant}, ngAP~\cite{ngap},
+HybridSA~\cite{hybridsa}, BitGen~\cite{bitgen}, ANG~\cite{ang}---are uniformly single-stack CUDA,
+framed as faster \emph{algorithms}, never as what a programming abstraction forecloses. No prior
+work compares modern GPU kernel DSLs on an irregular workload.
+
+We answer the question on finite-automata simulation, a canonical irregular workload
+(deep-packet inspection, regular-expression matching, bioinformatics) with \emph{two
+complementary faces}: an NFA active-set traversal that is control-flow-bound, and a DFA
+dense-table walk that is memory-bound. We name the cost \emph{abstraction regret}---the
+performance a DSL forecloses, with the algorithm held fixed, because it cannot express the
+memory layout or control flow a workload needs---and find it is large (Triton pays $6$--$8\times$
+versus CUDA). The central, and initially counter-intuitive, result is \emph{what causes it}:
+not how high-level the DSL is, but its \emph{execution paradigm}. A clean $2\times2$
+(abstraction-height $\times$ paradigm) factorial over four real DSLs shows the thread-SIMT
+column (low-level CUDA and \emph{high-level} Warp) sits at $\approx$1$\times$ while the tile-SPMD
+column (high-level Triton and \emph{low-level} Gluon) fails. We make the attribution causal---a
+controlled same-MLIR-stack Triton$\leftrightarrow$Gluon pair, plus a $16\times$ tile-vs-scalar
+cliff measured \emph{within} one DSL---and actionable: both faces reduce to a \emph{single}
+missing IR primitive, a scalar gather within a tile.
+
+\textbf{Contributions.}
+\textbf{(A)} \emph{Abstraction regret, operationalized and falsified to a cause}: we show the
+regret is set by the \emph{execution paradigm} (tile-SPMD vs thread-SIMT), \emph{not}
+abstraction height, via a clean $2\times2$ (height $\times$ paradigm) factorial whose four
+cells are real DSLs (CUDA, Warp, Triton, Gluon). The attribution is made \emph{falsifiable},
+not rhetorical, by a controlled Triton$\leftrightarrow$Gluon pair (same MLIR stack, Gluon only
+\emph{adds} layout control yet \emph{still} cannot express the kernel)---which also defeats the
+autotuning counter-thesis~\cite{autotuning}, since no knob exists on the lower-level sibling.
+We decompose regret along two capability axes (control-flow vs memory-layout) on the
+\emph{two faces} of automata (control-flow-bound NFA, memory-bound DFA), back it with a
+holdout-validated cost model (\S\ref{sec:cost}), and distill an \emph{actionable}
+capability$\to$cost map naming the missing IR primitive (scalar-gather-in-tile) and its price---
+a result for GPU-DSL designers, distinct from hardware performance portability~\cite{pennycook}.
+\textbf{(B)} \emph{A work-efficient portable NFA engine}: an active-set/worklist
+bit-packed kernel (\S\ref{sec:impl}) that removes the $O(n^2)$ compute wall and reaches
+15--170~Gbps. \textbf{(C)} \emph{A reproducible artifact}: one registry-based framework,
+a CPU reference oracle, median+CI95 sweeps, and figures regenerated only from versioned
+CSVs.
+
+\section{Background}
+\textbf{Automata, and their two faces.} An \emph{NFA} maintains a set of active states; per
+input symbol it applies the transition relation (each active state's out-edges labelled by that
+symbol) and then an epsilon-closure (following label-free edges to fixpoint). GPU engines since
+iNFAnt~\cite{infant} store the transitions in CSR form---symbol- and epsilon-edge arrays indexed
+by per-state row pointers---and represent the active set as a bit-vector. The work per symbol is
+data-dependent (which states are active, how many out-edges each has) and scatter-heavy: this is
+the \emph{control-flow-bound} face. A \emph{DFA} is the deterministic dual: a single dense
+transition table $T[\textit{state},\textit{symbol}]$ ($n\times256$) with no active set, walked by
+one random gather $T[s\!\cdot\!256+c]$ per input byte. For large $n$ the table exceeds cache, so
+the DFA is the \emph{memory-bound} face. The two faces stress disjoint hardware limits, which is
+why we study both. We use the standard ANMLZoo~\cite{anmlzoo}/AutomataZoo benchmark families;
+Hyperscan~\cite{hyperscan} is the CPU baseline.
+
+\textbf{GPU automata engines} from iNFAnt to AsyncAP~\cite{asyncap}, ngAP~\cite{ngap}
+(non-blocking + memoization + privatization), HybridSA~\cite{hybridsa} (bit-parallel),
+BitGen~\cite{bitgen} (Parabix bitstreams) and ANG~\cite{ang} win by reorganizing or reducing
+irregular memory traffic---each a new \emph{algorithm}, hand-written in CUDA, that bundles the
+memory effects in. None isolates what a programming \emph{abstraction} costs.
+
+\textbf{Two GPU execution paradigms} (the axis we study). A \emph{thread-SIMT} DSL (CUDA, and
+NVIDIA Warp) is written from one thread's point of view: scalars, data-dependent branches,
+per-thread loops, bit manipulation and a register-resident working set are all native, so the
+NFA's per-state traversal maps directly. A \emph{tile-SPMD} DSL (Triton, and its low-level
+frontend Gluon) operates on whole \emph{tiles} (blocks) of data, with the compiler owning the
+intra-tile layout and thread mapping; this is ideal for dense, uniform tensor algebra but a
+per-element scalar gather or a data-dependent inner loop must be emulated, not expressed.
+Crucially, \emph{abstraction height} (how much the DSL hides) is \emph{orthogonal} to the
+paradigm: Warp is high-level yet thread-SIMT, while Gluon is low-level yet tile-SPMD. Our $2\times2$
+study exploits exactly this orthogonality to separate the two candidate causes of the regret.
+
+\textbf{The gap.} Every GPU automata engine above is CUDA-only, and \textbf{no prior work
+compares modern GPU kernel DSLs (Triton/Gluon vs CUDA vs Warp) on an irregular workload}:
+published GPU-DSL benchmarks target dense tensor kernels, and no irregular-workload suite
+exercises these kernel DSLs. We close that gap and frame the resulting difference as an
+expressibility cost.
+
+\section{Abstraction regret and the cost model}\label{sec:cost}
+We model per-symbol time as a roofline-style sum $t_{\text{sym}} =
+\text{traffic}/\text{bandwidth} + n^2 c_2$, where the compute term is \emph{quadratic} because
+the faithful kernel runs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure per symbol,
+and $c_2$ is fitted per backend; its DSL-to-DSL ratio, at fixed algorithm, corroborates the
+regret. A holdout test (fit $n\!\le\!128$, predict $n{=}256$) shows the model is predictive for
+the thread-model backend (CUDA 2.7\% error) but \emph{not} for tile/SPMD Triton (45\% error:
+its large fixed launch overhead at small $n$ is misattributed to the $n^2$ term). We therefore
+take the directly-measured throughput ratio as the primary regret metric (Triton $6$--$8\times$,
+robust) and the fitted $c_2$ ratio ($10.1\times$) as corroborating only.
+
+\section{Implementation}\label{sec:impl}
+A single registry maps a backend/technique to an executor. The NFA is stored once in CSR
+and consumed identically by every backend, so comparisons are apples-to-apples.
+Correctness is gated against a CPU reference oracle (latch-first-match) and its bit-packed
+executable spec.
+\textbf{CUDA}: \texttt{dense} (int8/state), \texttt{bitpacked} (register-resident 64-bit
+words), \texttt{multistream} (one thread/string), \texttt{multistream\_shared} (CSR staged
+in shared memory---a layout Triton cannot express), \texttt{multistream\_async} (pinned +
+streamed overlap), and \texttt{worklist} (active-bit iteration via \texttt{\_\_ffsll} +
+frontier eps-closure; $O(\text{active})$, no $O(n^2)$), \texttt{worklist\_global}
+(global working set, dynamic word count, no 512-state cap --- scales to ANMLZoo-sized
+automata; register residency costs $\sim$4--5$\times$ vs the capped kernel), and
+\texttt{worklist\_warp} (\emph{block-parallel}: one warp per string, the 32 lanes partition
+the state-words and scatter transitions via \texttt{atomicOr}---it spreads one string's loads
+across the warp, $3$--$9\times$ faster than the single-thread global kernel on real ANMLZoo
+automata at a GPU-saturating batch, \S\ref{sec:results}), and \texttt{worklist\_shared} (same
+scheme with the working set staged in dynamic \emph{shared} memory, $\le$1536 states---the
+working-set-layout ablation of the work-efficient kernel).
+\textbf{Triton}: \texttt{dense}, \texttt{bitpacked}, \texttt{multistream},
+\texttt{worklist} ($\le 64$ states, via \texttt{libdevice.ffs} + a data-dependent
+\texttt{while} loop). \textbf{Warp}: \texttt{multistream} (thread-SIMT Python).
+\textbf{Gluon} (Triton's experimental low-level frontend): \texttt{gl.load} always returns
+a layout-typed tensor (no scalar load), so the data-dependent CSR inner loop is
+inexpressible---a runnable probe (\texttt{scripts/gluon\_probe.py}) reproduces the
+compiler error (\emph{``Value argument cannot be block type''}) and exits non-zero if a
+future Gluon ever compiles it, making the claim falsifiable.
+\textbf{DFA (the memory-bound face):} a \texttt{dfa} kernel walks a dense
+$\textit{states}\times256$ table, one random lookup per byte, implemented identically in
+CUDA, Triton and Warp (one program/thread per string); all match the DFA oracle.
+
+\section{Methodology}\label{sec:method}
+\textbf{Fairness protocol (the crux of a DSL comparison).} Every backend consumes the
+\emph{same} CSR automaton representation and implements the \emph{same} algorithm, with kernels
+structurally mirrored line-for-line from one specification; across a comparison we vary
+\emph{only} the DSL (and, within a DSL, the technique), never the algorithm. This is what makes
+the measured gap an \emph{abstraction} cost rather than an algorithmic one, and it is enforced
+mechanically: a single registry maps a (backend, technique) pair to an executor, and a CPU
+reference oracle gates correctness.
+
+\textbf{Correctness oracle.} The oracle (\texttt{reference.py}) is the NFA/DFA semantics with
+\emph{latch-first-match} (report at the first accepting configuration). Every backend/technique
+is verified bit-identical to it---\texttt{(accepted, match\_len)} on all examples, on randomized
+fuzz/stress NFAs (up to 500 states), and on six real ANMLZoo automata (below)---so a faster
+kernel can never be a wrong kernel.
+
+\textbf{Timing and statistics.} Throughput is total input bits over the per-run batch-kernel
+time on a fixed batch ($2048\times256$~B), reported as median + percentile-bootstrap 95\% CI
+over 9 runs after warmup, with kernel and transfer time separated; GPU timings are
+non-Gaussian, so we use medians and bootstrap CIs throughout~\cite{hoefler}. The headline
+regret ratios are additionally measured over multiple random-NFA seeds (median + min--max
+spread) to rule out single-instance artifacts, and parallel-scaling comparisons use a
+GPU-saturating batch so a baseline is never starved of parallelism.
+
+\textbf{Bound diagnosis.} We classify kernels compute- vs memory-bound with the
+\emph{instruction} roofline~\cite{instrroofline,roofline}---appropriate for these
+integer/transaction-dominated FSM kernels, which a FLOP roofline would understate---and
+corroborate with Nsight Compute counters (SM\%, DRAM\%, L2 hit, achieved occupancy).
+
+\textbf{Environment.} Hardware and library versions are captured per CSV row. Hardware: NVIDIA
+RTX 4070 (sm\_89, 46 SMs, 12\,GB, 6\,MB L2); software: CUDA toolkit 13.x, Triton 3.5.1, Warp
+1.14, PyTorch 2.9 (cu128). We additionally validate on \emph{six real} ANMLZoo automata
+spanning six families: Levenshtein (2787 states), Hamming (11349, 2.1M transitions), Brill
+(42661, 4.4M), Fermi (40786, particle-physics regexes), RandomForest (33223, 6.27M
+transitions---an ML decision-forest, our densest), and CoreRings (48005, synthetic ring---our
+largest state count); all loaded from pinned public ANML with correct
+\texttt{all-input}/\texttt{start-of-data} semantics. \texttt{worklist\_global} matches the
+reference oracle bit-for-bit on every input, confirming correctness at production scale
+(up to 48k states, 6.3M transitions).
+
+\section{Results}\label{sec:results}
+
+\begin{table}[t]
+\centering
+\caption{Throughput (Gbps) by technique and NFA size (batched, RTX 4070). Dashes:
+$>64$ states unsupported by the single-word Triton/Warp kernels.}
+\label{tab:throughput}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{rrrrr}
+\toprule
+states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
+\midrule
+32  & 170.2 & 0.513 & 0.071 & 24.4 \\
+64  & 163.8 & 0.131 & 0.021 & 25.2 \\
+128 & 47.6  & 0.023 & 0.003 & --   \\
+256 & 31.7  & 0.006 & 0.001 & --   \\
+500 & 15.5  & 0.0015& 0.0002& --   \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Table~\ref{tab:throughput} reports throughput.
+
+\textbf{The faithful kernel is compute-bound; memory layout is irrelevant there.}
+\texttt{multistream}, \texttt{multistream\_shared} (modeled CSR traffic $=0$), and
+\texttt{multistream\_async} tie to within the bootstrap CI at every size, and throughput
+scales as $1/n^2$. Nsight Compute counters confirm this at the hardware level: the full-scan
+kernel sustains $\approx$19\% of peak SM throughput but only \textbf{0.01\%} of peak DRAM
+throughput, and \texttt{multistream\_shared} shows identical SM\%, DRAM\% and occupancy---only
+the L2 hit rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot help
+until the algorithm is work-efficient.
+
+\textbf{The work-efficient kernel unlocks the regime.} The \texttt{worklist} kernel is
+$\approx\!330\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$: $332\times$
+at 32 states, $\approx\!10^4\times$ at 500) and reaches 15--170~Gbps, moving the workload toward
+memory-bound where the memory techniques become load-bearing.
+
+\textbf{Abstraction regret is the execution paradigm, not abstraction height.} On the same
+full-scan kernel the directly-measured throughput ratio vs CUDA is Triton $6$--$8\times$ and
+Warp $0.9\times$ (Warp is \emph{faster}; Fig.~\ref{fig:regret}); the cost-model fit corroborates
+($c_2$ ratio Triton $10.1\times$, Warp $0.63\times$). The ratios are stable, not single-seed
+artifacts: across 5 random NFAs $\times$ 3 sizes the Triton regret is median $7.1\times$
+(6.6--9.4) and Warp median $0.85\times$ (Warp beats CUDA in the median;
+\texttt{paper/data/regret\_multiseed\_rtx4070.csv}). The four DSLs form a clean $2\times2$
+factorial (Table~\ref{tab:twobytwo}) that separates the two candidate causes. Regret tracks the
+\emph{column} (execution paradigm), not the \emph{row} (abstraction height): the thread-SIMT
+column is $\approx$1$\times$ at \emph{both} heights (low-level CUDA and high-level Warp), while
+the tile-SPMD column fails at \emph{both} heights (high-level Triton $6$--$8\times$; low-level
+Gluon cannot express the kernel \emph{at all}). This falsifies the obvious alternative
+hypothesis ``high-level $\Rightarrow$ slow,'' and---because Gluon is the lower-level sibling on
+the \emph{same} MLIR stack---it also rules out tuning/maturity: the gap persists where no knob
+exists.
+
+\begin{table}[t]
+\centering
+\caption{The regret is the execution paradigm, not abstraction height. Cells are
+DSL (NFA regret vs CUDA). Regret tracks the column, not the row.}
+\label{tab:twobytwo}
+\small
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{thread-SIMT} & \textbf{tile-SPMD} \\
+\midrule
+\textbf{low-level}  & CUDA ($1\times$)        & Gluon (\xmark\ inexpressible) \\
+\textbf{high-level} & Warp ($0.6$--$0.9\times$) & Triton ($6$--$8\times$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Causal control: the regret is caused by the scalar/control-flow primitive.} To show the
+attribution is causal, not correlational, we ablate the primitive \emph{within Triton}, holding
+language, data, harness and parallelism fixed: one program per string processes the same bytes
+either (i) as a tile-vectorized reduction or (ii) with a carried data-dependent scalar recurrence
+(the automata pattern). At a GPU-saturating batch the tile kernel scales to 1320~Gbps (Triton's
+design point) while the scalar kernel hits a hard $\approx$81~Gbps per-program ceiling---a
+$16\times$ cliff from the access/control pattern alone (\texttt{paper/data/scalar\_ablation\_rtx4070.csv}).
+The regret appears \emph{iff} the inexpressible primitive is required. The cross-paradigm half
+confirms it: thread-SIMT runs the \emph{same} scalar data-dependent recurrence with \emph{no}
+per-program ceiling---CUDA's DFA walk (a per-byte scalar gather + state recurrence) reaches
+163--364~Gbps---whereas tile-SPMD Triton is pinned at a $\approx$29--81~Gbps scalar ceiling
+regardless of table size or batch. Same work, same hardware: the ceiling is a property of the
+paradigm.
+
+\textbf{Expressibility $\neq$ efficiency.} Triton \emph{can} express the work-efficient
+worklist (unlike Gluon), yet still pays $\approx\!6.5\times$ vs CUDA there (CUDA 164~Gbps vs
+Triton 25~Gbps at $\le 64$ states)---essentially the same regret as the $6$--$8\times$ on the
+full scan. Even expressing the right algorithm, the tile/SPMD model imposes a large constant
+penalty on scalar, data-dependent automata work.
+
+\textbf{The second face: DFA is memory-bound, and the regret persists.} The DFA dense-table
+walk is the memory-bound dual of the NFA. A fine table-size sweep, median over 3 random DFAs
+per size (Fig.~\ref{fig:dfa}), makes the signature explicit: CUDA throughput rises to a peak
+\emph{exactly} at the L2 capacity ($364$~Gbps at the 6\,MB table) and then falls $2.2\times$
+monotonically to a DRAM-bound plateau ($\sim$163~Gbps) once the table far exceeds L2. Warp
+tracks the same shape at about half ($177\!\rightarrow\!108$~Gbps). \textbf{Triton, by
+contrast, is flat at $29$--$32$~Gbps across the entire 1--100\,MB range}---it never enters the
+memory-bound regime because its tile/SPMD codegen bottlenecks the scalar gather first (DFA
+regret $5$--$13\times$, largest where CUDA peaks at L2). This $\approx$29~Gbps is a per-program
+scalar \emph{ceiling}, not a parallelism limit: sweeping batch size, Triton saturates at
+$\approx$29~Gbps by $\sim$4k strings while CUDA keeps scaling past 400~Gbps with the memory
+idle. So on \emph{both} faces---control-flow-bound (NFA) and memory-bound (DFA)---the
+regret tracks the execution paradigm, not the workload's bottleneck: it is an intrinsic
+property of the DSL, not of where the kernel happens to be limited. This is not a single-GPU
+artifact: on an A100 (40\,MB L2, current Triton~3.7) the CUDA knee shifts to $\approx$32--48\,MB
+(vs $\approx$6--8\,MB on the 4070's 6\,MB L2) while Triton stays flat at $\approx$24--30\,Gbps
+across the whole 2--128\,MB sweep---the \emph{same} scalar ceiling as the 4070, three years and
+$6.7\times$ L2 apart, confirming it is a property of the tile/SPMD model and not the hardware
+(\S\ref{sec:limits}).
+
+\textbf{Capability $\to$ cost.} Table~\ref{tab:cap} maps the capabilities each kernel needs to
+whether a DSL expresses them and the resulting regret. The thread-SIMT DSLs (CUDA, Warp)
+express all of scalar load, data-dependent loops, register-resident bitsets and explicit
+shared-memory layout; the tile-SPMD DSLs cannot express a scalar element load at all (Gluon)
+or only via a strained single program (Triton), which is exactly what the regret measures.
+\textbf{One root cause, both faces.} Strikingly, both faces reduce to the \emph{same} missing
+primitive---a \emph{scalar gather within a tile}. The NFA's control-flow regret is the
+data-dependent per-state scatter/gather; the DFA's memory regret is the per-byte random
+table gather $\textit{trans}[s\!\cdot\!256+c]$. A tile DSL cannot issue either as a scalar
+element op, so on the DFA Triton never even reaches the memory-bound regime---it is
+scalar-gather-bound first (hence flat at $\approx$29~Gbps while CUDA's same gather scales to
+$364$). So the capability$\to$cost map has a single actionable root: give the tile/SPMD IR a
+first-class scalar gather (and the data-dependent loop it implies), and the regret on
+\emph{both} faces should collapse---a concrete, falsifiable directive for GPU-DSL designers.
+This also sharpens the two-axis decomposition into a finding: we examined \emph{both} the
+control-flow and memory-layout capability axes, and the memory-layout levers turned out
+\emph{inert} (shared-CSR staging and byte$\to$bit packing tie their global-memory counterparts,
+\S\ref{sec:results})---so on these irregular workloads the binding constraint is control-flow
+expressibility, even on the memory-bound face. Abstraction regret here is, at root, one axis,
+not two.
+
+\begin{table}[t]
+\centering
+\caption{Capability $\to$ cost---an actionable map for GPU-DSL designers: each missing IR
+primitive and the regret it carries. \cmark\ expressible, \tmark\ only as a strained single
+program, \xmark\ inexpressible. Regret is throughput vs CUDA on each face. The single primitive
+that most closes the tile-SPMD gap is a \emph{scalar gather within a tile}.}
+\label{tab:cap}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Capability (paradigm) & CUDA & Warp & Triton & Gluon \\
+ & \multicolumn{2}{c}{thread-SIMT} & \multicolumn{2}{c}{tile-SPMD} \\
+\midrule
+Scalar element load        & \cmark & \cmark & \tmark & \xmark \\
+Data-dependent loop        & \cmark & \cmark & \tmark & \tmark \\
+Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
+Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
+\midrule
+NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
+DFA regret (memory)        & $1\times$ & $1.4$--$2.3\times$ & $5$--$13\times$ & --- \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{fig_abstraction_regret.pdf}
+\caption{Throughput relative to CUDA: Triton (tile) $\ll$ Warp (thread) $\approx$ CUDA.
+Regret is the execution paradigm, not abstraction height.}\label{fig:regret}\end{figure}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\columnwidth]{fig_dfa_memory_bound.pdf}
+\caption{DFA (memory-bound face), throughput vs table size (log $x$), median over 3 random
+DFAs/size: CUDA/Warp peak at the 6\,MB L2 then drop $\sim$2.2$\times$ to a DRAM plateau; Triton
+stays flat (29--32~Gbps)---scalar-gather-bound, never reaching the memory regime.}\label{fig:dfa}\end{figure}
+
+\section{Related work}
+\textbf{Naming.} We deliberately invert ``abstraction \emph{without} regret''
+(LMS~\cite{lms}): staging removes call/dispatch overhead, but cannot manufacture a layout or
+control-flow pattern the surface abstraction forbids---precisely the residual we measure.
+
+\textbf{Closest prior on expressibility limits.} Two recent works come closest, on orthogonal
+axes, and neither runs a controlled cross-DSL comparison on an irregular workload.
+\emph{Hexcute}~\cite{hexcute} decomposes the Triton$\leftrightarrow$CUDA gap into
+layout-synthesis vs dataflow---but as a \emph{compiler} that \emph{removes} the gap on
+\emph{dense} GEMM. \emph{STeP}~\cite{step} (ASPLOS'26) makes almost our control-flow diagnosis
+(tile/dataflow abstractions force data-dependent control flow to be static or unoptimized, and
+scalar-only primitives block tiling)---but for \emph{spatial dataflow accelerators}, and again
+ships a solution rather than a measured cross-DSL regret. \emph{GraphIt}~\cite{graphit} is the
+nearest \emph{DSL-for-an-irregular-workload}, but it \emph{presupposes} the primitives are
+expressible and autotunes a layout/traversal \emph{schedule}; our point is expressibility
+itself---of control flow, not just layout---is the gate. \emph{Tawa}~\cite{tawa} and
+\emph{Descend}~\cite{descend} argue \emph{qualitatively} that a model's execution paradigm
+forecloses patterns; we quantify it with a falsifiable Triton$\leftrightarrow$Gluon control and
+a capability$\to$cost table. That data-dependent control flow is the hard case for
+\emph{tiled/SIMD} execution is itself long known~\cite{cfemul}, supporting that the limit is
+the \emph{paradigm}, not Triton's maturity. We rebut the autotuning counter-thesis~\cite{autotuning}
+and the LLM kernel-generation line: searching the Triton schedule space cannot manufacture an IR
+primitive the paradigm lacks---Gluon, the explicit-control sibling on the same MLIR
+stack~\cite{triton}, still cannot express the kernel.
+
+\textbf{Abstraction and schedule languages.} The Halide~\cite{halide}/TVM~\cite{tvm} lineage
+established that abstraction constrains the \emph{schedule} space; Graphene~\cite{graphene}
+that tensor IRs can be \emph{too inexpressive} for required data-to-thread mappings. These
+target \emph{dense} tensors; we add the irregular, control-flow face. \textbf{Performance
+portability}~\cite{pennycook} decomposes efficiency across a \emph{hardware set}; we decompose
+across the \emph{expressible-capability} axis at fixed hardware and algorithm---orthogonal, and
+falsifiable via a named missing primitive rather than a harmonic-mean efficiency.
+
+\textbf{Irregular GPU workloads.} That irregular codes are bound by control divergence and
+data-dependent memory access, not arithmetic, is the canonical
+characterization~\cite{burtscher}; SpMV format selection~\cite{bestsf,sparsetir} and the
+sparse-tensor compiler~\cite{taco} show layout/representation alone swings irregular GPU
+performance by $\sim$10$\times$ at fixed algorithm. Frontier/work-efficient
+traversal~\cite{merrill,gunrock} is the method-analogy for our worklist. Automata are the
+\emph{dynamic-control} member of this family (a small register-resident active set evolving per
+symbol) that lets us isolate the control-flow face those workloads fix offline (SpMV) or have
+already abstracted (graph frameworks).
+
+\textbf{GPU automata engines.} The SOTA line---iNFAnt~\cite{infant}, AsyncAP~\cite{asyncap},
+ngAP~\cite{ngap}, HybridSA~\cite{hybridsa}, BitGen~\cite{bitgen}, ANG~\cite{ang},
+AutomataBLAS~\cite{automatablas} (AP-as-SpMV, our DFA-face comparator)---and AP
+accelerators~\cite{hopps}, plus portable-automata languages~\cite{rapid} and the Parabix
+bitstream lineage~\cite{parabix}, are all single-stack (CUDA/accelerator) and framed as
+\emph{faster engines}, never as what a programming abstraction forecloses. Each reports a
+speedup over \emph{its own} baseline/hardware (ngAP $7.9\times$, ANG $11.7\times$, BitGen
+$19.5\times$---not comparable in absolute Gbps) and is a new \emph{algorithm} on CUDA, whereas
+our axis is orthogonal. We therefore \emph{position}, not benchmark, against them; matching
+ngAP/ANG-class absolute throughput is explicit future work (\S\ref{sec:limits}). To our
+knowledge no prior work studies DSL expressibility across multiple GPU programming models on
+irregular automata.
+
+\section{Threats to validity}
+\emph{Construct.} Most throughput points use randomly generated NFAs, which may not
+represent production automata; we mitigate this by also validating on six real ANMLZoo
+automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
+reference oracle bit-for-bit, and the block-parallel kernel gives $1.4$--$27\times$ over the
+single-thread baseline on them (CSV in \texttt{paper/data/}).
+\emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
+Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
+algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
+(a relative measure at fixed algorithm). \emph{Internal.} Every backend/technique is checked against a
+single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
+use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
+\emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
+$6$--$15\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
+limit. Three facts argue against this: (i) the fairness protocol (\S\ref{sec:method}) holds the
+algorithm fixed and mirrors kernels line-for-line from one CSR spec; (ii) \emph{Warp}---an
+equally high-level Python DSL written with comparable effort---matches or beats hand CUDA, so
+``high-level $\Rightarrow$ slow'' is not the explanation; and (iii) the controlled
+Triton$\leftrightarrow$Gluon pair and the within-Triton $16\times$ tile-vs-scalar cliff show the
+gap survives where no tuning knob exists---the tile/SPMD execution model is the cause. \emph{External.} Most results are from one GPU (RTX 4070); we re-ran the centerpiece on a second
+architecture (NVIDIA A100, \S\ref{sec:limits}) and the $2\times2$ \emph{holds}: the Triton regret
+rescales ($6$--$8\times\!\rightarrow\!3.2\times$) but stays on the tile/SPMD column, Warp remains
+$\le$CUDA ($0.80\times$), and the Triton DFA line stays flat on a \emph{current} Triton~3.7 stack.
+The cost-model constants are per-backend fits that rescale across architectures, but the
+\emph{relative} regret---which is the claim---is reproduced cross-arch.
+
+\section{Limitations and future work}\label{sec:limits}
+\emph{Generality across architectures.} Most results are from one GPU (RTX 4070, sm\_89,
+6\,MB L2); the qualitative claims are architecture-independent (the capability table is a
+property of the DSL compilers, and the Triton$\leftrightarrow$Gluon control holds at compile
+time). We re-ran the centerpiece on a \emph{second} architecture---an NVIDIA A100 (40\,MB L2),
+on a current Triton~3.7 stack---and every load-bearing claim holds. \emph{(i) The $2\times2$
+regret pattern reproduces:} the NFA regret vs CUDA is Triton $3.2\times$ (flat across 32/48/64
+states, 3 seeds) and Warp $0.80$--$0.83\times$ (\texttt{paper/data/regret\_a100.csv}). The
+absolute factors rescale from the 4070 ($6$--$8\times$ / $0.9\times$)---a bigger,
+higher-bandwidth GPU narrows the tile/SPMD penalty---but the \emph{structure} is identical:
+Triton (tile/SPMD) pays regret, Warp (thread-SIMT) matches or beats hand CUDA, so regret tracks
+the paradigm column, not abstraction height, on both architectures. \emph{(ii) The Triton DFA
+ceiling is architecture-independent:} Triton throughput stays flat at $\approx$24--30\,Gbps
+across the entire 2--128\,MB table sweep---essentially the same flat value as the 4070's
+29--32\,Gbps---never reaching the memory-bound regime, while CUDA reaches 73--531\,Gbps by
+exploiting the larger L2 (DFA regret $3$--$18\times$; \texttt{paper/data/dfa\_knee\_rich\_a100.csv}).
+That the scalar-gather ceiling is the \emph{same absolute number} on two GPUs three years and
+$6.7\times$ L2 apart is strong evidence it is a property of the tile/SPMD model, not the hardware.
+\emph{(iii) The DFA memory-bound knee shifts with L2:} in a cleaner single-backend sweep CUDA
+falls to its DRAM plateau past $\approx$6--8\,MB on the 4070 but stays high through 32--48\,MB on
+the A100---the knee moves by $\approx$6$\times$, tracking the $6.7\times$ larger L2
+(\texttt{paper/data/dfa\_knee\_a100.csv}). This closes the chief external-validity gap: the
+contribution is reproduced, not merely re-predicted, on a second architecture.
+\emph{Kernel.} The single-thread worklist under-utilizes the GPU on large automata (Nsight:
+17\% occupancy); a block-parallel \texttt{worklist\_warp} (one warp/string, 32 lanes
+partitioning the state-words, scattering via \texttt{atomicOr}) restores it---$3$--$9\times$
+faster on real ANMLZoo automata at a saturating batch, occupancy $17\!\rightarrow\!57\%$. Two
+negative results bound the remaining gap: shared-memory working-set privatization only ties the
+global kernel ($0.99$--$1.10\times$) and a compacted active-ID worklist barely beats the bitmap
+scan ($0.8$--$1.5\times$)---once work-efficient the kernel is \emph{latency-bound}, not memory-
+or layout-bound (DRAM $\le$2.25\%, L2 hit $\ge$97.6\% even for brill's 17\,MB CSR, since all
+strings share the CSR and only a hot row subset is touched). The remaining gap to ngAP-class
+throughput is therefore \emph{algorithmic} (cross-string/symbol redundancy: memoization,
+non-blocking multi-symbol processing), not memory residency or worklist representation---the
+next step.
+
+\section{Conclusion}
+On irregular automata the GPU-DSL promise breaks along a measurable axis we call
+\emph{abstraction regret}: the performance a DSL forecloses at a fixed algorithm. Across the two
+faces of automata---the control-flow-bound NFA and the memory-bound DFA---the regret is large for
+tile-SPMD DSLs (Triton $6$--$8\times$) and absent for thread-SIMT ones (Warp $\le$1$\times$). A
+$2\times2$ (height $\times$ paradigm) factorial localizes the cause to the \emph{execution
+paradigm}, not abstraction height; a controlled same-stack Triton$\leftrightarrow$Gluon pair and a
+within-Triton $16\times$ tile-vs-scalar cliff make that attribution causal and rule out tuning; and
+both faces reduce to a \emph{single} missing IR primitive.
+
+The takeaway is constructive and actionable. ``Abstraction regret'' is not an argument against
+high-level GPU DSLs---Warp shows a high-level DSL can match hand CUDA on exactly this irregular
+workload---but a diagnosis with a falsifiable, named cure: \textbf{give a tile/SPMD IR a
+first-class scalar gather within a tile} (and the data-dependent loop it implies), and our map
+predicts the regret on \emph{both} the control-flow and memory faces should collapse. The method
+generalizes beyond automata: hold the algorithm fixed, vary the DSL across a controlled pair, and
+attribute the residual to a named, missing primitive. We release the framework, oracle, kernels,
+and versioned data so the prediction can be tested as such a primitive lands---and so the same
+diagnosis can be run on the next irregular workload.
+
+\section*{Artifact availability}
+All code, the CPU reference oracle, the versioned result CSVs, and the figure generator are
+in the project repository. Every figure and table regenerates from the committed CSVs via a
+single command (\texttt{python paper/figures.py}); the CPU correctness suite runs without a
+GPU (\texttt{pytest -m "not gpu"}), and the GPU kernels and the Gluon falsifiability probe run
+on any CUDA device. A versioned snapshot with a Zenodo DOI will be minted at release for
+artifact evaluation. The claim-to-command map is in \texttt{docs/REPRODUCIBILITY.md} and a
+SIGPLAN-style artifact appendix (check-list, install, claims$\to$commands$\to$expected) in
+\texttt{docs/ARTIFACT\_APPENDIX.md}.
+
+\begin{thebibliography}{99}
+\bibitem{infant} N. Cascarano \emph{et al.}, ``iNFAnt: NFA pattern matching on GPGPU
+devices,'' \emph{ACM SIGCOMM CCR}, 2010.
+\bibitem{asyncap} H. Liu, S. Pai, A. Jog, ``Asynchronous Automata Processing on GPUs,''
+\emph{POMACS/SIGMETRICS}, 2023.
+\bibitem{ngap} T. Ge, T. Zhang, H. Liu, ``ngAP: Non-blocking Large-scale Automata
+Processing on GPUs,'' \emph{ASPLOS}, 2024.
+\bibitem{hybridsa} A. Le Glaunec, L. Kong, K. Mamouras, ``HybridSA: GPU Acceleration of
+Multi-pattern Regex Matching using Bit Parallelism,'' \emph{OOPSLA}, 2024.
+\bibitem{bitgen} T. Ge, X. Chu, H. Liu, ``Interleaved Bitstream Execution for
+Multi-Pattern Regex Matching on GPUs,'' \emph{MICRO}, 2025.
+\bibitem{hyperscan} X. Wang \emph{et al.}, ``Hyperscan: A Fast Multi-pattern Regex Matcher
+for Modern CPUs,'' \emph{USENIX NSDI}, 2019.
+\bibitem{anmlzoo} J. Wadden \emph{et al.}, ``ANMLZoo: a benchmark suite for exploring
+bottlenecks in automata processing,'' \emph{IISWC}, 2016.
+\bibitem{hoefler} T. Hoefler, R. Belli, ``Scientific Benchmarking of Parallel Computing
+Systems,'' \emph{SC}, 2015.
+\bibitem{pennycook} S. J. Pennycook, J. D. Sewall, V. W. Lee, ``A Metric for Performance
+Portability,'' \emph{PMBS@SC / FGCS}, 2016/2019.
+\bibitem{halide} J. Ragan-Kelley \emph{et al.}, ``Halide: a language and compiler for
+optimizing parallelism, locality, and recomputation,'' \emph{PLDI}, 2013.
+\bibitem{gunrock} Y. Wang \emph{et al.}, ``Gunrock: A High-Performance Graph Processing
+Library on the GPU,'' \emph{PPoPP}, 2016.
+\bibitem{lms} T. Rompf, M. Odersky, ``Lightweight Modular Staging: Abstraction Without
+Regret,'' \emph{CACM} 55(6), 2012.
+\bibitem{hexcute} X. Zhang \emph{et al.}, ``Hexcute: A Tile-based Programming Language with
+Automatic Layout and Task-Mapping Synthesis,'' arXiv:2504.16214, 2025 (preprint).
+\bibitem{tawa} Authors, ``Tawa: Automatic Warp Specialization for GPU Tile Languages,''
+\emph{CGO}, 2026 (to appear; arXiv:2510.14719).
+\bibitem{descend} B. K\"opcke, S. Gorlatch, M. Steuwer, ``Descend: A Safe GPU Systems
+Programming Language,'' \emph{PLDI}, 2024.
+\bibitem{triton} P. Tillet, H. T. Kung, D. Cox, ``Triton: an intermediate language and
+compiler for tiled neural network computations,'' \emph{MAPL@PLDI}, 2019.
+\bibitem{ang} Y. Wang \emph{et al.}, ``ANG: Accelerating NFA Processing on GPUs via
+Multi-Level Fine-Grained Parallelism,'' \emph{ICCD}, 2025.
+\bibitem{automatablas} ``Advancing Matrix Operations for Memory-Efficient Automata
+Processing on GPUs (AutomataBLAS),'' \emph{ACM TACO}, 2025.
+\bibitem{hopps} N. Du, J. Emer, D. S\'anchez, ``Hopps: Leveraging Sparsity to Accelerate
+Automata Processing,'' \emph{ASPLOS}, 2025.
+\bibitem{rapid} K. Angstadt, W. Weimer, K. Skadron, ``RAPID Programming of
+Pattern-Recognition Processors,'' \emph{ASPLOS}, 2016.
+\bibitem{parabix} R. D. Cameron \emph{et al.}, ``Bitwise Data Parallelism in Regular
+Expression Matching,'' \emph{PACT}, 2014.
+\bibitem{automatazoo} J. Wadden \emph{et al.}, ``AutomataZoo: A Modern Automata Processing
+Benchmark Suite,'' \emph{IISWC}, 2018.
+\bibitem{step} G. Sohn \emph{et al.}, ``STeP: A Streaming Abstraction for Dynamic
+Parallelism on Spatial Dataflow Architectures,'' \emph{ASPLOS}, 2026 (arXiv:2511.07776).
+\bibitem{graphit} Y. Zhang \emph{et al.}, ``GraphIt: A High-Performance Graph DSL,''
+\emph{OOPSLA}, 2018.
+\bibitem{taco} F. Kjolstad \emph{et al.}, ``The Tensor Algebra Compiler,'' \emph{OOPSLA}, 2017.
+\bibitem{sparsetir} Z. Ye \emph{et al.}, ``SparseTIR: Composable Abstractions for Sparse
+Compilation in Deep Learning,'' \emph{ASPLOS}, 2023.
+\bibitem{bestsf} A. Benatia \emph{et al.}, ``BestSF: A Sparse Meta-Format for Optimizing
+SpMV on GPU,'' \emph{ACM TACO} 15(3), 2018.
+\bibitem{burtscher} M. Burtscher, R. Nasre, K. Pingali, ``A Quantitative Study of Irregular
+Programs on GPUs,'' \emph{IISWC}, 2012.
+\bibitem{merrill} D. Merrill, M. Garland, A. Grimshaw, ``Scalable GPU Graph Traversal,''
+\emph{PPoPP}, 2012.
+\bibitem{graphene} B. Hagedorn \emph{et al.}, ``Graphene: An IR for Optimized Tensor
+Computations on GPUs,'' \emph{ASPLOS}, 2023.
+\bibitem{cfemul} G. Diamos \emph{et al.}, ``Control Flow Emulation on Tiled SIMD
+Architectures,'' \emph{CC}, 2008.
+\bibitem{instrroofline} N. Ding, S. Williams, ``An Instruction Roofline Model for GPUs,''
+\emph{Concurrency Computat.\ Pract.\ Exper.}, 2022.
+\bibitem{roofline} S. Williams, A. Waterman, D. Patterson, ``Roofline: an insightful visual
+performance model for multicore architectures,'' \emph{CACM} 52(4), 2009.
+\bibitem{autotuning} J. Ringlein \emph{et al.}, ``GPU Performance Portability needs
+Autotuning,'' arXiv:2505.03780, 2025.
+\bibitem{tvm} T. Chen \emph{et al.}, ``TVM: An Automated End-to-End Optimizing Compiler for
+Deep Learning,'' \emph{OSDI}, 2018.
+\end{thebibliography}
+
+\end{document}
