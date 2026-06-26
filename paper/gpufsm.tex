@@ -112,10 +112,50 @@ Throughput is measured on a fixed batch ($2048\times256$~B) as total input bits 
 kernel time, reported as median + percentile-bootstrap 95\% CI over 9 runs (GPU timings
 are non-Gaussian~\cite{hoefler}), kernel and transfer time separated. Every configuration
 is verified bit-identical to the oracle on examples and randomized fuzz/stress NFAs (up to
-500 states). Data and library versions are captured per CSV row. Hardware: RTX 4070
-(sm\_89).
+500 states). Data and library versions are captured per CSV row. Hardware: NVIDIA RTX 4070
+(sm\_89, 46 SMs, 12\,GB); software: CUDA toolkit 13.x, Triton 3.5.1, Warp 1.14, PyTorch
+2.9 (cu128). Each datum is the median of 9 batch-kernel times; CSR transitions are read-only
+and shared across the batch.
 
 \section{Results}\label{sec:results}
+
+\begin{table}[t]
+\centering
+\caption{Throughput (Gbps) by technique and NFA size (batched, RTX 4070). Dashes:
+$>64$ states unsupported by the single-word Triton/Warp kernels.}
+\label{tab:throughput}
+\small
+\begin{tabular}{rrrrr}
+\toprule
+states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
+\midrule
+32  & 142.2 & 0.513 & 0.071 & 24.5 \\
+64  & 142.2 & 0.131 & 0.021 & 25.1 \\
+128 & 45.5  & 0.023 & 0.003 & --   \\
+256 & 33.9  & 0.006 & 0.001 & --   \\
+500 & 15.3  & 0.0015& 0.0002& --   \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Nsight Compute counters (single launch). Full-scan: SM throughput $\gg$ DRAM
+$\Rightarrow$ compute-bound; shared-CSR is identical but for L2 hit rate.}
+\label{tab:nsight}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+kernel & SM\% & DRAM\% & L2 hit\% & occ\% \\
+\midrule
+\texttt{multistream} (full-scan) & 19.44 & 0.01 & 79.2 & 16.7 \\
+\texttt{multistream\_shared}     & 19.60 & 0.01 & 93.0 & 16.7 \\
+\texttt{worklist} (16384 str)    & 5.43  & 6.30 & 95.6 & 23.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:throughput} reports throughput; Table~\ref{tab:nsight} the Nsight counters.
 
 \textbf{The faithful kernel is compute-bound; memory layout is irrelevant there.}
 \texttt{multistream}, \texttt{multistream\_shared} (modeled CSR traffic $=0$), and
