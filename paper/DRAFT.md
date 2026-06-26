@@ -28,7 +28,7 @@ the binding constraint is the paradigm, not tuning or layout. A two-parameter co
 predicts the regret and names the missing IR primitives (scalar gather in a tile,
 register-resident bitset, data-dependent loop). Along the way we build a portable
 work-efficient automata engine (≈330×–10⁴× over a faithful full scan, 15–170 Gbps, validated
-bit-for-bit against a CPU oracle on real ANMLZoo automata up to 42k states).
+bit-for-bit against a CPU oracle on six real ANMLZoo automata up to 48k states).
 
 ## 1. Introduction
 
@@ -110,13 +110,15 @@ kernel time, reported as **median + percentile-bootstrap 95% CI** over 9 runs (G
 are non-Gaussian; Hoefler & Belli, SC15), with kernel and transfer time separated. Every
 configuration is verified bit-identical to the oracle on the example suite and on randomized
 fuzz/stress NFAs (up to 500 states). Data and environment (GPU, CUDA, Triton, Warp versions)
-are captured in `paper/data/sweep_techniques.csv`. We additionally validate on **real
-ANMLZoo automata** — Levenshtein (2787 states), Hamming (11349 states, 2.1M transitions),
-and Brill (42661 states, 4.4M transitions) — loaded from pinned public ANML via
+are captured in `paper/data/sweep_techniques.csv`. We additionally validate on **six real
+ANMLZoo automata spanning six families** — Levenshtein (2787 states), Hamming (11349, 2.1M
+transitions), Brill (42661, 4.4M), Fermi (40786, particle-physics regexes), RandomForest
+(33223, 6.27M transitions — an ML decision-forest, our densest), and CoreRings (48005,
+synthetic ring — our largest state count) — loaded from pinned public ANML via
 `gpufsm.io.anml` with the `all-input`/`start-of-data` start semantics handled correctly. On
-all three, the scalable `worklist_global` kernel matches the reference oracle bit-for-bit on
-every input, confirming correctness on production-scale automata (tens of thousands of
-states, millions of transitions), not only synthetic NFAs.
+all six, the scalable `worklist_global` kernel matches the reference oracle bit-for-bit on
+every input, confirming correctness on production-scale automata (up to 48k states, 6.3M
+transitions), not only synthetic NFAs.
 
 ## 6. Results
 
@@ -211,8 +213,8 @@ irregular workload.
 ## 7b. Threats to validity
 
 - **Construct:** most throughput points use random NFAs; mitigated by validating on three
-  real ANMLZoo automata (2.8k–42.7k states, up to 4.4M transitions) — GPU == reference
-  bit-for-bit.
+  real ANMLZoo automata spanning six families (2.8k–48k states, up to 6.3M transitions) —
+  GPU == reference bit-for-bit.
 - **Internal:** every backend/technique is gated against the CPU oracle (latch-first-match)
   on examples + fuzz/stress; timings use median + bootstrap CI, warmup, kernel/transfer split.
 - **Implementation-effort asymmetry** (key DSL-comparison risk): the Triton 6–15× gap might

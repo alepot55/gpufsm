@@ -21,7 +21,9 @@ _HAS_WORKLIST_GLOBAL = (
 
 
 @pytest.mark.skipif(not _HAS_WORKLIST_GLOBAL, reason="needs CUDA worklist_global")
-@pytest.mark.parametrize("key", ["levenshtein"])
+@pytest.mark.parametrize(
+    "key", ["levenshtein", "hamming", "brill", "fermi", "randomforest", "corerings"]
+)
 def test_real_anmlzoo_matches_reference(key):
     from gpufsm.api import run_batch
     from gpufsm.io.anml import load_anml

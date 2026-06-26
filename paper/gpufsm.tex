@@ -47,7 +47,7 @@ binding constraint is the paradigm, not tuning or layout. A two-parameter cost m
 the regret and names the missing IR primitives (scalar gather in a tile, register-resident
 bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
 ($\approx\!330\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
-against a CPU oracle on real ANMLZoo automata up to 42k states).
+against a CPU oracle on six real ANMLZoo automata up to 48k states).
 \end{abstract}
 
 \section{Introduction}
@@ -134,11 +134,14 @@ is verified bit-identical to the oracle on examples and randomized fuzz/stress N
 500 states). Data and library versions are captured per CSV row. Hardware: NVIDIA RTX 4070
 (sm\_89, 46 SMs, 12\,GB); software: CUDA toolkit 13.x, Triton 3.5.1, Warp 1.14, PyTorch
 2.9 (cu128). Each datum is the median of 9 batch-kernel times; CSR transitions are read-only
-and shared across the batch. We additionally validate on \emph{real} ANMLZoo automata
-(Levenshtein 2787 states; Hamming 11349 states, 2.1M transitions; Brill 42661 states, 4.4M
-transitions; loaded from pinned public ANML with correct \texttt{all-input}/\texttt{start-of-data}
-semantics): \texttt{worklist\_global} matches the reference oracle bit-for-bit on every input,
-confirming correctness at production scale (tens of thousands of states).
+and shared across the batch. We additionally validate on \emph{six real} ANMLZoo automata
+spanning six families: Levenshtein (2787 states), Hamming (11349, 2.1M transitions), Brill
+(42661, 4.4M), Fermi (40786, particle-physics regexes), RandomForest (33223, 6.27M
+transitions---an ML decision-forest, our densest), and CoreRings (48005, synthetic ring---our
+largest state count); all loaded from pinned public ANML with correct
+\texttt{all-input}/\texttt{start-of-data} semantics. \texttt{worklist\_global} matches the
+reference oracle bit-for-bit on every input, confirming correctness at production scale
+(up to 48k states, 6.3M transitions).
 
 \section{Results}\label{sec:results}
 
@@ -297,8 +300,8 @@ expressibility study of an irregular workload.
 
 \section{Threats to validity}
 \emph{Construct.} Most throughput points use randomly generated NFAs, which may not
-represent production automata; we mitigate this by also validating on three real ANMLZoo
-automata (2.8k--42.7k states, up to 4.4M transitions), where the GPU output matches the
+represent production automata; we mitigate this by also validating on six real ANMLZoo
+automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
 reference oracle bit-for-bit. \emph{Internal.} Every backend/technique is checked against a
 single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.

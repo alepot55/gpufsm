@@ -45,6 +45,27 @@ DATASETS: dict[str, Dataset] = {
         url=f"{_ANMLZOO}/Brill/anml/brill.1chip.anml",
         sha256="2a914b59da8340b71d79bfaa39e518fc536729c2bcbeaafaedccae71061af885",
     ),
+    # Fermi (particle-physics trigger regexes): 40786 STEs, pure homogeneous. A
+    # network/regex-style automaton — a different family from the edit-distance ones.
+    "fermi": Dataset(
+        name="fermi_2400.1chip.anml",
+        url=f"{_ANMLZOO}/Fermi/anml/fermi_2400.1chip.anml",
+        sha256="2d0df2ee2d6730c58353fe44dfc06092bdd4141ecdfbc1da2c9769ea2df95272",
+    ),
+    # RandomForest (ML decision forest as an automaton): 33223 STEs, 6.27M symbol
+    # transitions — a high transition-density stress for the CSR traffic model.
+    "randomforest": Dataset(
+        name="rf.1chip.anml",
+        url=f"{_ANMLZOO}/RandomForest/anml/rf.1chip.anml",
+        sha256="78ee215c1b0668666539e794a37554bda6c443fe7aebcccb657b0ca5570f6bf3",
+    ),
+    # CoreRings (Synthetic STE-only ring stress automaton): 48005 STEs, one transition
+    # per state — the largest pure-STE state count in our suite, minimal density.
+    "corerings": Dataset(
+        name="CoreRings.anml",
+        url=f"{_ANMLZOO}/Synthetic/anml/CoreRings.anml",
+        sha256="0f751a223495cca0e5f69151998311f7dfd86827b6c98ebca25786bad707a3a9",
+    ),
 }
 
 
