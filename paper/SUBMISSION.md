@@ -21,7 +21,8 @@ the 6 figures), inline bibliography (no .bib/.bbl needed), verified to compile c
 **Title:**
 The Two Faces of Abstraction Regret: Control-Flow and Memory-Layout Limits of GPU DSLs on Irregular Automata
 
-**Authors:** Alessandro Potenza
+**Authors:** Alessandro Potenza (Politecnico di Milano, Milan, Italy;
+alessandro1.potenza@mail.polimi.it)
 
 **Primary category:** cs.DC (Distributed, Parallel, and Cluster Computing)
 **Cross-list:** cs.PL (Programming Languages), cs.PF (Performance)
