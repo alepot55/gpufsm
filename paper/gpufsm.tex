@@ -88,7 +88,13 @@ where $n$ is the state count. The compute term is \emph{quadratic} because the f
 kernel performs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure ($n$ convergence
 passes $\times\,n$ states) per symbol. The two constants are fitted per backend from
 measured throughput; the ratio of $c_2$ between two DSLs, at constant algorithm, \emph{is}
-the abstraction regret.
+the abstraction regret. The per-backend fit tracks the measurements closely
+(Fig.~\ref{fig:cm}).
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.86\columnwidth]{fig_costmodel_fit.pdf}
+\caption{Cost-model predicted vs measured throughput (per-backend $n^2$ fit); points near
+$y{=}x$ indicate the two-parameter model captures the regime.}\label{fig:cm}\end{figure}
 
 \section{Implementation}\label{sec:impl}
 A single registry maps a backend/technique to an executor. The NFA is stored once in CSR

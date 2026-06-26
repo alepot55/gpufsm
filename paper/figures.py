@@ -137,12 +137,39 @@ def fig_abstraction_regret(df: pd.DataFrame) -> None:
     _save(fig, "fig_abstraction_regret")
 
 
+def fig_costmodel_fit(cm: pd.DataFrame) -> None:
+    """Predicted vs measured throughput: per-backend fit of time = a*traffic + b*n^2."""
+    import numpy as np
+
+    fig, ax = plt.subplots()
+    for be, g in cm.groupby("backend"):
+        traffic = g["traffic_bytes_per_sym"].to_numpy(float)
+        n2 = (g["num_states"].to_numpy(float)) ** 2
+        meas = g["throughput_gbps"].to_numpy(float)
+        t_meas = 8e-9 / meas  # seconds/symbol
+        coef, *_ = np.linalg.lstsq(np.stack([traffic, n2], axis=1), t_meas, rcond=None)
+        a, b = max(coef[0], 1e-18), max(coef[1], 0.0)
+        pred = 8e-9 / (a * traffic + b * n2) / 1e9
+        ax.scatter(meas, pred, label=be, s=40)
+    lim = [cm["throughput_gbps"].min() * 0.5, cm["throughput_gbps"].max() * 2]
+    ax.plot(lim, lim, "k--", lw=0.8, label="y = x")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Measured throughput (Gbps)")
+    ax.set_ylabel("Cost-model predicted (Gbps)")
+    ax.set_title("Cost model: predicted vs measured (per-backend n^2 fit)")
+    ax.legend(loc="best")
+    _save(fig, "fig_costmodel_fit")
+
+
 def main() -> None:
     sweep = pd.read_csv(DATA / "sweep_techniques.csv")
     fig_throughput_vs_states(sweep)
     fig_worklist_speedup(sweep)
     fig_memory_ablation(sweep)
     fig_abstraction_regret(sweep)
+    cm = pd.read_csv(DATA / "costmodel_rtx4070.csv")
+    fig_costmodel_fit(cm)
     print(f"\nfigures written to {FIGS}")
 
 
