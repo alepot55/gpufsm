@@ -374,6 +374,12 @@ scalar-gather-bound first (hence flat at $\approx$29~Gbps while CUDA's same gath
 $364$). So the capability$\to$cost map has a single actionable root: give the tile/SPMD IR a
 first-class scalar gather (and the data-dependent loop it implies), and the regret on
 \emph{both} faces should collapse---a concrete, falsifiable directive for GPU-DSL designers.
+This also sharpens the two-axis decomposition into a finding: we examined \emph{both} the
+control-flow and memory-layout capability axes, and the memory-layout levers turned out
+\emph{inert} (shared-CSR staging and byte$\to$bit packing tie their global-memory counterparts,
+\S\ref{sec:results})---so on these irregular workloads the binding constraint is control-flow
+expressibility, even on the memory-bound face. Abstraction regret here is, at root, one axis,
+not two.
 
 \begin{table}[t]
 \centering
