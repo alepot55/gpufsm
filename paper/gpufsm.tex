@@ -256,6 +256,15 @@ DSL (NFA regret vs CUDA). Regret tracks the column, not the row.}
 \end{tabular}
 \end{table}
 
+\textbf{Causal control: the regret is caused by the scalar/control-flow primitive.} To show the
+attribution is causal, not correlational, we ablate the primitive \emph{within Triton}, holding
+language, data, harness and parallelism fixed: one program per string processes the same bytes
+either (i) as a tile-vectorized reduction or (ii) with a carried data-dependent scalar recurrence
+(the automata pattern). At a GPU-saturating batch the tile kernel scales to 1320~Gbps (Triton's
+design point) while the scalar kernel hits a hard $\approx$81~Gbps per-program ceiling---a
+$16\times$ cliff from the access/control pattern alone (\texttt{paper/data/scalar\_ablation\_rtx4070.csv}).
+The regret appears \emph{iff} the inexpressible primitive is required.
+
 \textbf{Expressibility $\neq$ efficiency.} Triton \emph{can} express the work-efficient
 worklist (unlike Gluon), yet still pays $\approx\!6.5\times$ vs CUDA there (CUDA 164~Gbps vs
 Triton 25~Gbps at $\le 64$ states)---essentially the same regret as the $6$--$8\times$ on the
