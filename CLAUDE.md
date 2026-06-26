@@ -137,6 +137,11 @@ dipende dalla capacità che il workload stressa* — NFA = faccia control-flow (
 capability-vs-costo** su 2 workload × spettro DSL (CUDA/Triton/Gluon/Warp). Piano: (1) `dfa.py` core + oracolo;
 (2) kernel DFA CUDA/Triton/Warp; (3) misurare regret DFA (atteso memory-bound, Nsight DRAM% alto); (4) riscrivere
 il paper attorno alle due facce + tabella capability. Aumentare gradualmente, tutto a discrezione.
+- **Progresso v2:** ✅ `dfa.py` core (tabella densa) + oracolo `simulate_dfa` + `dfa_api.run_dfa_batch`; ✅ kernel
+  **DFA CUDA** (`run_dfa`) validato vs oracolo. **Firma memory-bound confermata**: 496 Gbps @4096 stati (tabella
+  in L2) → crolla a 207 Gbps @200k (tabella >>L2 6MB). Complementare all'NFA (compute-bound). PROSSIMO: kernel DFA
+  **Triton + Warp** → misurare il regret sulla faccia memory-bound (Triton esprime il gather? a che costo?) → poi
+  riscrivere il paper attorno alle due facce.
 
 ### ⚠️ FINDING CHIAVE che riformula la roadmap (vedi `docs/RESULTS_COSTMODEL.md`)
 1. **I kernel attuali sono COMPUTE-bound, non memory-bound.** L'eps-closure è O(n²)/simbolo (n passi × n
