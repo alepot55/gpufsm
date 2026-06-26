@@ -40,10 +40,14 @@ that hiding costs on NFA processing, a canonical irregular workload (deep-packet
 inspection, regex, bioinformatics).
 
 **Contributions.**
-- **(A) Abstraction regret, operationalized.** A named framing plus a predictive
-  two-parameter cost model (§3) and a constant-algorithm factorial ablation (§5–6) that
-  attribute the DSL gap to *expressible memory layout and control flow*, distinguishing it
-  from generic performance-portability efficiency (Pennycook et al.) and from autotuning.
+- **(A) Abstraction regret, operationalized.** A named framing decomposed along two
+  capability axes (control-flow vs memory-layout) and instantiated on the *two faces* of
+  automata (control-flow-bound NFA, memory-bound DFA); a predictive two-parameter cost model
+  (§3) and a constant-algorithm factorial ablation (§5–6); and — the move that makes the
+  attribution falsifiable — a controlled Triton↔Gluon pair (same MLIR stack, Gluon only *adds*
+  layout control; runnable probe `scripts/gluon_probe.py`) plus a capability→cost table naming
+  the missing IR primitive, attributing the gap to the *execution paradigm*, distinct from
+  generic performance-portability efficiency (Pennycook et al.) and from autotuning.
 - **(B) A work-efficient portable NFA engine.** An active-set/worklist bit-packed kernel
   (§4) that removes the O(n²) compute wall and reaches 15–170 Gbps, the regime where the
   memory axes become load-bearing.
@@ -227,8 +231,15 @@ irregular workload.
 
 ## 8. Limitations & future work
 
-- Single GPU architecture so far (RTX 4070); validate on a 2nd arch (generality) before
-  camera-ready.
+- **Generality across architectures.** One GPU so far (RTX 4070, sm_89, 6 MB L2). The
+  *qualitative* claims should be architecture-independent (the capability table is a property
+  of the DSL compilers, not the silicon; the Triton↔Gluon control holds at compile time), but
+  two quantities are L2-/SM-count-dependent and are the planned camera-ready run on a second
+  arch (e.g. A100/H100, ≥40 MB L2): (i) the DFA memory-bound knee, which should shift to a
+  *larger* table size on a bigger L2 — a clean falsifiable prediction of the memory-bound
+  reading; and (ii) the absolute regret factors (cost-model constants are fits that may
+  rescale). The whole sweep regenerates from one command, so it is a re-run, not a
+  re-implementation.
 - The worklist kernel is one thread/string; a cooperative warp/block-parallel version
   (iNFAnt/ngAP-style) is needed to approach SOTA absolute throughput and to make the memory
   axes bite — this is the path for contribution (B) to land at MICRO/ASPLOS strength.

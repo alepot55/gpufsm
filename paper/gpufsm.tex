@@ -59,10 +59,15 @@ that hiding costs on NFA processing, a canonical irregular workload (deep-packet
 inspection, regular-expression matching, bioinformatics).
 
 \textbf{Contributions.}
-\textbf{(A)} \emph{Abstraction regret, operationalized}: a named framing, a predictive
-two-parameter cost model (\S\ref{sec:cost}), and a constant-algorithm factorial ablation
-(\S\ref{sec:results}) that attribute the DSL gap to \emph{expressible memory layout and
-control flow}, distinct from generic performance portability and from autotuning.
+\textbf{(A)} \emph{Abstraction regret, operationalized}: a named framing decomposed along
+two capability axes (control-flow vs memory-layout) and instantiated on the \emph{two faces}
+of automata---the control-flow-bound NFA and the memory-bound DFA; a predictive two-parameter
+cost model (\S\ref{sec:cost}) and a constant-algorithm factorial ablation
+(\S\ref{sec:results}); and---the move that makes the attribution falsifiable rather than
+rhetorical---a controlled Triton$\leftrightarrow$Gluon pair (same MLIR stack, Gluon only
+\emph{adds} layout control) plus a capability$\to$cost table naming the missing IR primitive,
+attributing the DSL gap to the \emph{execution paradigm}, distinct from generic performance
+portability and from autotuning.
 \textbf{(B)} \emph{A work-efficient portable NFA engine}: an active-set/worklist
 bit-packed kernel (\S\ref{sec:impl}) that removes the $O(n^2)$ compute wall and reaches
 15--170~Gbps. \textbf{(C)} \emph{A reproducible artifact}: one registry-based framework,
@@ -317,10 +322,18 @@ GPU (RTX 4070); the cost-model constants are per-backend fits that may differ ac
 architectures, so cross-architecture generality is future work.
 
 \section{Limitations and future work}
-Single GPU architecture so far; a second architecture is needed for generality. The
-worklist is one thread/string and, at small batches, under-utilizes the GPU (Nsight: 17\%
-occupancy, 2 blocks); a cooperative warp/block-parallel version is the path to SOTA
-absolute throughput when streams are few.
+\emph{Generality across architectures.} Results are from one GPU (RTX 4070, sm\_89, 6\,MB
+L2). The qualitative claims should be architecture-independent---the capability table is a
+property of the DSL compilers, not the silicon, and the Triton$\leftrightarrow$Gluon control
+holds at compile time---but two quantities are L2- and SM-count-dependent and are the planned
+camera-ready run on a second architecture (e.g.\ an A100/H100, with $\ge$40\,MB L2): (i) the
+DFA memory-bound knee, which should shift to a larger table size on a bigger L2 (a clean,
+falsifiable prediction of the memory-bound reading); and (ii) the absolute regret factors,
+since the per-backend cost-model constants are fits that may rescale. The entire sweep
+regenerates from one command, so the second-GPU run is a re-run, not a re-implementation.
+\emph{Kernel.} The worklist is one thread/string and, at small batches, under-utilizes the
+GPU (Nsight: 17\% occupancy, 2 blocks); a cooperative warp/block-parallel version is the path
+to SOTA absolute throughput when streams are few.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call
