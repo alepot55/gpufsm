@@ -95,7 +95,17 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] LOCAL TIER-RAISING (real-automata throughput + unificazione + 2nd-GPU TODO).**
+- **[Iter più recente] 2ª GPU FATTA — A100 80GB (RunPod, ~$0.25) riproduce il 2×2 CROSS-ARCH.**
+  `scripts/second_gpu_rich.sh` su A100 (stack Triton 3.7 CORRETTO, tutti e 3 i backend oracle-match):
+  **NFA 2×2 regret = Triton 3.2× (flat 32/48/64, 3 seed), Warp 0.80–0.83×** → rescala dal 4070 (6–8×/0.9×)
+  ma la STRUTTURA è identica (Triton tile/SPMD paga, Warp thread-SIMT ≤ CUDA) → il regret segue la COLONNA
+  paradigma non la RIGA altezza, su DUE architetture. **DFA: Triton flat ~24–30 Gbps** su 2–128 MB (≈ il
+  29–32 del 4070 → **ceiling scalare arch-independent**, stesso numero a 6.7× di L2 di distanza), CUDA 73–531
+  (sfrutta i 40 MB L2; regret DFA 3–18×). Chiude il gap di validità esterna #1 + ritira il caveat camera-ready
+  "re-validate su Triton 3.5" (fatto su 3.7). Dati: `paper/data/regret_a100.csv`, `dfa_knee_rich_a100.csv`.
+  Paper aggiornato (Threats-External + Limitations-Generality + §6.5 DFA), 8pp, 0 overfull. `docs/TODO_SECOND_GPU`
+  #1+#2 ✅. RESTA opzionale 2ª-GPU: #3 causal cliff + #4 worklist/Nsight su A100 (re-run, non ricca di valore).
+- **[Iter -1] LOCAL TIER-RAISING (real-automata throughput + unificazione + 2nd-GPU TODO).**
   (a) Throughput su 6 automi reali (`real_automata_throughput_rtx4070.csv`): warp 1.4-27× su single-thread,
   assoluto basso (sub-Gbps..4.5) = gap algoritmico onesto, messo in threats (non intacca il regret relativo).
   (b) **UNIFICAZIONE**: entrambe le facce della capability→cost map riconducono a UNA primitiva mancante
