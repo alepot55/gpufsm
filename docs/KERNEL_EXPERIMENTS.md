@@ -57,6 +57,13 @@ subset is touched per batch (stays L2-resident).
   (enough programs to fill the GPU, memory idle) — confirming the model-bound reading.
 - **Cost model** predictive for CUDA (2.7% holdout) but not Triton (45%, unstable) — see
   `docs/RESULTS_COSTMODEL.md`; measured throughput ratio is the primary metric.
+- **CAUSAL primitive ablation (within Triton).** Same language/data/harness/parallelism (one
+  program/string), only the access pattern differs: tile-vectorized reduction vs a carried
+  data-dependent scalar recurrence. At a saturating batch the tile kernel scales to **1320 Gbps**
+  while the scalar pattern hits a hard **~81 Gbps** per-program ceiling — a **16× cliff** from the
+  control pattern alone (`scripts/ablate_scalar_control.py`, `paper/data/scalar_ablation_rtx4070.csv`).
+  This makes the capability→cost attribution *causal*: the regret appears iff the inexpressible
+  scalar/control-flow primitive is required (the scalar ceiling mirrors the DFA Triton-flat result).
 
 ## Where this points (path to SOTA-absolute)
 Neither memory layout (shared) nor work-reduction (compaction) is the lever; **parallelism**

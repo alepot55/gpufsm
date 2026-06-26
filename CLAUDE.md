@@ -95,7 +95,27 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] VERIFICA Warp-beats-CUDA + causa Triton-DFA-flat — entrambe CONFERMATE.**
+- **[Iter più recente] ABLATION CAUSALE — la capability→cost map ora è CAUSALE (cliff 16× in Triton).**
+  Stesso linguaggio/dati/harness/parallelismo (1 program Triton/stringa), stessi byte processati tile-vettoriale
+  vs con ricorrenza scalare data-dependent: tile scala a **1320 Gbps** (design point Triton), lo scalare satura
+  a **~81 Gbps** (ceiling per-program) → **cliff 16×** dal solo pattern di accesso/controllo. Eleva l'attribuzione
+  da correlazionale a CAUSALE: il regret appare SE E SOLO SE serve la primitiva inesprimibile (specchia il
+  DFA-Triton-flat). `scripts/ablate_scalar_control.py` + `scalar_ablation_rtx4070.csv`; aggiunto come "causal
+  control" in §6.3 + KERNEL_EXPERIMENTS.md. **MANDATO (26 giu): processo costante autonomo, mai chiedere, zero
+  imperfezione — vedi memory relentless-improvement-mandate.** Prossimo nel loop: espandere il paper a lunghezza
+  full-conference attorno al 2×2 + map causale; continuare verifica/SOTA/completezza senza fine.
+- **[Iter -1] SOTA PROFONDA (4 agent paralleli) + ELEVAZIONE CONTRIBUTO.** Sweep verificato in 4 aree
+  (automi GPU, DSL/espressività, perf-portability/metodologia, workload irregolari) → bibliografia paper **15→35
+  ref**, related-work ristrutturato in sotto-sezioni. **CONTRIBUTO PIÙ IMPORTANTE identificato e reso centrale:**
+  i 4 DSL formano un **2×2 (altezza-astrazione × paradigma-esecuzione)** — CUDA(low/thread,1×), Warp(high/thread,
+  0.6-0.9×), Triton(high/tile,6-8×), Gluon(low/tile,inesprimibile); il regret segue la COLONNA (paradigma) non la
+  RIGA (altezza) → falsifica "high-level⇒slow" + (stesso stack MLIR Triton↔Gluon) la counter-thesis autotuning.
+  Nuova `Table tab:twobytwo` + contrib (A) riscritta + capability→cost map resa "actionable per DSL-designer"
+  (primitiva mancante: scalar-gather-in-tile) + Instruction Roofline in metodologia. Closest prior NUOVO: **STeP
+  (ASPLOS'26)** — stessa diagnosi control-flow ma su spatial-dataflow + ships-a-fix; distinto. Verdetto: nicchia
+  (multi-DSL expressibility su automi irregolari) VUOTA, novelty confermata vs il più recente. Dettagli completi
+  in `docs/LITERATURE_REVIEW.md` (sweep 2026-06-26). Paper 6pp pulito, ref risolte, CI verde.
+- **[Iter -1] VERIFICA Warp-beats-CUDA + causa Triton-DFA-flat — entrambe CONFERMATE.**
   (1) Warp vs CUDA multistream su 3 seed × {32,48,64} stati: warp/cuda = **1.11–1.13× (regret 0.89–0.90×)**,
   spread ±1% → robusto, non artefatto (il 0.63× era il fit del cost-model; il misurato 0.90× è l'headline).
   (2) Triton-DFA-flat = **ceiling scalare per-program**, non memoria né parallelismo: Triton sale col batch

@@ -12,6 +12,37 @@
 > bottleneck modeling) is relevant to our `atomicOr` worklist analysis. No action needed beyond a
 > one-line acknowledgment of the LLM-kernel-gen line in related work.
 
+> **Deep SOTA sweep 2026-06-26** (4 parallel verified sub-sweeps; all refs added to `paper/gpufsm.tex`,
+> 15→35 bibitems). **Strategic verdict — where the highest-value contribution is:** the four DSLs form
+> a clean **2×2 (abstraction-height × execution-paradigm)** factorial — CUDA(low/thread,1×),
+> Warp(high/thread,0.6–0.9×), Triton(high/tile,6–8×), Gluon(low/tile,inexpressible). Regret tracks the
+> **paradigm column, not the height row** → falsifies "high-level⇒slow" AND (same-MLIR-stack Triton↔Gluon)
+> the autotuning counter-thesis. This + the **actionable capability→cost map** (named missing primitive:
+> scalar-gather-in-tile) is the top-venue contribution — lifts it from a measurement study to a falsifiable
+> diagnosis for GPU-DSL designers. Now the paper's centerpiece (Table tab:twobytwo).
+>
+> **Closest priors (verified, all distinguished in related work):**
+> - **STeP** (Sohn et al., ASPLOS 2026, arXiv:2511.07776) — CLOSEST on control-flow inexpressibility: states
+>   our diagnosis (tile/dataflow can't express data-dependent control flow; scalar-only blocks tiling) but for
+>   *spatial dataflow accelerators*, and *ships a fix*. We measure it falsifiably across real GPU DSLs.
+> - **Hexcute** (arXiv:2504.16214) — layout-gap decomposition, *dense* GEMM, a *cure*.
+> - **GraphIt** (OOPSLA'18) — DSL for an irregular workload but *presupposes* expressibility, tunes a schedule.
+> - **Tawa** (CGO'26, arXiv:2510.14719), **Descend** (PLDI'24), **ML-Triton** (arXiv:2503.14985) — name missing
+>   tile-IR primitives *qualitatively*; we quantify cross-DSL. **CC'08 "Control Flow Emulation on Tiled SIMD"**
+>   (Diamos et al.) — decades-old precedent that data-dependent control flow is the hard case for tiled SIMD.
+> **Newest engines to position (not compete):** ANG (ICCD'25, 11.7× avg), AutomataBLAS (TACO'25, AP-as-SpMV =
+> our DFA-face comparator), BitGen (MICRO'25), Hopps (ASPLOS'25, sparse AP accelerator).
+> **Framing/methodology:** invert LMS "abstraction without regret" (CACM'12); differentiate Pennycook PP
+> (across *hardware*, we across *DSL capability* at fixed hw); **Instruction Roofline** (Ding&Williams,
+> CC:P&E'22) is the correct roofline for integer FSM kernels (FLOP roofline understates); Hierarchical Roofline
+> (CC:P&E'20) licenses per-level Nsight; Hoefler&Belli (SC'15) for median+CI95; Hong&Kim (ISCA'09) analytic-model
+> precedent. **Layout-dominance anchors:** Burtscher (IISWC'12, irregular=control/memory-bound), BestSF (TACO'18),
+> SparseTIR (ASPLOS'23), taco (OOPSLA'17), Merrill BFS (PPoPP'12, worklist analogy). **Counter-theses to rebut:**
+> Ringlein "GPU PP needs autotuning" (arXiv:2505.03780) + Deakin GPU-prog-models (arXiv:2402.08950) — both use
+> *regular* apps; none covers irregular automata.
+> **Bottom line: the niche (multi-DSL expressibility on irregular automata) is empty; the 2×2 + capability→cost
+> map is the contribution that matters.**
+
 Generated: 2026-06-25
 Review type: **scoping** (exploratory, to set publication direction)
 Search window: 2009–2026 (emphasis 2021–2026)
