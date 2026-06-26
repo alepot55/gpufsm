@@ -111,12 +111,13 @@ kernel time, reported as **median + percentile-bootstrap 95% CI** over 9 runs (G
 are non-Gaussian; Hoefler & Belli, SC15), with kernel and transfer time separated. Every
 configuration is verified bit-identical to the oracle on the example suite and on randomized
 fuzz/stress NFAs (up to 500 states). Data and environment (GPU, CUDA, Triton, Warp versions)
-are captured in `paper/data/sweep_techniques.csv`. We additionally validate on a **real
-ANMLZoo automaton** — Levenshtein (2787 states, 9193 transitions, 96 report states; loaded
-from the pinned public ANML via `gpufsm.io.anml`, with the `all-input` start semantics
-handled correctly): the scalable `worklist_global` kernel matches the reference oracle
-bit-for-bit on every input, confirming correctness on a production-scale automaton, not only
-synthetic NFAs.
+are captured in `paper/data/sweep_techniques.csv`. We additionally validate on **real
+ANMLZoo automata** — Levenshtein (2787 states), Hamming (11349 states, 2.1M transitions),
+and Brill (42661 states, 4.4M transitions) — loaded from pinned public ANML via
+`gpufsm.io.anml` with the `all-input`/`start-of-data` start semantics handled correctly. On
+all three, the scalable `worklist_global` kernel matches the reference oracle bit-for-bit on
+every input, confirming correctness on production-scale automata (tens of thousands of
+states, millions of transitions), not only synthetic NFAs.
 
 ## 6. Results
 

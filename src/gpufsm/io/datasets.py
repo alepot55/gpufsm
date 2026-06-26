@@ -39,6 +39,12 @@ DATASETS: dict[str, Dataset] = {
         url=f"{_ANMLZOO}/Hamming/anml/93_20X3.1chip.anml",
         sha256="6005437dac4581223c30c9d039b08e6a6a856e821507b300023665995f91170b",
     ),
+    # Brill part-of-speech tagging: 42658 STEs, pure homogeneous (character-class STEs).
+    "brill": Dataset(
+        name="brill.1chip.anml",
+        url=f"{_ANMLZOO}/Brill/anml/brill.1chip.anml",
+        sha256="2a914b59da8340b71d79bfaa39e518fc536729c2bcbeaafaedccae71061af885",
+    ),
 }
 
 
