@@ -42,8 +42,9 @@ inspection, regex, bioinformatics).
 **Contributions.**
 - **(A) Abstraction regret, operationalized.** A named framing decomposed along two
   capability axes (control-flow vs memory-layout) and instantiated on the *two faces* of
-  automata (control-flow-bound NFA, memory-bound DFA); a predictive two-parameter cost model
-  (§3) and a constant-algorithm factorial ablation (§5–6); and — the move that makes the
+  automata (control-flow-bound NFA, memory-bound DFA); a two-parameter cost model (§3;
+  predictive for the thread model, holdout-validated; corroborating only for Triton) and a
+  constant-algorithm factorial ablation (§5–6); and — the move that makes the
   attribution falsifiable — a controlled Triton↔Gluon pair (same MLIR stack, Gluon only *adds*
   layout control; runnable probe `scripts/gluon_probe.py`) plus a capability→cost table naming
   the missing IR primitive, attributing the gap to the *execution paradigm*, distinct from
@@ -80,8 +81,13 @@ time_per_symbol = traffic_bytes_per_symbol / eff_bandwidth      (memory)
 The compute term is *quadratic* because the faithful kernel performs an O(n) transition
 scan and an O(n²) epsilon-closure (n convergence passes × n states) per symbol. The two
 constants are fitted per backend from measured throughput (`scripts/calibrate_costmodel.py`).
-The ratio of the fitted `compute_s_per_state2` between two DSLs, at constant algorithm, *is*
-the abstraction regret.
+The ratio of the fitted `compute_s_per_state2` between two DSLs, at constant algorithm,
+corroborates the abstraction regret. **Validation** (`scripts/validate_costmodel.py`): a holdout
+(fit n≤128, predict n=256) shows the model is predictive+stable for the thread model (CUDA 2.7%
+error, leave-one-out `b` spread 1.03×) but **not** for tile/SPMD Triton (45% error, `b` spread
+2.46×) — Triton's fixed launch overhead at small n is misattributed to the n² term. So the
+*measured* throughput ratio (Triton 6–8×, robust) is the primary regret metric; the fitted-`b`
+ratio (10.1×) is corroborating, not load-bearing.
 
 ## 4. Implementation
 

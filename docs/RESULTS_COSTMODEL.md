@@ -56,6 +56,24 @@ this kernel:
 fixed launch overhead the pure-n² model omits. Warp has only two points, so its fit is exact
 by construction and not a quality signal.)
 
+### Validation: predictive for CUDA, NOT for Triton (`scripts/validate_costmodel.py`)
+
+The full-fit residual above is in-sample. Two honest out-of-sample tests:
+
+| backend | holdout error (fit n≤128, predict n=256) | leave-one-out spread of b |
+|---|---|---|
+| **CUDA** | **2.7%** (predictive) | **1.03×** (stable) |
+| **Triton** | **45%** (fails) | **2.46×** (UNSTABLE) |
+
+So the 2-parameter model is **predictive and robust for the thread-model backend (CUDA)** but
+**not for the tile/SPMD backend (Triton)**: Triton's large fixed launch overhead at small n is
+misattributed to the n² term, so extrapolation and the fitted-b are unstable. This is itself
+consistent with the regret thesis (the overhead is part of Triton's regret), but the
+consequence is methodological: **the primary regret metric is the directly-measured throughput
+ratio (Triton 6–8×, robust); the fitted-b ratio (10.1×) is corroborating and must not be
+over-claimed for Triton.** A 3-parameter model (add a constant term) would fit Triton but
+cannot be validated with only 4 points (3 params, 3 train points ⇒ exactly determined).
+
 ## Interpretation — regret is the execution *paradigm*, not abstraction height
 
 Two **equally high-level Python DSLs** land on opposite ends: **Triton pays 10.1×** (fit; 6–8×
