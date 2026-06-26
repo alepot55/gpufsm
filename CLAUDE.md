@@ -95,7 +95,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] #2 DEEP CONCLUSO (shared-mem worklist) — finding onesto.** `worklist_shared`:
+- **[Iter più recente] PRESSURE-TEST COST-MODEL — predittivo per CUDA, NON per Triton.** `scripts/validate_costmodel.py`:
+  holdout (fit n≤128, predici n=256) → **CUDA 2.7% (predittivo), Triton 45% (fallisce)**; leave-one-out di b →
+  CUDA spread 1.03× (stabile), Triton 2.46× (INSTABILE). Causa: overhead di lancio fisso di Triton a piccolo n
+  mis-attribuito al termine n². ⇒ metrica di regret PRIMARIA = throughput ratio MISURATO (Triton 6-8×, robusto),
+  il fit-b (10.1×) è corroborante NON load-bearing. Claim "predictive cost model" scopato onestamente in
+  paper (abstract+contrib A+§cost) + DRAFT + `docs/RESULTS_COSTMODEL.md`. (Skeptical-scientist: un nostro claim
+  era solo parzialmente vero.) Modello 3-param fixerebbe Triton ma non validabile con 4 punti.
+- **[Iter -1] #2 DEEP CONCLUSO (shared-mem worklist) — finding onesto.** `worklist_shared`:
   working set in shared memory dinamica (warps/block adattivo per stare in 48KB; ≤1536 stati), vs il global
   di `worklist_warp`. Validato == warp bit-for-bit (9 test verdi). **FINDING:** shared **pareggia** warp
   (0.99–1.10×, `paper/data/worklist_shared_rtx4070.csv`) → una volta che il kernel è work-efficient il
@@ -129,7 +136,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   resta L2-resident. Spiega perché worklist_shared è inerte (working set già in L2) e perché il gap SOTA è
   **algoritmico** (worklist compatto active-ID, meno atomicOr/syncwarp, ngAP non-blocking), non memory.
   Dati in `paper/data/nsight_rtx4070.csv` + `docs/PROFILING.md`. PROSSIMO: prototipo worklist compatto (array
-  di ID attivi) vs bitmap-scan O(nwords) — l'esperimento che potrebbe alzare il throughput assoluto. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
+  di ID attivi) vs bitmap-scan O(nwords) — l'esperimento che potrebbe alzare il throughput assoluto.
+  **FATTO + RISULTATO (26 giu): IPOTESI CONFUTATA.** `worklist_compact` (1-thread, frontier compatto O(active)
+  + visited bitmap, clear O(active)) validato vs oracle (1200 stringhe, 0 mismatch). MA: vs global 1-thread
+  appena **0.8–1.5×** (levenshtein 0.8× PEGGIO, fermi 1.0-1.2×, brill 1.5×), e vs warp **0.1–0.4×** (molto
+  più lento). Perché: saltare una parola vuota nel bitmap-scan è 1 load+branch (economico) + accesso coalescizzato,
+  mentre il frontier compatto ha load sparsi + dedup test-and-set per transizione → il word-scan NON era il collo
+  di bottiglia. Tenuto come ablation validata (come worklist_shared). Premessa: automi reali sparsissimi (brill
+  mean 1.5 attivi/667 words). ⇒ Né layout (shared) né work-reduction (compact) è la leva; lo è il **parallelismo**
+  (warp, già fatto). Gap SOTA = **ridondanza algoritmica cross-string/symbol** (memoization, non-blocking ngAP).
+  Knowledge base: `docs/KERNEL_EXPERIMENTS.md` (log vivo degli esperimenti kernel + esiti). Paper corretto. ⚠️ Rebuild ext: `pip install -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON`
   (NON `--no-build-isolation`: manca scikit_build_core nel venv). RESTA per SOTA assoluto: block-cooperative
   + shared-mem frontier privatization (prossimo passo #2). User (26 giu): fare #2-#5, #1 (2ª GPU) dopo.
 - **[Iter -1] DFA sweep fine — knee L2 visibile** (vedi findings two-faces sotto).

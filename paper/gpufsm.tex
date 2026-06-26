@@ -43,8 +43,9 @@ regret is set by the execution \emph{paradigm}, not by how
 high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
 Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
 explicit layout/shared-memory control): Gluon \emph{still} cannot express the kernel, so the
-binding constraint is the paradigm, not tuning or layout. A two-parameter cost model predicts
-the regret and names the missing IR primitives (scalar gather in a tile, register-resident
+binding constraint is the paradigm, not tuning or layout. A two-parameter cost model
+corroborates the regret (predictive for the thread model; holdout 2.7\%) and we name the
+missing IR primitives (scalar gather in a tile, register-resident
 bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
 ($\approx\!330\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
 against a CPU oracle on six real ANMLZoo automata up to 48k states).
@@ -61,8 +62,8 @@ inspection, regular-expression matching, bioinformatics).
 \textbf{Contributions.}
 \textbf{(A)} \emph{Abstraction regret, operationalized}: a named framing decomposed along
 two capability axes (control-flow vs memory-layout) and instantiated on the \emph{two faces}
-of automata---the control-flow-bound NFA and the memory-bound DFA; a predictive two-parameter
-cost model (\S\ref{sec:cost}) and a constant-algorithm factorial ablation
+of automata---the control-flow-bound NFA and the memory-bound DFA; a two-parameter
+cost model (\S\ref{sec:cost}; predictive for the thread model, holdout-validated) and a constant-algorithm factorial ablation
 (\S\ref{sec:results}); and---the move that makes the attribution falsifiable rather than
 rhetorical---a controlled Triton$\leftrightarrow$Gluon pair (same MLIR stack, Gluon only
 \emph{adds} layout control) plus a capability$\to$cost table naming the missing IR primitive,
@@ -100,10 +101,14 @@ t_{\text{sym}} = \frac{\text{traffic}_{\text{bytes/sym}}}{\text{bandwidth}}
 where $n$ is the state count. The compute term is \emph{quadratic} because the faithful
 kernel performs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure ($n$ convergence
 passes $\times\,n$ states) per symbol. The two constants are fitted per backend from
-measured throughput; the ratio of $c_2$ between two DSLs, at constant algorithm, \emph{is}
-the abstraction regret. The per-backend fit tracks the measurements closely---within 1\% at
-the largest size (n{=}256: CUDA 0.3\%, Triton 0.6\%), the residual at small $n$ being fixed
-launch overhead the pure-$n^2$ model omits (Fig.~\ref{fig:cm}).
+measured throughput; the ratio of $c_2$ between two DSLs, at constant algorithm, corroborates
+the abstraction regret. A holdout test (fit on $n\!\le\!128$, predict $n{=}256$) shows the
+model is \emph{predictive for the thread-model backend} (CUDA 2.7\% error, leave-one-out $c_2$
+stable to $1.03\times$) but \emph{not for the tile/SPMD backend} (Triton 45\% error, $c_2$
+swings $2.5\times$): Triton's large fixed launch overhead at small $n$ is misattributed to the
+$n^2$ term (\texttt{scripts/validate\_costmodel.py}). We therefore take the \emph{directly
+measured} throughput ratio as the primary regret metric (Triton $6$--$8\times$, robust) and the
+fitted-$c_2$ ratio ($10.1\times$) as corroborating, not load-bearing (Fig.~\ref{fig:cm}).
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.86\columnwidth]{fig_costmodel_fit.pdf}
@@ -316,7 +321,10 @@ hardware. The Halide~\cite{halide} lineage established abstraction constrains th
 space; SpMV format selection and Gunrock~\cite{gunrock} that layout dominates irregular GPU
 performance---we add the DSL-expressibility axis. We rebut the autotuning counter-thesis: our
 gap is expressibility, not tuning---Gluon, the explicit-control sibling on the same compiler
-stack, still cannot express the kernel. SOTA automata engines (ngAP, HybridSA, BitGen) are
+stack, still cannot express the kernel. The same answers the recent LLM kernel
+auto-generation/tuning line (e.g.\ AutoTriton, TritonForge, 2026): automatically searching the
+Triton schedule space cannot manufacture an IR primitive (scalar gather in a tile) the paradigm
+lacks, so it cannot close a regret that is expressibility, not effort. SOTA automata engines (ngAP, HybridSA, BitGen) are
 CUDA-only baselines; our contribution is the metric + cost model + the first multi-DSL
 expressibility study of an irregular workload. Table~\ref{tab:sota} positions us against them:
 each reports a speedup over \emph{its own} baseline and hardware (not comparable in absolute
@@ -390,9 +398,14 @@ bottleneck (mirroring the compute-bound \texttt{multistream\_shared} result). Ns
 the cause: \texttt{worklist\_warp} fixes the single-thread kernel's occupancy ($17\!\rightarrow\!57\%$)
 but is \emph{latency-bound}, not memory-bound---DRAM $\le$2.25\% and L2 hit $\ge$97.6\% even for
 brill's 17\,MB CSR (far above the 6\,MB L2), since all strings share the CSR and only a hot row
-subset is touched (\texttt{paper/data/nsight\_rtx4070.csv}). So the remaining gap to SOTA absolute
-throughput (ngAP-class) is \emph{algorithmic}---fewer instructions/serialization: a compacted
-active-ID worklist, memoization, non-blocking multi-symbol---not memory residency. That is the next step.
+subset is touched (\texttt{paper/data/nsight\_rtx4070.csv}). We also tested the natural
+work-reduction fix---a \emph{compacted active-ID worklist} ($O(\text{active})$ instead of the
+$O(\text{words})$ bitmap scan)---but it barely beats the bitmap kernel ($0.8$--$1.5\times$,
+\texttt{docs/KERNEL\_EXPERIMENTS.md}): skipping an empty word is already cheap and the bitmap's
+coalesced access offsets compaction's scattered loads and dedup overhead, so word-scanning was
+never the bottleneck. The remaining gap to SOTA absolute throughput (ngAP-class) is therefore
+\emph{algorithmic redundancy across strings/symbols}---memoization, non-blocking multi-symbol
+processing---not memory residency or worklist representation. That is the next step.
 
 \section{Conclusion}
 For irregular automata the GPU-DSL promise breaks along a measurable axis we call

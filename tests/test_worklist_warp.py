@@ -72,3 +72,15 @@ def test_shared_matches_warp(n):
     w = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_warp")]
     s = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_shared")]
     assert s == w
+
+
+@skip
+@pytest.mark.parametrize("n", [65, 200, 1000, 2048])
+def test_compact_matches_global_large(n):
+    """worklist_compact (compacted active-ID, O(active)) == worklist_global on >64-state NFAs."""
+    rng = random.Random(300 + n)
+    nfa, alpha = _random_nfa(n, rng)
+    batch = [bytes(ord(rng.choice(alpha)) for _ in range(rng.randint(0, 24))) for _ in range(24)]
+    g = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_global")]
+    c = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_compact")]
+    assert c == g

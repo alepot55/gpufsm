@@ -1,0 +1,62 @@
+# Kernel-design experiments — what we tried and what moved the needle
+
+A living log of GPU worklist kernel variants and their measured outcomes (RTX 4070, sm_89).
+Goal: characterize the work-efficient NFA worklist and find the path to SOTA-absolute
+throughput. Skeptical-scientist rule: report negative results honestly; a tried-and-failed
+optimization is knowledge. All numbers trace to `paper/data/*.csv` and are reproducible via
+the cited scripts.
+
+## Baseline regimes (established earlier)
+- **Full-scan kernels are compute-bound (O(n²) eps-closure):** throughput ∝ 1/n²; memory-layout
+  axes (`multistream_shared`, `_async`) are inert (`docs/RESULTS_COSTMODEL.md`). The cure is a
+  work-efficient kernel.
+- **Register worklist** (≤512 states, 1 thread/string): 15–170 Gbps — the fast small-automaton path.
+- **`worklist_global`** (1 thread/string, global working set, no state cap): the scalable but
+  under-parallelized large-automaton baseline.
+
+## Active-set sparsity (premise measurement)
+Real automata are extremely sparse-active (mean active states over a random run):
+levenshtein **7** / 2787 (44 words), fermi **269** / 40786 (638 words), brill **1.5** / 42661
+(667 words). This motivated testing whether the O(nwords) bitmap scan is wasteful.
+
+## Experiments
+
+### ✅ `worklist_warp` — block-parallel (one warp/string), 32 lanes partition the words
+**Outcome: the win.** 3–9× over `worklist_global` on real automata at a GPU-saturating batch
+(up to ~12× dense synthetic, up to ~180× at small batch). Source of the win is **occupancy /
+parallelism** (Nsight: 17→57% occupancy, SM 1→16%), not memory. The speedup is **batch- and
+density-dependent** (`paper/data/worklist_warp{,_batch}_rtx4070.csv`).
+
+### ◐ `worklist_shared` — warp kernel, working set in shared memory (≤1536 states)
+**Outcome: inert (0.99–1.10× vs `worklist_warp`).** Nsight explains it: the working set already
+lives in L2 at 99.96% hit, so moving it to shared memory changes nothing. Memory-layout
+privatization does not help once the kernel is work-efficient
+(`paper/data/worklist_shared_rtx4070.csv`).
+
+### ✗ `worklist_compact` — compacted active-ID frontier (O(active)), 1 thread/string
+**Outcome: refuted hypothesis — barely beats the bitmap scan (0.8–1.5× vs `worklist_global`),
+and far slower than `worklist_warp` (0.1–0.4×).** Measured: levenshtein 0.8× (worse), fermi
+1.0–1.2×, brill 1.5× vs the 1-thread bitmap kernel. Why the O(active) advantage doesn't
+materialize: skipping an empty 64-bit word in the bitmap scan is one load + branch (cheap), and
+the bitmap's sequential/coalesced word access beats the compacted frontier's scattered state-ID
+loads + per-transition `visited` test-and-set dedup. So word-scanning was never the bottleneck.
+
+## Nsight characterization (`paper/data/nsight_rtx4070.csv`)
+`worklist_warp` is **latency/instruction-bound, not memory-bound**: DRAM ≤2.25%, L2 hit ≥97.6%
+even for brill's 17 MB CSR (≫ 6 MB L2), because all strings share the CSR and only a hot row
+subset is touched per batch (stays L2-resident).
+
+## Where this points (path to SOTA-absolute)
+Neither memory layout (shared) nor work-reduction (compaction) is the lever; **parallelism**
+(warp) is, and it's now in. The remaining gap to ngAP-class absolute throughput is **algorithmic
+redundancy across strings/symbols**: memoization (reuse repeated state-set transitions),
+non-blocking multi-symbol processing (ngAP), or cross-string CSR-access batching/coalescing.
+That — not another data-layout tweak — is the next worthwhile kernel experiment.
+
+## Reproduce
+- warp/shared/compact correctness: `pytest tests/test_worklist_warp.py -m gpu`
+- warp speedup + batch sensitivity: `python scripts/bench_worklist_warp.py`
+- shared vs warp: `python scripts/bench_worklist_shared.py`
+- compact vs global vs warp (the 3-way above): run `run_batch(nfa, batch, "cuda", t)` for
+  `t in {worklist_global, worklist_warp, worklist_compact}` on the pinned ANMLZoo automata
+  (`gpufsm.io.datasets.DATASETS`) at batch 256 and 4096; numbers above are medians of 5.
