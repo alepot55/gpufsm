@@ -92,7 +92,10 @@ so comparisons are apples-to-apples. Correctness is gated against a CPU referenc
   thread/string), `multistream_shared` (CSR cooperatively staged into shared memory — a
   layout Triton cannot express), `multistream_async` (pinned + streamed H2D/kernel/D2H
   overlap), and **`worklist`** (active-bit iteration via `__ffsll` + frontier eps-closure;
-  O(active), no O(n²)).
+  O(active), no O(n²)). A `worklist_global` variant keeps the working set in global memory
+  (dynamic word count), removing the 512-state register cap so the engine scales to
+  ANMLZoo-sized automata (thousands of states); register residency costs it ~4–5× vs the
+  capped register kernel — itself a memory-layout data point.
 - **Triton**: `dense`, `bitpacked`, `multistream`. The tile/SPMD model forbids `return`
   inside loops (forcing a done-latch rewrite) and truncates integer literals to 32 bits
   (bit masks must be int64 scalars); it cannot place the CSR in shared memory.
@@ -108,7 +111,12 @@ kernel time, reported as **median + percentile-bootstrap 95% CI** over 9 runs (G
 are non-Gaussian; Hoefler & Belli, SC15), with kernel and transfer time separated. Every
 configuration is verified bit-identical to the oracle on the example suite and on randomized
 fuzz/stress NFAs (up to 500 states). Data and environment (GPU, CUDA, Triton, Warp versions)
-are captured in `paper/data/sweep_techniques.csv`.
+are captured in `paper/data/sweep_techniques.csv`. We additionally validate on a **real
+ANMLZoo automaton** — Levenshtein (2787 states, 9193 transitions, 96 report states; loaded
+from the pinned public ANML via `gpufsm.io.anml`, with the `all-input` start semantics
+handled correctly): the scalable `worklist_global` kernel matches the reference oracle
+bit-for-bit on every input, confirming correctness on a production-scale automaton, not only
+synthetic NFAs.
 
 ## 6. Results
 
