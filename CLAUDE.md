@@ -128,6 +128,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (no scalar load) — `docs/DSL_EXPRESSIVENESS.md`.
 - **Cost model FATTO** (`gpufsm.costmodel` + `scripts/calibrate_costmodel.py` + `paper/data/costmodel_rtx4070.csv`).
 
+### 🚀 SCOPE v2 (26 giu, mandato utente "contributo più forte, rivoluziona il paper")
+**Tesi rivoluzionata: "le due facce dell'abstraction regret".** L'NFA si è rivelato control-flow/compute-bound;
+manca la faccia memory-bound. La aggiungo con un **2° workload: simulazione DFA** (lookup tabella densa
+states×256, 1 accesso random/simbolo → memory-bound, regime opposto). Tesi generale: *il regret di un DSL
+dipende dalla capacità che il workload stressa* — NFA = faccia control-flow (Triton non esprime active-set →
+9–15×), DFA = faccia memory-layout (layout/cache tabella domina). Eleva da "studio automi" a **framework
+capability-vs-costo** su 2 workload × spettro DSL (CUDA/Triton/Gluon/Warp). Piano: (1) `dfa.py` core + oracolo;
+(2) kernel DFA CUDA/Triton/Warp; (3) misurare regret DFA (atteso memory-bound, Nsight DRAM% alto); (4) riscrivere
+il paper attorno alle due facce + tabella capability. Aumentare gradualmente, tutto a discrezione.
+
 ### ⚠️ FINDING CHIAVE che riformula la roadmap (vedi `docs/RESULTS_COSTMODEL.md`)
 1. **I kernel attuali sono COMPUTE-bound, non memory-bound.** L'eps-closure è O(n²)/simbolo (n passi × n
    stati) + scan O(n) → throughput ∝ 1/n². Prova: `multistream_shared` (traffic CSR = 0) **pareggia**
