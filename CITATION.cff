@@ -1,16 +1,32 @@
 cff-version: 1.2.0
 message: "If you use gpufsm in academic work, please cite it."
-title: "gpufsm: A workload-driven study and portable framework for GPU finite-state-machine processing"
+title: "gpufsm: The Two Faces of Abstraction Regret — Control-Flow and Memory-Layout Limits of GPU DSLs on Irregular Automata"
+abstract: >-
+  A workload-driven study and portable framework measuring "abstraction regret" — the
+  performance a GPU DSL forecloses, at a fixed algorithm, because it cannot express the
+  memory layout or control flow a workload needs. Instantiated on finite automata across
+  two faces (control-flow-bound NFA, memory-bound DFA) and a paradigm axis (CUDA/Warp
+  thread-SIMT vs Triton/Gluon tile-SPMD), with a falsifiable Triton<->Gluon control.
 authors:
   - family-names: Potenza
     given-names: Alessandro
+    email: ap.alessandro.potenza@gmail.com
 version: 0.1.0
-date-released: 2026-01-01
+date-released: 2026-06-26
 license: MIT
 repository-code: "https://github.com/alepot55/gpufsm"
+url: "https://github.com/alepot55/gpufsm"
+type: software
 keywords:
   - GPU
   - automata
   - NFA
+  - DFA
   - Triton
   - CUDA
+  - Warp
+  - Gluon
+  - abstraction regret
+  - performance portability
+# A versioned snapshot with a Zenodo DOI will be minted at the first tagged release for
+# artifact evaluation; add the `doi:` field here and `identifiers:` once issued.
