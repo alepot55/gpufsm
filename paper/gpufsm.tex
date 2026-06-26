@@ -567,11 +567,24 @@ never the bottleneck. The remaining gap to SOTA absolute throughput (ngAP-class)
 processing---not memory residency or worklist representation. That is the next step.
 
 \section{Conclusion}
-For irregular automata the GPU-DSL promise breaks along a measurable axis we call
-abstraction regret, governed by expressibility---of memory layout and, more sharply here,
-of data-dependent control flow---not by abstraction height. The memory-organization thesis
-holds, but only once the algorithm is work-efficient enough to be memory-bound, which our
-worklist engine achieves.
+On irregular automata the GPU-DSL promise breaks along a measurable axis we call
+\emph{abstraction regret}: the performance a DSL forecloses at a fixed algorithm. Across the two
+faces of automata---the control-flow-bound NFA and the memory-bound DFA---the regret is large for
+tile-SPMD DSLs (Triton $6$--$8\times$) and absent for thread-SIMT ones (Warp $\le$1$\times$). A
+$2\times2$ (height $\times$ paradigm) factorial localizes the cause to the \emph{execution
+paradigm}, not abstraction height; a controlled same-stack Triton$\leftrightarrow$Gluon pair and a
+within-Triton $16\times$ tile-vs-scalar cliff make that attribution causal and rule out tuning; and
+both faces reduce to a \emph{single} missing IR primitive.
+
+The takeaway is constructive and actionable. ``Abstraction regret'' is not an argument against
+high-level GPU DSLs---Warp shows a high-level DSL can match hand CUDA on exactly this irregular
+workload---but a diagnosis with a falsifiable, named cure: \textbf{give a tile/SPMD IR a
+first-class scalar gather within a tile} (and the data-dependent loop it implies), and our map
+predicts the regret on \emph{both} the control-flow and memory faces should collapse. The method
+generalizes beyond automata: hold the algorithm fixed, vary the DSL across a controlled pair, and
+attribute the residual to a named, missing primitive. We release the framework, oracle, kernels,
+and versioned data so the prediction can be tested as such a primitive lands---and so the same
+diagnosis can be run on the next irregular workload.
 
 \section*{Artifact availability}
 All code, the CPU reference oracle, the versioned result CSVs, and the figure generator are
