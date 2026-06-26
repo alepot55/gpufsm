@@ -291,6 +291,94 @@ __global__ void worklist_multistream_kernel(
     out_flags[i] = out_f; out_lens[i] = out_l;
 }
 
+// Frontier epsilon-closure over a GLOBAL-memory bitset (nwords words). S is the set
+// being closed; F (frontier) and B (new bits) are per-thread scratch slices.
+__device__ __forceinline__ void eps_closure_global(
+    unsigned long long* S, unsigned long long* F, unsigned long long* B, int nwords,
+    const int* eps_row_ptr, const int* eps_targets) {
+    for (int w = 0; w < nwords; ++w) F[w] = S[w];
+    bool any = true;
+    while (any) {
+        for (int w = 0; w < nwords; ++w) B[w] = 0ULL;
+        for (int w = 0; w < nwords; ++w) {
+            unsigned long long b = F[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = eps_row_ptr[s]; k < eps_row_ptr[s + 1]; ++k) {
+                    int t = eps_targets[k];
+                    B[t >> 6] |= (1ULL << (t & 63));
+                }
+            }
+        }
+        any = false;
+        for (int w = 0; w < nwords; ++w) {
+            B[w] &= ~S[w];
+            S[w] |= B[w];
+            F[w] = B[w];
+            if (B[w]) any = true;
+        }
+    }
+}
+
+// Work-efficient worklist with the working set in GLOBAL memory — NO state-count cap
+// (the register worklist is capped at 512). nwords words per string; cur/nxt/frontier/
+// newb are per-string global slices. One thread per string. Same latch-first-match
+// verdict as the reference. This is what scales the engine to large (ANMLZoo-sized) automata.
+__global__ void worklist_global_kernel(
+    const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
+    const int* eps_row_ptr, const int* eps_targets,
+    const unsigned long long* accept_words,
+    const int* input_data, const int* input_offsets, int num_strings,
+    int num_states, int start_state, int uses_any, int nwords,
+    unsigned long long* cur, unsigned long long* nxt,
+    unsigned long long* frontier, unsigned long long* newb,
+    int* out_flags, int* out_lens) {
+    (void)num_states;
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= num_strings) return;
+    size_t off = (size_t)i * nwords;
+    unsigned long long* C = cur + off;
+    unsigned long long* N = nxt + off;
+    unsigned long long* F = frontier + off;
+    unsigned long long* B = newb + off;
+    const int* input_symbols = input_data + input_offsets[i];
+    int input_len = input_offsets[i + 1] - input_offsets[i];
+
+    for (int w = 0; w < nwords; ++w) C[w] = 0ULL;
+    C[start_state >> 6] |= (1ULL << (start_state & 63));
+    eps_closure_global(C, F, B, nwords, eps_row_ptr, eps_targets);
+
+    int out_f = 0, out_l = 0, done = 0;
+    for (int w = 0; w < nwords; ++w) if (C[w] & accept_words[w]) done = 1;
+    if (done) { out_f = 1; out_l = 0; }
+
+    for (int pos = 0; pos < input_len && !done; ++pos) {
+        int sym = input_symbols[pos];
+        for (int w = 0; w < nwords; ++w) N[w] = 0ULL;
+        for (int w = 0; w < nwords; ++w) {
+            unsigned long long b = C[w];
+            while (b) {
+                int s = w * 64 + __ffsll(b) - 1;
+                b &= b - 1;
+                for (int k = sym_row_ptr[s]; k < sym_row_ptr[s + 1]; ++k) {
+                    int tsym = sym_symbols[k];
+                    if (tsym == sym || (uses_any && tsym == ANY_SYMBOL)) {
+                        int t = sym_targets[k];
+                        N[t >> 6] |= (1ULL << (t & 63));
+                    }
+                }
+            }
+        }
+        eps_closure_global(N, F, B, nwords, eps_row_ptr, eps_targets);
+        for (int w = 0; w < nwords; ++w) C[w] = N[w];
+        int m = 0;
+        for (int w = 0; w < nwords; ++w) if (C[w] & accept_words[w]) m = 1;
+        if (m) { out_f = 1; out_l = pos + 1; done = 1; }
+    }
+    out_flags[i] = out_f; out_lens[i] = out_l;
+}
+
 // Multi-stream technique — single->multi-stream ablation axis.
 // One thread per input string (blockIdx.x*blockDim.x+threadIdx.x); strings run
 // concurrently across the SMs. Read-only CSR shared by all threads, in GLOBAL memory.
@@ -847,6 +935,64 @@ static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist(
     return {flags, lens, kernel_ms};
 }
 
+// Work-efficient worklist with a GLOBAL working set — no state-count cap. Returns
+// (flags, lens, kernel_ms). accept_words has nwords = ceil(num_states/64) entries.
+static std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global(
+    py::array_t<int> sym_row_ptr, py::array_t<int> sym_targets, py::array_t<int> sym_symbols,
+    py::array_t<int> eps_row_ptr, py::array_t<int> eps_targets,
+    py::array_t<unsigned long long> accept_words,
+    py::array_t<int> input_data, py::array_t<int> input_offsets,
+    int num_states, int start_state, int uses_any) {
+
+    int nwords = (num_states + 63) / 64;
+    int num_strings = static_cast<int>(input_offsets.request().size) - 1;
+
+    std::vector<void*> frees;
+    const int* d_srp = dev_copy(sym_row_ptr, frees);
+    const int* d_st = dev_copy(sym_targets, frees);
+    const int* d_ss = dev_copy(sym_symbols, frees);
+    const int* d_erp = dev_copy(eps_row_ptr, frees);
+    const int* d_et = dev_copy(eps_targets, frees);
+    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    const int* d_in = dev_copy(input_data, frees);
+    const int* d_off = dev_copy(input_offsets, frees);
+
+    int *d_flags, *d_lens;
+    CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    unsigned long long *d_cur, *d_nxt, *d_fr, *d_nb;
+    size_t ws = sizeof(unsigned long long) * (size_t)(num_strings ? num_strings : 1) * nwords;
+    CUDA_CHECK(cudaMalloc(&d_cur, ws)); CUDA_CHECK(cudaMalloc(&d_nxt, ws));
+    CUDA_CHECK(cudaMalloc(&d_fr, ws)); CUDA_CHECK(cudaMalloc(&d_nb, ws));
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start); cudaEventCreate(&stop);
+    cudaEventRecord(start);
+    if (num_strings > 0) {
+        int threads = 256, blocks = (num_strings + threads - 1) / threads;
+        worklist_global_kernel<<<blocks, threads>>>(
+            d_srp, d_st, d_ss, d_erp, d_et, d_acc, d_in, d_off, num_strings,
+            num_states, start_state, uses_any, nwords, d_cur, d_nxt, d_fr, d_nb, d_flags, d_lens);
+        CUDA_CHECK(cudaGetLastError());
+    }
+    cudaEventRecord(stop); cudaEventSynchronize(stop);
+    CUDA_CHECK(cudaDeviceSynchronize());
+    float kernel_ms = 0.0f; cudaEventElapsedTime(&kernel_ms, start, stop);
+
+    py::array_t<int> flags(num_strings);
+    py::array_t<int> lens(num_strings);
+    if (num_strings > 0) {
+        cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+        cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
+    }
+
+    for (void* p : frees) cudaFree(p);
+    cudaFree(d_flags); cudaFree(d_lens);
+    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_fr); cudaFree(d_nb);
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    return {flags, lens, kernel_ms};
+}
+
 PYBIND11_MODULE(_cuda, m) {
     m.doc() = "gpufsm CUDA backend (dense + bit-packed + multi-stream [+ shared-CSR/async/worklist] NFA kernels)";
     m.def("run_dense", &run_dense,
@@ -862,5 +1008,8 @@ PYBIND11_MODULE(_cuda, m) {
           "returns (flags, lens, total_ms).");
     m.def("run_worklist", &run_worklist,
           "Work-efficient multi-stream (iterate active states + frontier eps-closure); "
+          "returns (flags, lens, kernel_ms).");
+    m.def("run_worklist_global", &run_worklist_global,
+          "Work-efficient worklist with a global working set — no state-count cap; "
           "returns (flags, lens, kernel_ms).");
 }
