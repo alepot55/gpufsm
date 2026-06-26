@@ -162,8 +162,15 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   sul kernel work-efficient (cuda 221–286 Gbps, triton 26–29 Gbps), vs 15.7× sul full-scan → **espressività ≠
   efficienza**: anche esprimendo l'algoritmo giusto, il modello tile/SPMD impone un penalty costante grosso sul
   lavoro scalare data-dependent. (Finding forte per il paper.)
-- TODO rimasti: **worklist warp/block-parallel** (per avvicinare ngAP, contributo B forte); **2ª GPU** (generalità);
-  migrare DRAFT.md → LaTeX; pin SHA ANMLZoo + run suite; aggiungere worklist al sweep/figure.
+### Sessione 3 — settimana autonoma (loop, dal 2026-06-26)
+- ✅ **`worklist_global` FATTO**: kernel work-efficient con working-set in **global memory**, **nessun cap stati**
+  (il register worklist è ≤512). Validato vs oracolo fino a **5000 stati**. register ~4–5× più veloce del global
+  a parità n (residency) → altro data point thesis; global è il path di scalabilità per automi ANMLZoo-scale.
+- **Piano settimana (ordine di leva):** (a) ✅ scalare i kernel (worklist_global) → fatto; (b) **dati ANMLZoo reali**:
+  auto-pin SHA da sorgente pubblica fidata (github jackwadden/ANMLZoo), parsare con `io/anml`, girare la suite →
+  numeri su automi reali (forte per reviewer); (c) ottimizzazione occupancy worklist (register pressure); (d) espandere
+  il paper LaTeX a lunghezza piena con risultati reali; (e) opzionale: warp/block-parallel, 2ª GPU (serve hardware).
+- Note: il lavoro DEVE girare in questa sessione (GPU locale) → loop ScheduleWakeup, non cron cloud.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
   + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
 
