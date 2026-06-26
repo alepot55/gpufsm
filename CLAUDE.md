@@ -95,7 +95,16 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] #5 (AE packaging) + #4 (SOTA table) FATTI.** #5: `docs/ARTIFACT_APPENDIX.md`
+- **[Iter più recente] #2 DEEP CONCLUSO (shared-mem worklist) — finding onesto.** `worklist_shared`:
+  working set in shared memory dinamica (warps/block adattivo per stare in 48KB; ≤1536 stati), vs il global
+  di `worklist_warp`. Validato == warp bit-for-bit (9 test verdi). **FINDING:** shared **pareggia** warp
+  (0.99–1.10×, `paper/data/worklist_shared_rtx4070.csv`) → una volta che il kernel è work-efficient il
+  **layout del working-set NON è più il collo di bottiglia** (specchia il risultato compute-bound
+  `multistream_shared`); il gap residuo verso SOTA assoluto (ngAP-class) è **algoritmico** (memoization/
+  non-blocking), non residency. Documentato in Implementation+Limitations. ⇒ #2 chiuso onestamente (warp 12-17×
+  è la vera vincita; ngAP-style memoization sarebbe "competere con SOTA", fuori scope = positioning non benchmark).
+  **STATO: #2,#3,#4,#5 TUTTI FATTI. Resta solo #1 (2ª GPU) che richiede hardware dall'utente.**
+- **[Iter -1] #5 (AE packaging) + #4 (SOTA table) FATTI.** #5: `docs/ARTIFACT_APPENDIX.md`
   (SIGPLAN-style check-list/install/claims→commands→expected + piano Zenodo-DOI-al-release), `CITATION.cff`
   arricchito (titolo two-faces, abstract, keywords), `REPRODUCIBILITY.md` aggiornato (6 famiglie non 2, .tex
   canonico non "migration pending", +righe DFA-sweep/warp-speedup), Artifact Availability nel .tex punta
