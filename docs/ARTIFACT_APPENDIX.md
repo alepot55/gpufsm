@@ -49,7 +49,11 @@ pytest -m gpu                            # GPU backends == oracle, bit-for-bit (
 python scripts/sweep_techniques.py       # technique throughput sweep -> sweep CSV
 python scripts/calibrate_costmodel.py    # cost-model fit -> costmodel CSV
 python scripts/sweep_dfa.py              # DFA table-size sweep -> dfa_regret CSV (L2 knee)
-python scripts/bench_worklist_warp.py    # block-parallel speedup -> worklist_warp CSV
+python scripts/bench_worklist_warp.py    # block-parallel speedup -> worklist_warp{,_batch} CSV
+python scripts/bench_worklist_shared.py  # shared-mem working-set ablation -> worklist_shared CSV
+python scripts/ablate_scalar_control.py  # CAUSAL tile-vs-scalar cliff -> scalar_ablation CSV
+python scripts/regret_multiseed.py       # multi-seed regret robustness -> regret_multiseed CSV
+python scripts/validate_costmodel.py     # cost-model holdout (predictive for CUDA, not Triton)
 python scripts/gluon_probe.py            # Gluon falsifiability probe (exit 0 = expected failure)
 python paper/figures.py                  # regenerate all figures from the CSVs
 ```
@@ -64,6 +68,10 @@ python paper/figures.py                  # regenerate all figures from the CSVs
 | NFA abstraction regret = paradigm | `scripts/calibrate_costmodel.py` | Triton 6–8× / 10× fit, Warp 0.6–0.9× vs CUDA |
 | DFA memory-bound L2 knee | `scripts/sweep_dfa.py` | CUDA peaks ~6 MB then ~2.4× drop; Triton flat ~30 Gbps |
 | Block-parallel warp worklist speedup | `scripts/bench_worklist_warp.py` | 3–9× vs single-thread on real automata at a saturating batch (larger at small batch) |
+| CAUSAL: scalar-control cliff in Triton | `scripts/ablate_scalar_control.py` | tile ~1320 vs scalar ~81 Gbps = ~16× cliff (saturating batch) |
+| Regret is multi-seed robust | `scripts/regret_multiseed.py` | Triton 7.1× median, Warp 0.85× median (5 seeds × 3 sizes) |
+| Shared-mem working-set inert | `scripts/bench_worklist_shared.py` | 0.99–1.10× vs warp (layout not the bottleneck) |
+| Cost model predictive for CUDA only | `scripts/validate_costmodel.py` | holdout CUDA 2.7% / Triton 45%; LOO stable / unstable |
 | Gluon cannot express the kernel (falsifiable) | `scripts/gluon_probe.py` | "EXPECTED FAILURE … no scalar load", exit 0 |
 
 Exact figures and the full mapping are in `docs/REPRODUCIBILITY.md`; all numbers trace to
