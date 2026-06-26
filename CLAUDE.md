@@ -172,13 +172,14 @@ validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (
    Gli assi memory (byte→bit, shared-CSR, async) mordono SOLO con un kernel **work-efficient**
    (active-set/worklist, stile ngAP) che porti il kernel nel regime memory-bound.
 2. **L'abstraction regret è quantificata e NON è l'altezza dell'astrazione, è il PARADIGMA di esecuzione.**
-   Costo compute vs CUDA (stesso algoritmo): **Triton (tile/SPMD) 15.7×, CUDA 1.0×, Warp (thread-SIMT) 0.62×**
-   (batte la CUDA scritta a mano). Due DSL Python di pari livello agli estremi → conta tile/SPMD vs thread-SIMT.
+   Costo compute vs CUDA (stesso algoritmo): **Triton (tile/SPMD) 6–8× throughput misurato / 10.1× fit,
+   CUDA 1.0×, Warp (thread-SIMT) 0.6–0.9×** (batte la CUDA scritta a mano). Due DSL Python di pari livello
+   agli estremi → conta tile/SPMD vs thread-SIMT. ⚠️ NUMERI CANONICI = `paper/data/*.csv` (la prosa li rispecchia).
 
 ### TODO prossima sessione (riformulato dai finding)
 - ✅ **Kernel WORK-EFFICIENT FATTO** (CUDA `worklist`): itera solo gli stati attivi (bit set) + eps-closure
-  frontier-based, elimina l'O(n²). **1000–7000× più veloce del full-scan**, speedup crescente con n (n=64→1148×,
-  n=500→7147×). Validato vs reference (30 batch ≤500 stati, 0 mismatch). È la base del contributo (B).
+  frontier-based, elimina l'O(n²). **≈330×–10⁴× più veloce del full-scan**, speedup crescente con n (n=32→332×,
+  n=500→≈10⁴×). Validato vs reference (30 batch ≤500 stati, 0 mismatch). È la base del contributo (B).
   TODO: versione Triton worklist; verificare con Nsight se ora è memory-bound (→ gli assi memory contano).
 - ✅ **Sweep rigoroso FATTO** (task #7): `paper/data/sweep_techniques.csv` (median+CI95). worklist 15–132 Gbps
   vs full-scan ~0.5; multistream/shared/async identici → compute-bound confermato.
@@ -195,8 +196,8 @@ validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (
   ⚠️ Manca solo il **download dei dati ANMLZoo reali** (DATASETS vuoto, serve SHA pinnato da mirror fidato — non
   bypassare la safety). Con i dati → numeri su automi reali (forte per i reviewer).
 - ✅ **Worklist Triton FATTO** (≤64 stati): Triton **PUÒ** esprimere il kernel work-efficient via `libdevice.ffs`
-  + while-loop data-dependent (a differenza di Gluon che non ha scalar load). MA paga **~9× di regret vs CUDA**
-  sul kernel work-efficient (cuda 221–286 Gbps, triton 26–29 Gbps), vs 15.7× sul full-scan → **espressività ≠
+  + while-loop data-dependent (a differenza di Gluon che non ha scalar load). MA paga **~6.5× di regret vs CUDA**
+  sul kernel work-efficient (cuda 164–170 Gbps, triton 24–25 Gbps), ≈ uguale al 6–8× sul full-scan → **espressività ≠
   efficienza**: anche esprimendo l'algoritmo giusto, il modello tile/SPMD impone un penalty costante grosso sul
   lavoro scalare data-dependent. (Finding forte per il paper.)
 ### Sessione 3 — settimana autonoma (loop, dal 2026-06-26)
@@ -213,7 +214,7 @@ validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (
   - (d) espandere paper LaTeX a lunghezza piena; (e) opzionale: più automi pinnati, block-parallel, 2ª GPU (hardware).
 - Note: il lavoro DEVE girare in questa sessione (GPU locale) → loop ScheduleWakeup, non cron cloud.
 - **Contributo (A)+(C) è già forte e difendibile ORA**: caratterizzazione + cost model + regret quantificata
-  + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 15.7×, Gluon non esprime) + worklist 15–132 Gbps. Preprint pronto in bozza.
+  + abstraction-spectrum (CUDA/Warp esprimono, Triton stride 6–10×, Gluon non esprime) + worklist 15–170 Gbps. Preprint pronto in bozza.
 
 ### Fatto e verde (CPU) — sessione 1
 - Fondazione completa: `src/gpufsm` (nfa, reference, bitmap, result, registry, api, cli, examples,

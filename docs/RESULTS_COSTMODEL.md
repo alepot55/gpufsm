@@ -45,19 +45,19 @@ factor between DSLs. Fitting **per backend** (n² model) fits well and isolates 
 compute-efficiency constant. The ratio vs the CUDA baseline **is** the abstraction regret on
 this kernel:
 
-| Backend | compute (ns/state²) | mean rel. err | **regret vs CUDA** |
+| Backend | compute (ns/state²) | **regret vs CUDA (fit)** | regret (measured throughput) |
 |---|---|---|---|
-| **Triton** (tile/SPMD) | 0.162 | 24% | **15.7×** |
-| **CUDA** (C++ SIMT) | 0.0104 | 13% | 1.00× (baseline) |
-| **Warp** (Python thread-SIMT) | 0.0065 | 0% | **0.62×** (beats hand CUDA) |
+| **Triton** (tile/SPMD) | 0.103 | **10.1×** | 6–8× |
+| **CUDA** (C++ SIMT) | 0.0102 | 1.00× (baseline) | 1.00× |
+| **Warp** (Python thread-SIMT) | 0.0065 | **0.63×** (beats hand CUDA) | 0.9× |
 
 (Per-backend rel. err is <1% at n=128/256; the ~25% at n=32/64 is fixed launch overhead the
 pure-n² model omits.)
 
 ## Interpretation — regret is the execution *paradigm*, not abstraction height
 
-Two **equally high-level Python DSLs** land on opposite ends: **Triton pays 15.7×** while
-**Warp beats hand-written CUDA (0.62×)** — same algorithm, same hardware. The difference is
+Two **equally high-level Python DSLs** land on opposite ends: **Triton pays 10.1×** (fit; 6–8×
+measured throughput) while **Warp beats hand-written CUDA (0.63×)** — same algorithm, same hardware. The difference is
 the execution model: Triton's tile/SPMD paradigm is a poor fit for the data-dependent,
 per-state, scalar control flow automata need (it can only express the kernel as one strained
 program), whereas Warp's thread-SIMT model expresses it naturally and its codegen is
@@ -67,7 +67,7 @@ excellent. CUDA sits between (full control, but my hand kernel isn't maximally t
 model's execution paradigm can express the workload's control flow + memory layout* — not by
 how "high-level" the DSL looks. This complements the Gluon finding
 (`docs/DSL_EXPRESSIVENESS.md`): Gluon (tile, layout-explicit) cannot express the kernel at
-all, and Triton (tile) expresses it at 15.7× cost, while Warp (thread) is essentially free.
+all, and Triton (tile) expresses it at 10.1× cost, while Warp (thread) is essentially free.
 
 ## Caveats / next steps
 

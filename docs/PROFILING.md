@@ -82,8 +82,8 @@ The central regime claim is already established by *controlled experiment*, not 
    memory-bound, removing CSR global traffic would help — it does not ⇒ compute-bound.
 2. **Scaling:** throughput ∝ 1/n² for the full-scan kernels (the O(n²) eps-closure), fit by
    the cost model to <1% at large n (`docs/RESULTS_COSTMODEL.md`).
-3. **Cure:** the work-efficient `worklist` kernel (O(active), no O(n²)) is 250×–10000× faster
-   and reaches 15–132 Gbps — the regime where memory layout *can* matter; profiling it (once
+3. **Cure:** the work-efficient `worklist` kernel (O(active), no O(n²)) is ≈330×–10⁴× faster
+   and reaches 15–170 Gbps — the regime where memory layout *can* matter; profiling it (once
    ncu is unblocked) is the next confirmatory step.
 
 So Nsight counters are **confirmatory, not load-bearing** for the paper's argument.

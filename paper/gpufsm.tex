@@ -36,16 +36,17 @@ NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-S
 Automata expose \textbf{two complementary faces}: an NFA active-set traversal that is
 \emph{control-flow bound}, and a DFA dense-table walk that is \emph{memory bound} (its
 throughput halves as the table crosses L2). On both faces the regret is large for the
-tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $9$--$15\times$ versus CUDA
-while Warp, an equally high-level \emph{Python} DSL, matches or beats hand CUDA
-($0.62$--$1\times$). So regret is set by the execution \emph{paradigm}, not by how
+tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $6$--$15\times$ versus CUDA
+across the two faces, while Warp, an equally high-level \emph{Python} DSL, matches or beats
+hand CUDA on the NFA ($0.6$--$0.9\times$) and stays within $2$--$3\times$ on the DFA. So
+regret is set by the execution \emph{paradigm}, not by how
 high-level the DSL looks. We make the attribution \textbf{falsifiable} with the
 Triton$\leftrightarrow$Gluon controlled pair (identical MLIR compiler stack; Gluon only adds
 explicit layout/shared-memory control): Gluon \emph{still} cannot express the kernel, so the
 binding constraint is the paradigm, not tuning or layout. A two-parameter cost model predicts
 the regret and names the missing IR primitives (scalar gather in a tile, register-resident
 bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine
-($250\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
+($\approx\!330\times$--$10^4\times$ over a faithful full scan, 15--170~Gbps, validated bit-for-bit
 against a CPU oracle on real ANMLZoo automata up to 42k states).
 \end{abstract}
 
@@ -190,28 +191,31 @@ rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot
 the algorithm is work-efficient.
 
 \textbf{The work-efficient kernel unlocks the regime.} The \texttt{worklist} kernel is
-$250\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$;
-Fig.~\ref{fig:wl}) and reaches 15--170~Gbps, moving the workload toward memory-bound where
-the memory techniques become load-bearing.
+$\approx\!330\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$: $332\times$
+at 32 states, $\approx\!10^4\times$ at 500; Fig.~\ref{fig:wl}) and reaches 15--170~Gbps, moving
+the workload toward memory-bound where the memory techniques become load-bearing.
 
 \textbf{Abstraction regret is the execution paradigm.} On the same full-scan kernel the
-fitted per-DSL compute cost vs CUDA is Triton $15.7\times$, CUDA $1.0\times$, Warp
-$0.62\times$ (Fig.~\ref{fig:regret}). Two equally high-level Python DSLs sit at opposite
-extremes: Triton's tile/SPMD paradigm strains to express per-state data-dependent control
-flow, Gluon cannot express it at all, while Warp's thread-SIMT model expresses it naturally
-and its codegen beats hand-written CUDA.
+directly-measured throughput ratio vs CUDA is Triton $6$--$8\times$ and Warp $0.9\times$
+(Warp is \emph{faster}; Fig.~\ref{fig:regret}); the two-parameter cost-model fit corroborates
+this, isolating the per-DSL compute constant at Triton $10.1\times$, CUDA $1.0\times$, Warp
+$0.63\times$. Two equally high-level Python DSLs sit at opposite extremes: Triton's tile/SPMD
+paradigm strains to express per-state data-dependent control flow, Gluon cannot express it at
+all, while Warp's thread-SIMT model expresses it naturally and its codegen beats hand-written
+CUDA.
 
 \textbf{Expressibility $\neq$ efficiency.} Triton \emph{can} express the work-efficient
-worklist (unlike Gluon), yet still pays $\approx 9\times$ vs CUDA there (CUDA 142~Gbps vs
-Triton 25~Gbps at $\le 64$ states), versus $15.7\times$ on the full scan. Even expressing
-the right algorithm, the tile/SPMD model imposes a large constant penalty on scalar,
-data-dependent automata work.
+worklist (unlike Gluon), yet still pays $\approx\!6.5\times$ vs CUDA there (CUDA 164~Gbps vs
+Triton 25~Gbps at $\le 64$ states)---essentially the same regret as the $6$--$8\times$ on the
+full scan. Even expressing the right algorithm, the tile/SPMD model imposes a large constant
+penalty on scalar, data-dependent automata work.
 
 \textbf{The second face: DFA is memory-bound, and the regret persists.} The DFA dense-table
 walk is the memory-bound dual of the NFA: CUDA throughput \emph{halves} as the table crosses
-the 6\,MB L2 (496~Gbps at 4096 states, 207 at 200k; Fig.~\ref{fig:dfa}), the memory-bound
-signature. Yet the cross-DSL pattern is unchanged: Warp pays $2$--$3\times$ vs CUDA, while
-\textbf{Triton is flat at $\approx29$~Gbps regardless of table size}---it never reaches the
+the 6\,MB L2 (443~Gbps at a 4\,MB table / 4096 states, 213 at 50\,MB / 50k states;
+Fig.~\ref{fig:dfa}), the memory-bound signature. Yet the cross-DSL pattern is unchanged: Warp
+pays $2$--$3\times$ vs CUDA, while \textbf{Triton is flat at $\approx29$~Gbps regardless of
+table size}---it never reaches the
 memory-bound regime because its tile/SPMD codegen bottlenecks the scalar gather first (regret
 $7$--$15\times$). So on \emph{both} faces---control-flow-bound (NFA) and memory-bound
 (DFA)---the regret tracks the execution paradigm, not the workload's bottleneck: it is an
@@ -239,7 +243,7 @@ Data-dependent loop        & \cmark & \cmark & \tmark & \tmark \\
 Register-resident bitset   & \cmark & \cmark & \xmark & \xmark \\
 Explicit shared-mem layout & \cmark & \xmark & \xmark & \cmark \\
 \midrule
-NFA regret (control-flow)  & $1\times$ & $0.6\times$ & $9$--$15\times$ & n/a (\xmark) \\
+NFA regret (control-flow)  & $1\times$ & $0.6$--$0.9\times$ & $6$--$10\times$ & n/a (\xmark) \\
 DFA regret (memory)        & $1\times$ & $2$--$3\times$ & $7$--$15\times$ & --- \\
 \bottomrule
 \end{tabular}
@@ -299,7 +303,7 @@ reference oracle bit-for-bit. \emph{Internal.} Every backend/technique is checke
 single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
 use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
 \emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
-$15.7\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
+$6$--$15\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
 limit. Two facts argue against this: (i) the kernels are structurally mirrored from the same
 CSR spec, and (ii) \emph{Warp}---an equally high-level Python DSL written with comparable
 effort---matches or beats hand CUDA, so ``high-level $\Rightarrow$ slow'' is not the

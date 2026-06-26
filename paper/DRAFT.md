@@ -18,15 +18,16 @@ on finite automata across the paradigm axis CUDA and NVIDIA Warp (thread-SIMT) v
 its low-level Gluon frontend (tile-SPMD). Automata expose **two complementary faces**: an NFA
 active-set traversal that is *control-flow bound*, and a DFA dense-table walk that is *memory
 bound* (throughput halves as the table crosses L2). On both faces the regret is large for the
-tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 9–15× vs CUDA while Warp, an
-equally high-level *Python* DSL, matches or beats hand CUDA (0.62–1×) — so regret is set by the
+tile-SPMD DSLs and small for the thread-SIMT ones — Triton pays 6–15× vs CUDA across the two
+faces while Warp, an equally high-level *Python* DSL, matches or beats hand CUDA on the NFA
+(0.6–0.9×) and stays within 2–3× on the DFA — so regret is set by the
 execution **paradigm**, not by how high-level the DSL looks. We make the attribution
 **falsifiable** with the Triton↔Gluon controlled pair (identical MLIR compiler stack; Gluon
 only adds explicit layout/shared-memory control): Gluon *still* cannot express the kernel, so
 the binding constraint is the paradigm, not tuning or layout. A two-parameter cost model
 predicts the regret and names the missing IR primitives (scalar gather in a tile,
 register-resident bitset, data-dependent loop). Along the way we build a portable
-work-efficient automata engine (250×–10⁴× over a faithful full scan, 15–170 Gbps, validated
+work-efficient automata engine (≈330×–10⁴× over a faithful full scan, 15–170 Gbps, validated
 bit-for-bit against a CPU oracle on real ANMLZoo automata up to 42k states).
 
 ## 1. Introduction
@@ -130,15 +131,17 @@ of magnitude — and `multistream_shared` shows identical SM%, DRAM% and occupan
 only the L2 hit rate (79→93%) without moving runtime. Conclusion: the memory axes (byte→bit,
 shared CSR, async) cannot help until the algorithm is work-efficient.
 
-**6.2 The work-efficient kernel unlocks the regime.** The `worklist` kernel is 250×–10⁴×
-faster than full-scan (the speedup grows with n: 1148× at 64 states, 7147× at 500) and
+**6.2 The work-efficient kernel unlocks the regime.** The `worklist` kernel is ≈330×–10⁴×
+faster than full-scan (the speedup grows with n: 332× at 32 states, ≈10⁴× at 500) and
 reaches 15–170 Gbps (Fig. `fig_worklist_speedup`), moving the workload toward memory-bound
 where the §4 memory techniques become load-bearing (future work confirms with Nsight once
 counters are unblocked, `docs/PROFILING.md`).
 
 **6.3 Abstraction regret is the execution paradigm.** On the same full-scan kernel, the
-fitted per-DSL compute cost vs CUDA is **Triton 15.7×, CUDA 1.0×, Warp 0.62×**
-(Fig. `fig_abstraction_regret`). Two equally high-level Python DSLs sit at opposite extremes:
+directly-measured throughput ratio vs CUDA is **Triton 6–8×, Warp 0.9×** (Warp is *faster*;
+Fig. `fig_abstraction_regret`); the two-parameter cost-model fit corroborates this, isolating
+the per-DSL compute constant at **Triton 10.1×, CUDA 1.0×, Warp 0.63×**. Two equally
+high-level Python DSLs sit at opposite extremes:
 Triton's tile/SPMD paradigm strains to express per-state data-dependent control flow (it can
 only run as one unrolled program), Gluon cannot express it at all, while Warp's thread-SIMT
 model expresses it naturally and its codegen beats hand-written CUDA. Regret tracks *what the
@@ -148,14 +151,14 @@ model forbids you to express*, not abstraction height.
 sharper test: can Triton express the *work-efficient* worklist (the kernel that matters), and
 at what cost? Unlike Gluon (no scalar load), Triton *can* — `libdevice.ffs` plus a
 data-dependent `while` loop iterate the active bits — and it is validated against the oracle.
-But it still pays **≈9× vs CUDA** on that kernel (CUDA worklist 142 Gbps vs Triton worklist
-25 Gbps at ≤64 states), versus 15.7× on the full scan. So even when Triton expresses the right
+But it still pays **≈6.5× vs CUDA** on that kernel (CUDA worklist 164 Gbps vs Triton worklist
+25 Gbps at ≤64 states) — essentially the same regret as the 6–8× on the full scan. So even when Triton expresses the right
 algorithm, its tile/SPMD model imposes a large constant penalty on scalar, data-dependent
 automata work — expressibility does not buy efficiency.
 
 **6.5 The second face: DFA is memory-bound, and the regret persists.** The DFA dense-table
 walk is the memory-bound dual of the NFA: CUDA throughput *halves* as the table crosses the
-6 MB L2 (496 Gbps at 4096 states → 207 Gbps at 200k; Fig. `fig_dfa_memory_bound`,
+6 MB L2 (443 Gbps at a 4 MB table / 4096 states → 213 Gbps at 50 MB / 50k states; Fig. `fig_dfa_memory_bound`,
 `paper/data/dfa_regret_rtx4070.csv`) — the memory-bound signature. Yet the cross-DSL pattern
 is unchanged: Warp pays 2–3× vs CUDA, while **Triton is flat at ≈29 Gbps regardless of table
 size** — it never reaches the memory-bound regime because its tile/SPMD codegen bottlenecks
@@ -177,7 +180,7 @@ or only via a strained single program (Triton) — exactly what the regret measu
 | Data-dependent loop          | ✓ | ✓ | ◐ | ◐ |
 | Register-resident bitset     | ✓ | ✓ | ✗ | ✗ |
 | Explicit shared-mem layout   | ✓ | ✗ | ✗ | ✓ |
-| **NFA regret (control-flow)** | 1× | 0.6× | 9–15× | n/a (✗) |
+| **NFA regret (control-flow)** | 1× | 0.6–0.9× | 6–10× | n/a (✗) |
 | **DFA regret (memory)**       | 1× | 2–3× | 7–15× | — |
 
 ## 7. Related work
@@ -212,7 +215,7 @@ irregular workload.
   bit-for-bit.
 - **Internal:** every backend/technique is gated against the CPU oracle (latch-first-match)
   on examples + fuzz/stress; timings use median + bootstrap CI, warmup, kernel/transfer split.
-- **Implementation-effort asymmetry** (key DSL-comparison risk): the Triton 15.7× gap might
+- **Implementation-effort asymmetry** (key DSL-comparison risk): the Triton 6–15× gap might
   reflect a weaker Triton kernel, not an inherent limit. Against this: (i) kernels are
   structurally mirrored from one CSR spec; (ii) **Warp**, an equally high-level Python DSL
   written with comparable effort, matches/beats hand CUDA — so "high-level ⇒ slow" is not the
@@ -237,7 +240,7 @@ irregular workload.
 For irregular automata, the GPU-DSL promise breaks along a measurable axis we call
 abstraction regret. It is governed by expressibility — of memory layout and, more sharply
 here, of data-dependent control flow — not by abstraction height: a high-level thread-SIMT
-DSL (Warp) matches CUDA while a high-level tile DSL (Triton) pays 15.7× and its lower-level
+DSL (Warp) matches CUDA while a high-level tile DSL (Triton) pays 6–15× and its lower-level
 sibling (Gluon) cannot express the kernel at all. The memory-organization thesis holds, but
 only once the algorithm is work-efficient enough to be memory-bound — which our worklist
 engine achieves.

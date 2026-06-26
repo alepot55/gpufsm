@@ -30,9 +30,9 @@ This is scalar, branch-heavy, scatter-heavy work — the opposite of dense tile/
 
 Update (work-efficient worklist): Triton **can** express the work-efficient active-set
 kernel too — `libdevice.ffs` + a data-dependent `while` loop iterate set bits — and it is
-validated against the oracle. But it still pays **~9× regret vs CUDA** on that kernel
-(CUDA worklist 221–286 Gbps vs Triton worklist 26–29 Gbps at ≤64 states), versus 15.7× on
-the full-scan kernel. So for Triton **expressibility ≠ efficiency**: even when it expresses
+validated against the oracle. But it still pays **~6.5× regret vs CUDA** on that kernel
+(CUDA worklist 164–170 Gbps vs Triton worklist 24–25 Gbps at ≤64 states), essentially the
+same as the 6–8× on the full-scan kernel. So for Triton **expressibility ≠ efficiency**: even when it expresses
 the right algorithm, the tile/SPMD model imposes a large constant penalty on scalar,
 data-dependent automata work. Gluon, by contrast, cannot express it at all.
 | **Tensor-only DSLs** (cuTile/Tile IR, CUTLASS CuTe DSL, ThunderKittens, JAX/Pallas, TileLang) | high (tile/tensor) | **No** | not attempted — dense-tile/tensor-core model; automata scatter/branch must be faked as masked dense ops | Off-axis for irregular automata; discuss in related work, do not benchmark |
