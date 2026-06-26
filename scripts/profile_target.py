@@ -31,12 +31,21 @@ def random_nfa(n: int, seed: int = 1):
 
 
 def main() -> None:
-    backend, technique, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    # arg3 is either an int num_states (random NFA) or "anml:<key>" (real ANMLZoo automaton,
+    # whose large CSR can exceed L2 -> tests whether the kernel becomes memory-bound).
+    backend, technique, spec = sys.argv[1], sys.argv[2], sys.argv[3]
     n_strings = int(sys.argv[4]) if len(sys.argv) > 4 else 16384  # default saturates ~46 SMs
     slen = 256
-    nfa = random_nfa(n)
+    if spec.startswith("anml:"):
+        from gpufsm.io.anml import load_anml
+        from gpufsm.io.datasets import DATASETS, ensure
+
+        nfa = load_anml(ensure(DATASETS[spec.split(":", 1)[1]], "data/anmlzoo"))
+    else:
+        nfa = random_nfa(int(spec))
+    alpha = sorted({int(s) for s in nfa.sym_symbols if 0 <= int(s) <= 255}) or [ord("a")]
     rng = np.random.default_rng(0)
-    flat = rng.integers(ord("a"), ord("a") + 5, size=n_strings * slen, dtype=np.uint8).tobytes()
+    flat = bytes(rng.choice(alpha, size=n_strings * slen).astype(np.uint8))
     batch = [flat[i * slen : (i + 1) * slen] for i in range(n_strings)]
     run_batch(nfa, batch, backend=backend, technique=technique)  # the single profiled launch
 

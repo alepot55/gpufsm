@@ -87,3 +87,27 @@ The central regime claim is already established by *controlled experiment*, not 
    ncu is unblocked) is the next confirmatory step.
 
 So Nsight counters are **confirmatory, not load-bearing** for the paper's argument.
+
+## Worklist kernels profiled (ncu, single launch; `paper/data/nsight_rtx4070.csv`)
+
+Profiled the work-efficient worklist kernels (8192-state synthetic, 2048 strings; and brill
+42661 states for the large-CSR case):
+
+| kernel | states | SM% | DRAM% | L2 hit% | occ% | dur |
+|---|---|---|---|---|---|---|
+| `worklist_global` (1 thread/string) | 8192 | 1.06 | 0.01 | 100 | 16.6 | 62.3 ms |
+| `worklist_warp` (warp/string) | 8192 | 15.98 | 0.13 | 99.96 | 56.8 | 2.64 ms |
+| `worklist_warp` | 42661 (17 MB CSR) | 16.30 | 2.25 | 97.6 | 36.6 | — |
+
+**Findings.** (1) The warp kernel fixes the single-thread kernel's catastrophic
+under-utilization (occupancy 16.6→56.8%, SM 1.1→16%) — the source of its speedup is
+**parallelism/occupancy, not memory**. (2) The worklist is **latency/instruction-bound, not
+memory-bound**: DRAM stays $\le$2.25% and L2 hit $\ge$97.6% *even for brill's 17 MB CSR* (far
+larger than the 6 MB L2) — because all strings share the CSR and only a hot subset of rows is
+touched per batch, staying L2-resident. (3) This is *why* `worklist_shared` (working set in
+shared memory) is inert: the working set already lives in L2 at 99.96% hit. ⇒ The path to SOTA
+absolute throughput is **algorithmic** (cut instructions/serialization: compacted active-ID
+worklist, fewer `atomicOr`/`__syncwarp`, ngAP-style non-blocking multi-symbol), **not** memory
+layout. This reinforces the control-flow-bound (not bandwidth-bound) nature of NFA simulation.
+(Note: the brill run reported app exit code 6 on teardown after the profiled launch; the
+single-launch counters above were captured cleanly and are consistent with the 8192 trend.)
