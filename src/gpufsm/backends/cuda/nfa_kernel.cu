@@ -273,8 +273,13 @@ __device__ __forceinline__ void simulate_one_worklist(
 }
 
 // Multi-stream worklist: one thread/string, work-efficient kernel, global CSR.
+// __launch_bounds__ raises occupancy for SMALL working sets (NWORDS<=2: cap registers
+// to fit 6 blocks/SM — the kernel is latency-bound, so more resident warps hide latency,
+// ~2x at <=64 states). For larger NWORDS the same cap forces register spills and hurts,
+// so we relax to minBlocks=1 (effectively unconstrained). NWORDS is a compile-time
+// template parameter, so the ternary is a constant expression.
 template <int NWORDS>
-__global__ void worklist_multistream_kernel(
+__global__ void __launch_bounds__(256, (NWORDS <= 2 ? 6 : 1)) worklist_multistream_kernel(
     const int* sym_row_ptr, const int* sym_targets, const int* sym_symbols,
     const int* eps_row_ptr, const int* eps_targets,
     const unsigned long long* accept_words,
