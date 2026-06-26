@@ -263,7 +263,12 @@ either (i) as a tile-vectorized reduction or (ii) with a carried data-dependent 
 (the automata pattern). At a GPU-saturating batch the tile kernel scales to 1320~Gbps (Triton's
 design point) while the scalar kernel hits a hard $\approx$81~Gbps per-program ceiling---a
 $16\times$ cliff from the access/control pattern alone (\texttt{paper/data/scalar\_ablation\_rtx4070.csv}).
-The regret appears \emph{iff} the inexpressible primitive is required.
+The regret appears \emph{iff} the inexpressible primitive is required. The cross-paradigm half
+confirms it: thread-SIMT runs the \emph{same} scalar data-dependent recurrence with \emph{no}
+per-program ceiling---CUDA's DFA walk (a per-byte scalar gather + state recurrence) reaches
+163--364~Gbps---whereas tile-SPMD Triton is pinned at a $\approx$29--81~Gbps scalar ceiling
+regardless of table size or batch. Same work, same hardware: the ceiling is a property of the
+paradigm.
 
 \textbf{Expressibility $\neq$ efficiency.} Triton \emph{can} express the work-efficient
 worklist (unlike Gluon), yet still pays $\approx\!6.5\times$ vs CUDA there (CUDA 164~Gbps vs
