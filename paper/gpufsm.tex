@@ -316,7 +316,35 @@ performance---we add the DSL-expressibility axis. We rebut the autotuning counte
 gap is expressibility, not tuning---Gluon, the explicit-control sibling on the same compiler
 stack, still cannot express the kernel. SOTA automata engines (ngAP, HybridSA, BitGen) are
 CUDA-only baselines; our contribution is the metric + cost model + the first multi-DSL
-expressibility study of an irregular workload.
+expressibility study of an irregular workload. Table~\ref{tab:sota} positions us against them:
+each reports a speedup over \emph{its own} baseline and hardware (not comparable in absolute
+Gbps), and each is a new \emph{algorithm} on CUDA, whereas our axis is orthogonal---algorithm
+fixed, measuring what each DSL expresses. We therefore \emph{position}, not benchmark, against
+them; matching ngAP-class absolute throughput is explicit future work (\S\ref{sec:limits}).
+
+\begin{table}[t]
+\centering
+\caption{Positioning vs SOTA GPU automata engines. ``Reported'' is each paper's own speedup
+over its own baseline/hardware---\emph{not} comparable in absolute Gbps. All are CUDA-only new
+algorithms; our axis (DSL expressibility, fixed algorithm) is orthogonal.}
+\label{tab:sota}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+System (venue) & Mechanism & Reported (own basis) \\
+\midrule
+iNFAnt (CCR'10)        & symbol-indexed CSR, bit-vector   & first GPU NFA \\
+AsyncAP (SIGMETRICS'23) & input-symbol async parallelism  & $2.4$--$58\times$ \\
+ngAP (ASPLOS'24)        & non-blocking + memoization      & $7.9\times$ avg \\
+HybridSA (OOPSLA'24)    & bit-parallel + CPU/GPU split    & bit-parallel \\
+BitGen (MICRO'25)       & Parabix bitstream fusion        & $19.5\times$ vs GPU \\
+\midrule
+\textbf{This work} & \textbf{DSL-regret metric, 4 DSLs} & \textbf{orthogonal} \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
 \section{Threats to validity}
 \emph{Construct.} Most throughput points use randomly generated NFAs, which may not
@@ -334,7 +362,7 @@ explanation; the tile/SPMD execution model is. \emph{External.} Results are from
 GPU (RTX 4070); the cost-model constants are per-backend fits that may differ across
 architectures, so cross-architecture generality is future work.
 
-\section{Limitations and future work}
+\section{Limitations and future work}\label{sec:limits}
 \emph{Generality across architectures.} Results are from one GPU (RTX 4070, sm\_89, 6\,MB
 L2). The qualitative claims should be architecture-independent---the capability table is a
 property of the DSL compilers, not the silicon, and the Triton$\leftrightarrow$Gluon control

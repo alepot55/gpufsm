@@ -220,6 +220,20 @@ AsyncAP, AutomataBLAS) are CUDA-only baselines our worklist engine must approach
 contribution is the metric + cost model + the first multi-DSL expressibility study of an
 irregular workload.
 
+**Positioning vs SOTA (not a benchmark).** Each engine below reports a speedup over *its own*
+baseline/hardware — not comparable in absolute Gbps — and each is a new *algorithm* on CUDA;
+our axis is orthogonal (algorithm fixed, measuring DSL expressibility). Matching ngAP-class
+absolute throughput is explicit future work.
+
+| System (venue) | Mechanism | Reported (own basis) |
+| --- | --- | --- |
+| iNFAnt (CCR'10) | symbol-indexed CSR, bit-vector | first GPU NFA |
+| AsyncAP (SIGMETRICS'23) | input-symbol async parallelism | 2.4–58× |
+| ngAP (ASPLOS'24) | non-blocking + memoization | 7.9× avg |
+| HybridSA (OOPSLA'24) | bit-parallel + CPU/GPU split | bit-parallel |
+| BitGen (MICRO'25) | Parabix bitstream fusion | 19.5× vs GPU |
+| **This work** | **DSL-regret metric, 4 DSLs** | **orthogonal** |
+
 ## 7b. Threats to validity
 
 - **Construct:** most throughput points use random NFAs; mitigated by validating on three
