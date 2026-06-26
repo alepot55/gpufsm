@@ -95,7 +95,18 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] 2ª GPU FATTA — A100 80GB (RunPod, ~$0.25) riproduce il 2×2 CROSS-ARCH.**
+- **[Iter più recente] VENUE DECISO + versione HPEC 6pp PRONTA (2026-06-27).** Dopo deep-research
+  (4 agent: SC-workshops/conferenze/journal/CV-value) l'utente ha scelto **IEEE HPEC 2026** come target
+  primario: virtuale (no viaggio), economico (~$140-180 reg studente, no APC), IEEE-Xplore (= pubblicazione
+  a conferenza internazionale per i job post), single-blind, **deadline 7 LUG 2026**, notif 19 ago,
+  conf 14-18 set. Submission = PDF su Microsoft CMT. Creata **`paper/gpufsm_hpec.tex/.pdf` (corpo 6 pagine,
+  ref escluse)** tagliando dalla full 8pp: tolte 4 figure ridondanti (tenute regret + DFA), Nsight+SOTA
+  inlinate, cost-model e kernel-limitations compressi; 2×2/capability→cost/causal/two-faces/A100 INTATTI,
+  35 ref tenute. Verificato: 6pp corpo, 0 overfull, 0 undefined. `paper/SUBMISSION_HPEC.md` = checklist +
+  abstract testuale per CMT. **`gpufsm.tex` (8pp full) resta intatto** per estensione **ACM TACO** (journal,
+  tier prestigio, dopo). arXiv resta in attesa di **endorsement cs.DC** (codice DAD34B; endorser candidato
+  Luca Morandini — orthogonale al path conferenza). Vedi memory [[gpufsm-publication-goal]].
+- **[Iter -1] 2ª GPU FATTA — A100 80GB (RunPod, ~$0.25) riproduce il 2×2 CROSS-ARCH.**
   `scripts/second_gpu_rich.sh` su A100 (stack Triton 3.7 CORRETTO, tutti e 3 i backend oracle-match):
   **NFA 2×2 regret = Triton 3.2× (flat 32/48/64, 3 seed), Warp 0.80–0.83×** → rescala dal 4070 (6–8×/0.9×)
   ma la STRUTTURA è identica (Triton tile/SPMD paga, Warp thread-SIMT ≤ CUDA) → il regret segue la COLONNA
