@@ -170,6 +170,21 @@ engines (ngAP, HybridSA, BitGen, AsyncAP, AutomataBLAS) are the baselines our wo
 must approach; our contribution is the framing + cost model + the multi-DSL expressibility
 study, not the kernels alone.
 
+## 7b. Threats to validity
+
+- **Construct:** most throughput points use random NFAs; mitigated by validating on three
+  real ANMLZoo automata (2.8k–42.7k states, up to 4.4M transitions) — GPU == reference
+  bit-for-bit.
+- **Internal:** every backend/technique is gated against the CPU oracle (latch-first-match)
+  on examples + fuzz/stress; timings use median + bootstrap CI, warmup, kernel/transfer split.
+- **Implementation-effort asymmetry** (key DSL-comparison risk): the Triton 15.7× gap might
+  reflect a weaker Triton kernel, not an inherent limit. Against this: (i) kernels are
+  structurally mirrored from one CSR spec; (ii) **Warp**, an equally high-level Python DSL
+  written with comparable effort, matches/beats hand CUDA — so "high-level ⇒ slow" is not the
+  cause; the tile/SPMD model is.
+- **External:** single GPU (RTX 4070); cost-model constants are per-backend fits that may
+  differ across architectures → cross-architecture generality is future work.
+
 ## 8. Limitations & future work
 
 - Single GPU architecture so far (RTX 4070); validate on a 2nd arch (generality) before

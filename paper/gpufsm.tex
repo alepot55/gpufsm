@@ -229,6 +229,22 @@ tuning---Triton cannot express the shared-CSR layout at any tuning. SOTA automat
 (ngAP, HybridSA, BitGen) are baselines our worklist engine approaches; our contribution is
 the framing + cost model + the multi-DSL expressibility study.
 
+\section{Threats to validity}
+\emph{Construct.} Most throughput points use randomly generated NFAs, which may not
+represent production automata; we mitigate this by also validating on three real ANMLZoo
+automata (2.8k--42.7k states, up to 4.4M transitions), where the GPU output matches the
+reference oracle bit-for-bit. \emph{Internal.} Every backend/technique is checked against a
+single CPU oracle (latch-first-match) on examples and randomized fuzz/stress NFAs; timings
+use median + bootstrap CI on a fixed batch with warmup, separating kernel from transfer.
+\emph{Implementation-effort asymmetry} (the key risk for a DSL comparison): the Triton
+$15.7\times$ gap could merely reflect a weaker Triton implementation rather than an inherent
+limit. Two facts argue against this: (i) the kernels are structurally mirrored from the same
+CSR spec, and (ii) \emph{Warp}---an equally high-level Python DSL written with comparable
+effort---matches or beats hand CUDA, so ``high-level $\Rightarrow$ slow'' is not the
+explanation; the tile/SPMD execution model is. \emph{External.} Results are from a single
+GPU (RTX 4070); the cost-model constants are per-backend fits that may differ across
+architectures, so cross-architecture generality is future work.
+
 \section{Limitations and future work}
 Single GPU architecture so far; a second architecture is needed for generality. The
 worklist is one thread/string and, at small batches, under-utilizes the GPU (Nsight: 17\%
