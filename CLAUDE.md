@@ -95,7 +95,14 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 ## 7. Stato corrente (handoff sessione 2)
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
-- **[Iter più recente] PROBE GLUON FALSIFICABILE + claim sharpening.** (a) `scripts/gluon_probe.py`:
+- **[Iter più recente] AUDIT COST-MODEL + typografia + artifact statement.** (a) Claim "<1% error at
+  large n" era sovrastimato: errore reale predicted-vs-measured = **<1% solo a n=256** (CUDA 0.3%, Triton
+  0.6%), ~2%(CUDA)/~13%(Triton) a n=128, 20–60% a n=32/64 (launch overhead). Warp fit esatto = 2pt/2par
+  (non è segnale di qualità). Prosa riconciliata in .tex/DRAFT/RESULTS_COSTMODEL/PROFILING. (b) 3 tabelle
+  (throughput/nsight/capability) wrappate in `\resizebox`+`\tabcolsep` → **0 overfull \hbox** (era 3), 5pp,
+  no undefined refs. (c) Sezione `\section*{Artifact availability}` (AE-friendly: regen a un comando, suite CPU
+  no-GPU, Zenodo DOI al release). Abstract riletto: tight e coerente coi numeri canonici, nessuna modifica.
+- **[Iter -1] PROBE GLUON FALSIFICABILE + claim sharpening.** (a) `scripts/gluon_probe.py`:
   artefatto runnabile (non snippet) che riproduce l'errore esatto `Value argument cannot be block type
   if pointer argument is not a block` su Triton 3.5.1 — exit 0 sul fallimento atteso, exit 1 se un Gluon
   futuro lo compila → claim falsificabile per costruzione. Citato da gpufsm.tex/DSL_EXPRESSIVENESS/REPRODUCIBILITY.
