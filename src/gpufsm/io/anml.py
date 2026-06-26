@@ -93,9 +93,34 @@ def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+# Elements the homogeneous-STE subset understands. Anything else (counters, boolean
+# gates: and/or/nor/inverter, report-on-high, ...) changes the automaton's semantics, so
+# we REFUSE rather than silently ignore it (which would yield a wrong automaton).
+_ALLOWED_TAGS = frozenset(
+    {
+        "anml",
+        "automata-network",
+        "description",
+        "state-transition-element",
+        "activate-on-match",
+        "report-on-match",
+    }
+)
+
+
 def load_anml(path: str | Path) -> NFA:
-    """Load a (supported-subset) ANML file into an edge-labelled :class:`NFA`."""
+    """Load a (supported-subset) ANML file into an edge-labelled :class:`NFA`.
+
+    Raises if the file uses ANML features outside the homogeneous-STE subset (counters,
+    boolean gates, ...), so a partially-understood file never produces a wrong automaton.
+    """
     root = ET.parse(path).getroot()  # noqa: S314 - local trusted automata files
+    unsupported = sorted({_local(e.tag) for e in root.iter()} - _ALLOWED_TAGS)
+    if unsupported:
+        raise ValueError(
+            f"{path}: unsupported ANML elements {unsupported} (only the homogeneous-STE "
+            f"subset is supported; counters/boolean gates change semantics)"
+        )
     stes = [e for e in root.iter() if _local(e.tag) == "state-transition-element"]
     if not stes:
         raise ValueError(f"no state-transition-element found in {path}")

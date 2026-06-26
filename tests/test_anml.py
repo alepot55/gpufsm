@@ -74,6 +74,20 @@ def test_start_of_data_does_not_match_midstream(tmp_path):
     assert simulate(nfa, b"xa") == (False, 0)  # 'a' not at position 0 -> no match
 
 
+def test_load_anml_rejects_unsupported_elements(tmp_path):
+    # A boolean gate (<or>) changes semantics; the loader must refuse, not ignore it.
+    gated = """<?xml version="1.0"?>
+<automata-network id="t">
+  <state-transition-element id="s0" symbol-set="[0x61]" start="all-input"/>
+  <or id="g0"><report-on-match reportcode="1"/></or>
+</automata-network>
+"""
+    p = tmp_path / "gated.anml"
+    p.write_text(gated)
+    with pytest.raises(ValueError, match="unsupported"):
+        load_anml(p)
+
+
 def test_load_anml_empty_raises(tmp_path):
     p = tmp_path / "empty.anml"
     p.write_text('<?xml version="1.0"?><automata-network id="t"></automata-network>')
