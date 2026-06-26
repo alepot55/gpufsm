@@ -22,13 +22,15 @@ OUT="paper/data/${ARCH}"
 mkdir -p "$OUT"
 
 echo "== [1/3] environment =="
-python -m venv .venv 2>/dev/null || true
-# shellcheck disable=SC1091
-source .venv/bin/activate 2>/dev/null || true
-pip install -q -e ".[dev,triton]" --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON
+# Install into the EXISTING environment (RunPod PyTorch images already ship torch+triton+CUDA
+# devel/nvcc). Do NOT create a venv -- that would reinstall torch and risk a CUDA mismatch.
+# Core install + CUDA build; Warp (thread-SIMT backend) added separately; base-env triton reused.
+pip install -q -e . --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON
+pip install -q warp-lang || echo "  (warp-lang install failed; Warp lines will be skipped)"
 python -c "import torch; print('GPU:', torch.cuda.get_device_name(0)); \
-print('L2 MB:', torch.cuda.get_device_properties(0).L2_cache_size/1e6)" || true
-python -m gpufsm.cli env 2>/dev/null || gpufsm env 2>/dev/null || true
+print('L2 MB:', torch.cuda.get_device_properties(0).L2_cache_size/1e6); \
+import triton; print('triton', triton.__version__)" || true
+python -m gpufsm.cli env 2>/dev/null || true
 
 echo "== [2/3] run experiments (re-runs; minutes) =="
 # Each script writes a *_rtx4070.csv by default; we copy it out then restore the original.
