@@ -260,10 +260,11 @@ throughput, and \texttt{multistream\_shared} shows identical SM\%, DRAM\% and oc
 the L2 hit rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot help
 until the algorithm is work-efficient.
 
-\textbf{The work-efficient kernel unlocks the regime.} The \texttt{worklist} kernel is
+\textbf{The work-efficient kernel removes the compute wall.} The \texttt{worklist} kernel is
 $\approx\!330\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$: $332\times$
-at 32 states, $\approx\!10^4\times$ at 500) and reaches 15--170~Gbps, moving the workload toward
-memory-bound where the memory techniques become load-bearing.
+at 32 states, $\approx\!10^4\times$ at 500) and reaches 15--170~Gbps. The work-efficient kernel
+is then \emph{latency}-bound rather than memory-bound (\S\ref{sec:limits}), so even here the
+memory-layout levers stay inert---part of the one-axis finding below.
 
 \textbf{Abstraction regret is the execution paradigm, not abstraction height.} On the same
 full-scan kernel the directly-measured throughput ratio vs CUDA is Triton $6$--$8\times$ and
