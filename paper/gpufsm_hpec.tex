@@ -147,27 +147,15 @@ exercises these kernel DSLs. We close that gap and frame the resulting differenc
 expressibility cost.
 
 \section{Abstraction regret and the cost model}\label{sec:cost}
-We model per-symbol time as a roofline-style sum:
-\begin{equation}
-t_{\text{sym}} = \frac{\text{traffic}_{\text{bytes/sym}}}{\text{bandwidth}}
-              + n^2 \cdot c_2 ,
-\end{equation}
-where $n$ is the state count. The compute term is \emph{quadratic} because the faithful
-kernel performs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure ($n$ convergence
-passes $\times\,n$ states) per symbol. The two constants are fitted per backend from
-measured throughput; the ratio of $c_2$ between two DSLs, at constant algorithm, corroborates
-the abstraction regret. A holdout test (fit on $n\!\le\!128$, predict $n{=}256$) shows the
-model is \emph{predictive for the thread-model backend} (CUDA 2.7\% error, leave-one-out $c_2$
-stable to $1.03\times$) but \emph{not for the tile/SPMD backend} (Triton 45\% error, $c_2$
-swings $2.5\times$): Triton's large fixed launch overhead at small $n$ is misattributed to the
-$n^2$ term (\texttt{scripts/validate\_costmodel.py}). We therefore take the \emph{directly
-measured} throughput ratio as the primary regret metric (Triton $6$--$8\times$, robust) and the
-fitted-$c_2$ ratio ($10.1\times$) as corroborating, not load-bearing (Fig.~\ref{fig:cm}).
-
-\begin{figure}[t]\centering
-\includegraphics[width=0.86\columnwidth]{fig_costmodel_fit.pdf}
-\caption{Cost-model predicted vs measured throughput (per-backend $n^2$ fit); points near
-$y{=}x$ indicate the two-parameter model captures the regime.}\label{fig:cm}\end{figure}
+We model per-symbol time as a roofline-style sum $t_{\text{sym}} =
+\text{traffic}/\text{bandwidth} + n^2 c_2$, where the compute term is \emph{quadratic} because
+the faithful kernel runs an $O(n)$ transition scan and an $O(n^2)$ epsilon-closure per symbol,
+and $c_2$ is fitted per backend; its DSL-to-DSL ratio, at fixed algorithm, corroborates the
+regret. A holdout test (fit $n\!\le\!128$, predict $n{=}256$) shows the model is predictive for
+the thread-model backend (CUDA 2.7\% error) but \emph{not} for tile/SPMD Triton (45\% error:
+its large fixed launch overhead at small $n$ is misattributed to the $n^2$ term). We therefore
+take the directly-measured throughput ratio as the primary regret metric (Triton $6$--$8\times$,
+robust) and the fitted $c_2$ ratio ($10.1\times$) as corroborating only.
 
 \section{Implementation}\label{sec:impl}
 A single registry maps a backend/technique to an executor. The NFA is stored once in CSR
@@ -261,42 +249,22 @@ states & CUDA worklist & CUDA full-scan & Triton full-scan & Triton worklist \\
 \end{tabular}}
 \end{table}
 
-\begin{table}[t]
-\centering
-\caption{Nsight Compute counters (single launch). Full-scan: SM throughput $\gg$ DRAM
-$\Rightarrow$ compute-bound; shared-CSR is identical but for L2 hit rate.}
-\label{tab:nsight}
-\small
-\setlength{\tabcolsep}{4pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrrrr}
-\toprule
-kernel & SM\% & DRAM\% & L2 hit\% & occ\% \\
-\midrule
-\texttt{multistream} (full-scan) & 19.44 & 0.01 & 79.2 & 16.7 \\
-\texttt{multistream\_shared}     & 19.60 & 0.01 & 93.0 & 16.7 \\
-\texttt{worklist} (16384 str)    & 5.43  & 6.30 & 95.6 & 23.4 \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-Table~\ref{tab:throughput} reports throughput; Table~\ref{tab:nsight} the Nsight counters.
+Table~\ref{tab:throughput} reports throughput.
 
 \textbf{The faithful kernel is compute-bound; memory layout is irrelevant there.}
 \texttt{multistream}, \texttt{multistream\_shared} (modeled CSR traffic $=0$), and
-\texttt{multistream\_async} tie to within the bootstrap CI at every size
-(Fig.~\ref{fig:mem}), and throughput scales as $1/n^2$ (Fig.~\ref{fig:thr}). Nsight Compute
-counters confirm this at the hardware level: the full-scan kernel sustains $\approx$19\% of
-peak SM throughput but only \textbf{0.01\%} of peak DRAM throughput, and
-\texttt{multistream\_shared} shows identical SM\%, DRAM\% and occupancy---only the L2 hit
-rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot help until
-the algorithm is work-efficient.
+\texttt{multistream\_async} tie to within the bootstrap CI at every size, and throughput
+scales as $1/n^2$. Nsight Compute counters confirm this at the hardware level: the full-scan
+kernel sustains $\approx$19\% of peak SM throughput but only \textbf{0.01\%} of peak DRAM
+throughput, and \texttt{multistream\_shared} shows identical SM\%, DRAM\% and occupancy---only
+the L2 hit rate rises (79$\rightarrow$93\%), without moving runtime. The memory axes cannot help
+until the algorithm is work-efficient.
 
 \textbf{The work-efficient kernel removes the compute wall.} The \texttt{worklist} kernel is
 $\approx\!330\times$--$10^4\times$ faster than full-scan (the speedup grows with $n$: $332\times$
-at 32 states, $\approx\!10^4\times$ at 500; Fig.~\ref{fig:wl}) and reaches 15--170~Gbps. The
-work-efficient kernel is then \emph{latency}-bound rather than memory-bound (\S\ref{sec:limits}),
-so even here the memory-layout levers stay inert---part of the one-axis finding below.
+at 32 states, $\approx\!10^4\times$ at 500) and reaches 15--170~Gbps. The work-efficient kernel
+is then \emph{latency}-bound rather than memory-bound (\S\ref{sec:limits}), so even here the
+memory-layout levers stay inert---part of the one-axis finding below.
 
 \textbf{Abstraction regret is the execution paradigm, not abstraction height.} On the same
 full-scan kernel the directly-measured throughput ratio vs CUDA is Triton $6$--$8\times$ and
@@ -418,21 +386,6 @@ DFA regret (memory)        & $1\times$ & $1.4$--$2.3\times$ & $5$--$13\times$ & 
 \end{table}
 
 \begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig_throughput_vs_states.pdf}
-\caption{Throughput vs NFA size (log scale). Worklist dominates; full-scan techniques
-collapse as $1/n^2$.}\label{fig:thr}\end{figure}
-
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig_worklist_speedup.pdf}
-\caption{Work-efficient worklist speedup over $O(n^2)$ full-scan (CUDA), growing with
-state count.}\label{fig:wl}\end{figure}
-
-\begin{figure}[t]\centering
-\includegraphics[width=\columnwidth]{fig_memory_ablation.pdf}
-\caption{\texttt{multistream} vs \texttt{\_shared} vs \texttt{\_async}: within noise at
-every size---compute-bound regime, memory layout irrelevant.}\label{fig:mem}\end{figure}
-
-\begin{figure}[t]\centering
 \includegraphics[width=\columnwidth]{fig_abstraction_regret.pdf}
 \caption{Throughput relative to CUDA: Triton (tile) $\ll$ Warp (thread) $\approx$ CUDA.
 Regret is the execution paradigm, not abstraction height.}\label{fig:regret}\end{figure}
@@ -491,38 +444,13 @@ ngAP~\cite{ngap}, HybridSA~\cite{hybridsa}, BitGen~\cite{bitgen}, ANG~\cite{ang}
 AutomataBLAS~\cite{automatablas} (AP-as-SpMV, our DFA-face comparator)---and AP
 accelerators~\cite{hopps}, plus portable-automata languages~\cite{rapid} and the Parabix
 bitstream lineage~\cite{parabix}, are all single-stack (CUDA/accelerator) and framed as
-\emph{faster engines}, never as what a programming abstraction forecloses. Table~\ref{tab:sota}
-positions us: each reports a speedup over \emph{its own} baseline/hardware (not comparable in
-absolute Gbps) and is a new \emph{algorithm} on CUDA, whereas our axis is orthogonal. We
-therefore \emph{position}, not benchmark, against them; matching ngAP/ANG-class absolute
-throughput is explicit future work (\S\ref{sec:limits}). To our knowledge no prior work studies
-DSL expressibility across multiple GPU programming models on irregular automata.
-
-\begin{table}[t]
-\centering
-\caption{Positioning vs SOTA GPU automata engines. ``Reported'' is each paper's own speedup
-over its own baseline/hardware---\emph{not} comparable in absolute Gbps. All are CUDA-only new
-algorithms; our axis (DSL expressibility, fixed algorithm) is orthogonal.}
-\label{tab:sota}
-\small
-\setlength{\tabcolsep}{4pt}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{lll}
-\toprule
-System (venue) & Mechanism & Reported (own basis) \\
-\midrule
-iNFAnt (CCR'10)        & symbol-indexed CSR, bit-vector   & first GPU NFA \\
-AsyncAP (SIGMETRICS'23) & input-symbol async parallelism  & $2.4$--$58\times$ \\
-ngAP (ASPLOS'24)        & non-blocking + memoization      & $7.9\times$ avg \\
-HybridSA (OOPSLA'24)    & bit-parallel + CPU/GPU split    & bit-parallel \\
-BitGen (MICRO'25)       & Parabix bitstream fusion        & $19.5\times$ vs GPU \\
-AutomataBLAS (TACO'25)  & AP-as-SpMV, dedup + caching     & memory-efficient \\
-ANG (ICCD'25)           & multi-level fine-grained par.   & $11.7\times$ avg \\
-\midrule
-\textbf{This work} & \textbf{DSL-regret metric, 4 DSLs} & \textbf{orthogonal} \\
-\bottomrule
-\end{tabular}}
-\end{table}
+\emph{faster engines}, never as what a programming abstraction forecloses. Each reports a
+speedup over \emph{its own} baseline/hardware (ngAP $7.9\times$, ANG $11.7\times$, BitGen
+$19.5\times$---not comparable in absolute Gbps) and is a new \emph{algorithm} on CUDA, whereas
+our axis is orthogonal. We therefore \emph{position}, not benchmark, against them; matching
+ngAP/ANG-class absolute throughput is explicit future work (\S\ref{sec:limits}). To our
+knowledge no prior work studies DSL expressibility across multiple GPU programming models on
+irregular automata.
 
 \section{Threats to validity}
 \emph{Construct.} The NFA cross-DSL regret is necessarily measured at $\le$64 states (the
@@ -532,7 +460,7 @@ far past L2---and is equally large ($5$--$13\times$), so the regret is not a sma
 Second, most NFA points use random automata, which we back with six real ANMLZoo families
 (2.8k--48k states, up to 6.3M transitions) where the GPU output matches the oracle bit-for-bit
 and the block-parallel kernel gives $1.4$--$27\times$ over the single-thread baseline
-(CSV in \texttt{paper/data/}).
+(\texttt{paper/data/}).
 \emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
 Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
 algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
@@ -576,30 +504,18 @@ falls to its DRAM plateau past $\approx$6--8\,MB on the 4070 but stays high thro
 the A100---the knee moves by $\approx$6$\times$, tracking the $6.7\times$ larger L2
 (\texttt{paper/data/dfa\_knee\_a100.csv}). This closes the chief external-validity gap: the
 contribution is reproduced, not merely re-predicted, on a second architecture.
-\emph{Kernel.} The single-thread worklist under-utilizes the GPU on large automata (one
-string's many state-words processed serially; Nsight: 17\% occupancy). Our
-\texttt{worklist\_warp} kernel (one warp/string, 32 lanes partitioning the words) addresses
-this. The speedup is \emph{batch- and density-dependent}: at a GPU-saturating batch (4096
-strings) it is $3$--$9\times$ faster on real ANMLZoo automata and $\sim$12$\times$ on dense
-synthetic NFAs; at small batch, where the single-thread kernel cannot fill the GPU, the gap is
-far larger (up to $\sim$180$\times$). The warp kernel reaches its throughput plateau at a much
-smaller batch than the single-thread kernel (CSVs in \texttt{paper/data/}), so it is the right
-choice for few-stream / low-latency use.
-We further tested \emph{shared-memory} working-set privatization (\texttt{worklist\_shared}):
-it only ties \texttt{worklist\_warp} ($0.99$--$1.10\times$, $\le$1536 states) ---
-i.e.\ once the kernel is work-efficient the working-set \emph{layout} is no longer the
-bottleneck (mirroring the compute-bound \texttt{multistream\_shared} result). Nsight confirms
-the cause: \texttt{worklist\_warp} fixes the single-thread kernel's occupancy ($17\!\rightarrow\!57\%$)
-but is \emph{latency-bound}, not memory-bound---DRAM $\le$2.25\% and L2 hit $\ge$97.6\% even for
-brill's 17\,MB CSR (far above the 6\,MB L2), since all strings share the CSR and only a hot row
-subset is touched (\texttt{paper/data/nsight\_rtx4070.csv}). We also tested the natural
-work-reduction fix---a \emph{compacted active-ID worklist} ($O(\text{active})$ instead of the
-$O(\text{words})$ bitmap scan)---but it barely beats the bitmap kernel ($0.8$--$1.5\times$,
-\texttt{docs/KERNEL\_EXPERIMENTS.md}): skipping an empty word is already cheap and the bitmap's
-coalesced access offsets compaction's scattered loads and dedup overhead, so word-scanning was
-never the bottleneck. The remaining gap to SOTA absolute throughput (ngAP-class) is therefore
-\emph{algorithmic redundancy across strings/symbols}---memoization, non-blocking multi-symbol
-processing---not memory residency or worklist representation. That is the next step.
+\emph{Kernel.} The single-thread worklist under-utilizes the GPU on large automata (Nsight:
+17\% occupancy); a block-parallel \texttt{worklist\_warp} (one warp/string, 32 lanes
+partitioning the state-words, scattering via \texttt{atomicOr}) restores it---$3$--$9\times$
+faster on real ANMLZoo automata at a saturating batch, occupancy $17\!\rightarrow\!57\%$. Two
+negative results bound the remaining gap: shared-memory working-set privatization only ties the
+global kernel ($0.99$--$1.10\times$) and a compacted active-ID worklist barely beats the bitmap
+scan ($0.8$--$1.5\times$)---once work-efficient the kernel is \emph{latency-bound}, not memory-
+or layout-bound (DRAM $\le$2.25\%, L2 hit $\ge$97.6\% even for brill's 17\,MB CSR, since all
+strings share the CSR and only a hot row subset is touched). The remaining gap to ngAP-class
+throughput is therefore \emph{algorithmic} (cross-string/symbol redundancy: memoization,
+non-blocking multi-symbol processing), not memory residency or worklist representation---the
+next step.
 
 \section{Conclusion}
 On irregular automata the GPU-DSL promise breaks along a measurable axis we call

@@ -1,5 +1,15 @@
 # Literature Review: GPU Automata Processing & DSL Abstraction Regret
 
+> **Freshness check 2026-06-27** (web sweep, arXiv/ACM/web). **Verdict unchanged: novelty uncontested.**
+> No new irregular-automata-DSL work. Tile-DSL candidates surfaced (TileLang arXiv:2504.17577;
+> ML-Triton arXiv:2503.14985) are **dense-tensor** Triton-family systems — already scoped out as
+> tensor-only traps and conceptually covered by the Hexcute/Graphene/TVM cluster in related work;
+> they do not touch the irregular-workload / control-flow-expressibility gap. ANG/AutomataBLAS/
+> HybridSA already cited. No citation added (would be padding). Headline-number audit this date:
+> all numbers (worklist 15–170 Gbps + 332×/10⁴×, causal 1320/81/16×, DFA 364/163/2.2×/29–32,
+> cost-model 2.7%/45%/10.1×, A100 3.2×/0.80×) verified against `paper/data/*.csv`; fixed 2 drifts
+> (cap-table NFA 6–10×→6–8×, threats 6–15×→5–13×) in both `gpufsm.tex` and `gpufsm_hpec.tex`.
+
 > **Freshness check 2026-06-26** (web sweep, arXiv/ACM). **Verdict: novelty uncontested.**
 > No 2026 successor to ngAP (ASPLOS'24) / HybridSA (OOPSLA'24) / BitGen (MICRO'25) found, and
 > **no DSL-expressibility study on irregular automata** — the clean gap holds. The 2026 activity

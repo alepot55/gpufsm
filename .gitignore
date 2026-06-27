@@ -125,3 +125,11 @@ experiments/notebooks/archive/
 # Private files
 private/
 data/anmlzoo/
+paper/arxiv_gpufsm.tar.gz
+paper/arxiv_gpufsm/
+paper/gpufsm_hpec.aux
+paper/gpufsm_hpec.log
+paper/gpufsm_hpec.out
+paper/*.aux
+paper/*.out
+paper/*.log
