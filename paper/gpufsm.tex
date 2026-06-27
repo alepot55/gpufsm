@@ -340,7 +340,7 @@ $16\times$ cliff from the access/control pattern alone (\texttt{paper/data/scala
 The regret appears \emph{iff} the inexpressible primitive is required. The cross-paradigm half
 confirms it: thread-SIMT runs the \emph{same} scalar data-dependent recurrence with \emph{no}
 per-program ceiling---CUDA's DFA walk (a per-byte scalar gather + state recurrence) reaches
-163--364~Gbps---whereas tile-SPMD Triton is pinned at a $\approx$29--81~Gbps scalar ceiling
+163--364~Gbps---whereas tile-SPMD Triton is pinned at its $\approx$29~Gbps DFA scalar ceiling
 regardless of table size or batch. Same work, same hardware: the ceiling is a property of the
 paradigm.
 
