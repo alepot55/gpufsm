@@ -56,7 +56,8 @@ architecture-independent tile-SPMD scalar ceiling both reproduce.
 
 \section{Introduction}
 GPU domain-specific languages such as OpenAI Triton~\cite{triton} have moved from research to
-the mainstream---Triton is the default code-generation backend for PyTorch---because they
+the mainstream---Triton is the GPU code-generation backend of PyTorch's compiler
+(TorchInductor)---because they
 deliver near-CUDA performance on dense tensor algebra at a fraction of the engineering effort.
 That productivity comes from \emph{hiding} the very things a GPU programmer otherwise manages by
 hand: thread indexing, memory placement, and control flow. On \emph{regular} workloads---dense
