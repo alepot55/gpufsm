@@ -523,11 +523,14 @@ ANG (ICCD'25)           & multi-level fine-grained par.   & $11.7\times$ avg \\
 \end{table}
 
 \section{Threats to validity}
-\emph{Construct.} Most throughput points use randomly generated NFAs, which may not
-represent production automata; we mitigate this by also validating on six real ANMLZoo
-automata spanning six families (2.8k--48k states, up to 6.3M transitions), where the GPU output matches the
-reference oracle bit-for-bit, and the block-parallel kernel gives $1.4$--$27\times$ over the
-single-thread baseline on them (CSV in \texttt{paper/data/}).
+\emph{Construct.} The NFA cross-DSL regret is necessarily measured at $\le$64 states (the
+single-word Triton/Warp kernels' cap); two facts guard against a small-$n$ artifact. First, the
+\emph{DFA} cross-DSL regret is measured at \emph{full scale}---tables up to 100k states / 100\,MB,
+far past L2---and is equally large ($5$--$13\times$), so the regret is not a small-$n$ effect.
+Second, most NFA points use random automata, which we back with six real ANMLZoo families
+(2.8k--48k states, up to 6.3M transitions) where the GPU output matches the oracle bit-for-bit
+and the block-parallel kernel gives $1.4$--$27\times$ over the single-thread baseline
+(CSV in \texttt{paper/data/}).
 \emph{Absolute throughput on these large, sparse-active automata is low (sub-Gbps to a few
 Gbps)}---the faithful per-string mapping is far from ngAP/ANG-class scheduling; this is the
 algorithmic gap we explicitly do not close, and it does not affect the cross-DSL \emph{regret}
