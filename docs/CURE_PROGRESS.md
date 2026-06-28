@@ -39,12 +39,40 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
   front-end packing trick. CUDA wins by getting BOTH full lane use AND occupancy AND per-lane
   control flow — tile/SPMD cannot. This sharpens the missing primitive to **genuine per-lane
   independent control flow + thread-style scheduling**, strengthening the paradigm thesis.
-- [ ] **M3 — constructive MLIR primitive** (gated on M2; M2 shows the Triton-expressible cure caps
-  at ~2–4×, so the full cure likely needs the IR-level thread/scalar-program lowering).
+- [x] **M2e — worklist head-to-head: the anchor DECOMPOSES into artifact + recoverable +
+  irreducible; mechanism = per-instruction tile tax.** `experiments/cure/m2e_worklist_packed.py` →
+  `paper2/data/m2e_worklist_packed_rtx4070.csv`, `m2e_nsight_rtx4070.csv`. 4-way (CU=cuda/worklist,
+  WT=gpufsm triton/worklist nw=4, WS=scalar worklist nw=1, WP=lane-packed worklist), oracle-gated:
+    - **num_warps artifact:** gpufsm triton/worklist defaults to num_warps=4 → 4 warps/program all
+      run ONE string redundantly. WS (nw=1) is **~3.3–3.6× faster** than WT (28→100 Gbps). So a big
+      chunk of the M0 anchor was a LAUNCH-CONFIG artifact. ⚠️ AFFECTS PAPER 1 (its worklist Triton
+      ~24 Gbps / 6.5× regret IS the nw=4 number) — must disclose + re-baseline.
+    - **lane-packing the worklist WORKS (~3×, WP/WS):** my M2a prediction (union → degenerate to
+      dense) was WRONG — for these automata the active-set union stays small, so packing helps.
+    - **irreducible residual WIDENS with batch:** WP/CU = 0.50× @4096 → 0.42× @16384 → 0.18× @65536
+      (regret_nw1 CU/WS = 3.45×/7.0×/13.3×). CUDA scales with batch; tile/SPMD does not.
+    - **MECHANISM (Nsight, WP vs CU @16384, ns=32):** SAME occupancy (22.4%), SAME total warps (512),
+      warp-inst within 1.33× — yet WP is **3.67× slower**. So the residual is NOT redundancy/occupancy
+      (M1's hypothesis, removed by packing) but **per-instruction tile tax**: cross-lane `tl.reduce`
+      for the active-set union, masking/predication, weaker scalar ILP. THIS is the IR-level missing
+      primitive — a zero-cost scalar/lane program. Honest arc: M1(redundancy)→M2(packing removes it)
+      →M2e(residual is per-instruction tile execution overhead, confirmed at matched occupancy).
+- [ ] **M3 / ⛔ USER DECISION POINT (reached).** The picture is complete: anchor = num_warps artifact
+  (~3.3×) × lane-packing-recoverable (~3×) × irreducible per-instruction tile tax (~2–6×, widens
+  with batch). The paper has a strong honest quantified story NOW without building Triton. M3 (MLIR
+  scalar-program lowering, weeks, Triton-from-source) is upside, NOT required. SURFACED to user;
+  do not start M3 without go-ahead.
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
 ## Next concrete actions (do these in order)
-1. **M2e — lane-pack the WORK-EFFICIENT worklist (the crux that reconnects to the M0 anchor).**
+0. **⛔ AWAITING USER DECISION (see end of milestone list).** Two threads to resolve with user:
+   (a) M3 go/no-go (build the MLIR scalar-program primitive vs ship the decomposition story);
+   (b) ⚠️ PAPER-1 INTEGRITY: the HPEC worklist Triton number (~24 Gbps / ~6.5×) is the num_warps=4
+   default; num_warps=1 is ~3.3× faster. Must disclose / re-baseline / sweep num_warps before the
+   July-7 submission, framed as the "did you tune Triton?" de-risk. Likely a quick paper-1 fix.
+1. **(if user OKs, cheap) M2d-followup — fix gpufsm backend default to num_warps=1** for the Triton
+   worklist + re-run paper-1 worklist numbers; disclose the sweep. Strengthens both papers.
+2. **M2e — lane-pack the WORK-EFFICIENT worklist (the crux that reconnects to the M0 anchor).**
    M2c settled the dense case: lane-packing IS occupancy-gated and recovers most of the warp-
    redundancy at scale (see finding). But the M0 anchor (10×) was the WORKLIST (ffs O(active)), not
    the dense scan. The genuine missing primitive should bite HERE: lane-packing the worklist forces
@@ -67,6 +95,15 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
    IR-level per-lane control flow" (strong CGO/CC story WITHOUT the build). Surface to user then.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M2e — anchor decomposed; residual is per-instruction tile tax; num_warps artifact
+  found.** 4-way worklist head-to-head across batch. (1) gpufsm triton/worklist default num_warps=4
+  wastes ~3.3× vs nw=1 → re-baselines the anchor and ⚠️ implicates paper-1's worklist number.
+  (2) Lane-packing the worklist helps ~3× (M2a prediction of degeneration was wrong; union stays
+  small). (3) Residual regret (best-Triton WP vs CUDA) WIDENS with batch: 0.50×→0.42×→0.18×. (4)
+  Nsight: at matched occupancy + matched warps + ~equal warp-inst, WP is still 3.67× slower → the
+  residual is per-instruction tile-execution overhead (cross-lane reduce, masking, ILP), the true
+  IR-level missing primitive. Reached the user decision point. Skeptical-scientist wins this round:
+  corrected my own M2a prediction AND found a launch-config inflation in the anchor.
 - 2026-06-28: **M2c — lane-packing's benefit is OCCUPANCY-GATED; at scale it recovers most of the
   redundancy.** Batch-scaling the pure-packing ratio C/B: **3.2× @4096 → 9.8× @16384 → 19.4×
   @65536** (toward the ideal 32×), realistic C/A → 10.8× @65536. Absolute lane-packed dense Triton

@@ -1,0 +1,3 @@
+kernel,states,n_strings,duration_us,warp_inst,occupancy_pct,grid,block,gpu
+wl_packed_triton,32,16384,130.27,6712815,22.45,512,32,RTX4070
+cuda_worklist,32,16384,35.46,5065274,22.41,64,256,RTX4070
