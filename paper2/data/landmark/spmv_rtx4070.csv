@@ -1,0 +1,3 @@
+matrix,nnz_cv,tile_gflop_s,thread_gflop_s,regret,gpu
+uniform,0.0,29.9,58.2,1.945,RTX4070
+powerlaw,3.789,18.3,39.7,2.173,RTX4070

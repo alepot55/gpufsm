@@ -1,0 +1,3 @@
+kernel,matrix,issue_active_pct,thread_inst_per_inst,occupancy_pct,dram_pct,gpu
+spmv_tile,uniform,2.55,32.0,49.65,29.35,RTX4070
+spmv_thread,uniform,1.57,32.0,94.51,50.53,RTX4070

@@ -193,6 +193,20 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LANDMARK P1 witness #3 (SpMV) — PREDICTION FALSIFIED (honest, important correction).**
+  `experiments/cure/landmark_spmv.py`: SpMV CSR, uniform-nnz (no control divergence) vs power-law-nnz
+  (divergent), same kernels, oracle-validated. PREDICTED uniform regret ~1× (clean negative control).
+  RESULT: uniform regret = **1.94× — NOT ~1×**. Nsight: tile thread_inst/inst=32 = thread (no
+  divergence, confirmed) BUT tile occupancy 50% / DRAM 29% vs thread 94% / 50% → the 1.9× is a
+  BASELINE TILE-LOWERING OVERHEAD (occupancy/register-pressure/masking on every gather), present even
+  with ZERO divergence, and NOT fixable by num_warps (BLOCK sweep 32/128/256 leaves uniform ~1.9×).
+  Power-law adds a divergence increment that GROWS with BLOCK (2.2×@32 → 3.9×@128 → 5.8×@256, since
+  the tile locksteps over more rows). ⇒ REVISED model: tile-vs-thread regret = **tile-lowering baseline
+  (occupancy/masking, even divergence-free) + divergence increment (masked-waste/latency)**. The clean
+  ~1× negative control is DENSE-REGULAR work (Triton≈cuBLAS, known), NOT irregular SpMV. This weakens
+  the simple "regret follows control-divergence not memory" headline → needs the multi-component framing.
+  `spmv_rtx4070.csv` + `spmv_nsight_rtx4070.csv`. (Skeptical-scientist: falsified my own negative-control
+  prediction — better found now than by a reviewer.)
 - 2026-06-28: **LANDMARK P1 witness #2 (rejection sampling) — regret 4.0×, isolates masked-lane waste.**
   `experiments/cure/landmark_rejection.py`: PURE control-flow divergence (data-dependent trip count via
   a deterministic hash, ~no memory), tile vs thread vs CPU oracle (exact 64-bit-wrap). Oracle-validated;
