@@ -90,9 +90,24 @@ engineering is making the compiler do automatically what M10 does by hand.
   is a clean no-op when disabled. Verified by `experiments/cure/p2_pass_verify.py` (ON→present,
   OFF→absent, kernel still correct). Sources version-controlled in
   `experiments/cure/triton_thread_region_pass/` (ThreadRegion.cpp + registration.patch + README).
-- REMAINING: the **lowering** half (the tile→thread transform of the matched region) + a cost-model
-  selector, then measure automatic gap-closing on the NFA worklist end-to-end. The detection pass is the
-  scaffolding that proves the build-edit-rebuild loop works and the matcher is correct on real IR.
+- RESOLVED (2026-06-29): **the in-IR lowering hits a STRUCTURAL WALL, demonstrated (not assumed).** The
+  matched region's carried tensors are ALREADY `sizePerThread=1` (one element per lane) — so the
+  lock-step is NOT a layout choice (re-encoding is a no-op; Gluon-style per-thread layout would not
+  help). The lock-step is the **loop construct**: `scf.while`'s `scf.condition` is defined to take a
+  single `i1`. The natural rewrite (give it a per-lane `tensor<NxI1>` so lanes terminate independently)
+  is **rejected by the MLIR verifier** — captured verbatim by `triton-opt` on
+  `triton_thread_region_pass/perlane_while_attempt.mlir`: *"use of value '%active' expects different
+  type than prior uses: 'i1' vs 'tensor<8xi1, #blocked>'"*. Falsifiable probe:
+  `experiments/cure/p2_lowering_wall.py` (exit 0 = wall confirmed). ⇒ per-lane loop termination is
+  inexpressible in TritonGPU's structured tile control flow; the cure must lower **below** TritonGPU to
+  the thread model (ITS) — which is exactly what M10 does (nvcc, 4.2×). This is a STRONGER result than a
+  hand-tuned in-IR rewrite: it proves the abstraction regret is structural in the loop construct, not a
+  layout or tuning artifact. **This is the central NVIDIA/landmark point**: the missing IR primitive is a
+  per-lane (sub-tile) loop/exit op; today's tile IR cannot express it.
+- REMAINING (the realized automatic cure): a cost-model **selector** that, on detecting the lock-step
+  signature (the pass already does this), routes the region to the M10 thread-model lowering — automatic
+  detect-and-lower at the source/codegen boundary, since the in-TritonGPU lowering is structurally
+  blocked. This is the honest P2 endpoint per LANDMARK_PLAN.
 - RISK: step 2 (per-lane independent `scf.while` via ITS inside one Triton program) may require lowering
   below TritonGPU to the LLVM/NVVM stage; if in-TritonGPU lowering proves infeasible, the honest
   fallback (per LANDMARK_PLAN P2) is the **automatic selector over the M10 lowering** + this IR design —

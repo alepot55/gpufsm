@@ -193,6 +193,23 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P2 LOWERING WALL — the regret is STRUCTURAL in the loop construct (demonstrated, the
+  landmark point).** Two facts from the real matched IR (paper2/data/landmark/p2_lockstep.ttgir): (1) the
+  carried tile tensors are ALREADY `#blocked sizePerThread=[1], threadsPerWarp=[32]` — one element per
+  lane — so the lock-step is **NOT a layout choice** (re-encoding is a no-op; Gluon-style per-thread
+  layout would not help → directly supports "paradigm/control-flow, not layout/abstraction-height").
+  (2) The lock-step is the **loop construct**: `scf.while`'s `scf.condition` is defined to take a single
+  `i1`; the natural tile→thread rewrite (per-lane `tensor<NxI1>` condition so lanes terminate
+  independently) is **rejected by the MLIR verifier**, captured verbatim via the built `triton-opt`:
+  *"use of value '%active' expects different type than prior uses: 'i1' vs 'tensor<8xi1, #blocked>'"*.
+  ⇒ per-lane loop termination is **inexpressible** in TritonGPU's structured tile control flow; the cure
+  must lower BELOW TritonGPU to the thread model (ITS) — exactly what M10 does (nvcc, 4.2×). This is a
+  STRONGER result than a hand-tuned in-IR rewrite: it proves the abstraction regret is structural in the
+  loop construct, and **names the missing IR primitive — a per-lane (sub-tile) loop/exit op**. Falsifiable
+  artifacts (Gluon-probe methodology): `experiments/cure/p2_lowering_wall.py` (exit 0 = wall confirmed) +
+  `triton_thread_region_pass/perlane_while_attempt.mlir`. docs/P2_PASS_DESIGN.md lowering status RESOLVED.
+  REMAINING P2 endpoint: the automatic SELECTOR over the M10 lowering (detect → route to thread lowering
+  at the source/codegen boundary, since in-IR lowering is structurally blocked).
 - 2026-06-29: **P2 DETECTION PASS REAL + VERIFIED IN libtriton — the make-or-break compiler loop works.**
   Wrote a TritonGPU MLIR pass `tritongpu-thread-region` (`ThreadRegion.cpp`, a `mlir::ModuleOp` pass):
   walks the module, matches the lock-step signature (an `scf.WhileOp` whose iter-inits include a
