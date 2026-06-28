@@ -180,6 +180,12 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LaTeX paper built — `paper2/gpufsm2.tex` compiles clean.** 4pp IEEE conference
+  (IEEEtran.cls copied locally; unsrt bibstyle since IEEEtran.bst absent), 5 figures, 21-entry
+  refs.bib from the verified citations, 0 undefined refs, 0 overfull hboxes; every number matches the
+  CSVs. The paper now physically exists and compiles. 4pp is short for CGO (11pp) → room to expand the
+  prose from DRAFT.md. PDF committed. NEXT: expand toward page budget + optional M8 (Little's-law
+  quantitative crossover); M3-full still deferred.
 - 2026-06-28: **M7 + DRAFT polish — submission-grade.** Added §6.1 capability-generalization table
   (decode / ragged batching / BFS / tokenization all need the same per-lane primitive) pre-empting
   "automata-only narrow"; figure refs (a–e) wired through; contributions tightened to the measured
