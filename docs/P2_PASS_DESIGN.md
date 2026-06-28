@@ -83,8 +83,16 @@ engineering is making the compiler do automatically what M10 does by hand.
 ## Honest status / risk
 - DONE: working hackable build; functional 3.8.0; the IR detector (falsifiable, asserted on live IR);
   the insertion point; the transformation spec; the pre-measured payoff bound (M10).
-- REMAINING: the C++ `ThreadRegion.cpp` + python binding + cost-model selector, then rebuild (`ninja`
-  incremental relink) and measure automatic gap-closing on the NFA worklist end-to-end.
+- DONE (2026-06-29): **the DETECTION pass is real and VERIFIED inside `libtriton`.** `ThreadRegion.cpp`
+  (a TritonGPU `mlir::ModuleOp` pass) compiles into `libtriton.so`, runs in `make_ttgir` (env-gated by
+  `GPUFSM_THREAD_REGION`), matches the lock-step signature (`scf.while` over `#blocked` tile iter-args
+  whose `scf.condition` derives from a `tt.reduce`), tags each with `ttg.thread_region_candidate`, and
+  is a clean no-op when disabled. Verified by `experiments/cure/p2_pass_verify.py` (ON→present,
+  OFF→absent, kernel still correct). Sources version-controlled in
+  `experiments/cure/triton_thread_region_pass/` (ThreadRegion.cpp + registration.patch + README).
+- REMAINING: the **lowering** half (the tile→thread transform of the matched region) + a cost-model
+  selector, then measure automatic gap-closing on the NFA worklist end-to-end. The detection pass is the
+  scaffolding that proves the build-edit-rebuild loop works and the matcher is correct on real IR.
 - RISK: step 2 (per-lane independent `scf.while` via ITS inside one Triton program) may require lowering
   below TritonGPU to the LLVM/NVVM stage; if in-TritonGPU lowering proves infeasible, the honest
   fallback (per LANDMARK_PLAN P2) is the **automatic selector over the M10 lowering** + this IR design —

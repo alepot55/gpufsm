@@ -193,6 +193,23 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P2 DETECTION PASS REAL + VERIFIED IN libtriton — the make-or-break compiler loop works.**
+  Wrote a TritonGPU MLIR pass `tritongpu-thread-region` (`ThreadRegion.cpp`, a `mlir::ModuleOp` pass):
+  walks the module, matches the lock-step signature (an `scf.WhileOp` whose iter-inits include a
+  RankedTensorType with a `BlockedEncodingAttr`, AND whose before-region `scf.ConditionOp` condition
+  traces — via a bounded backward def-walk — to a `triton::ReduceOp`), tags each match with a
+  `ttg.thread_region_candidate` UnitAttr + emits a remark. Registered end-to-end: pass def in `Passes.td`,
+  source in `CMakeLists.txt`, python binding `add_thread_region` in `python/src/passes.cc`, env-gated
+  insertion (`GPUFSM_THREAD_REGION`) early in `make_ttgir` (third_party/nvidia/backend/compiler.py).
+  **Incremental rebuild worked** (`cmake --build` → Passes.td change regenerated Passes.h.inc, recompiled
+  TritonGPUTransforms + ThreadRegion.cpp, relinked the 824 MB libtriton; ~5 min). **VERIFIED** by
+  `experiments/cure/p2_pass_verify.py`: pass ON → `ttg.thread_region_candidate` present in TTGIR; pass OFF
+  → absent (gated no-op); kernel still bit-exact (`sum_{j<trip} j`). ⚠️ Verify needed two DISTINCT JIT
+  fns for ON/OFF because Triton's compile cache aliased the second compile to the first. This proves the
+  full build-edit-rebuild-verify loop AND that the matcher is correct on real IR — the scaffolding the
+  tile→thread *lowering* (next step) plugs into. Sources preserved in-repo (the Triton tree is separate):
+  `experiments/cure/triton_thread_region_pass/` (ThreadRegion.cpp + registration.patch + README, base
+  Triton commit c05aa65). docs/P2_PASS_DESIGN.md status updated.
 - 2026-06-29: **P2 PLATFORM LIVE — Triton-from-source 3.8.0 builds, runs, and the pass target is pinned
   on real IR.** The make-or-break prerequisite is DONE: `libtriton.so` (823 MB) built; Triton 3.8.0
   imports via `PYTHONPATH=$HOME/m3full_build/triton-src/python`, JITs a kernel, runs correctly on GPU,

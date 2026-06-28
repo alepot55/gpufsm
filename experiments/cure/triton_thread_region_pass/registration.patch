@@ -1,0 +1,66 @@
+diff --git a/include/triton/Dialect/TritonGPU/Transforms/Passes.td b/include/triton/Dialect/TritonGPU/Transforms/Passes.td
+index 021c81d..b1b92ba 100644
+--- a/include/triton/Dialect/TritonGPU/Transforms/Passes.td
++++ b/include/triton/Dialect/TritonGPU/Transforms/Passes.td
+@@ -340,4 +340,22 @@ def TritonGPUCoalesceAsyncCopy: Pass<"tritongpu-coalesce-async-copy", "mlir::Mod
+                            "mlir::triton::TritonDialect"];
+ }
+ 
++def TritonGPUThreadRegion: Pass<"tritongpu-thread-region", "mlir::ModuleOp"> {
++  let summary = "Detect lock-step irregular regions that forfeit intra-warp latency hiding";
++
++  let description = [{
++    Research pass (gpufsm "abstraction regret"). Detects the lock-step signature of a
++    data-dependent irregular region: an `scf.while` whose iter-args are `#blocked`-encoded
++    tile tensors and whose loop condition is gated by a `tt.reduce` to a scalar (the whole
++    tile loops to the busiest lane; idle lanes are masked). Marks each match with a
++    `ttg.thread_region_candidate` unit attribute and emits a remark. This is the detection
++    half of the proposed tile->thread (`thread_region`) lowering that recovers per-lane
++    intra-warp latency hiding; see docs/P2_PASS_DESIGN.md.
++  }];
++
++  let dependentDialects = ["mlir::triton::gpu::TritonGPUDialect",
++                           "mlir::triton::TritonDialect",
++                           "mlir::scf::SCFDialect"];
++}
++
+ #endif
+diff --git a/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt b/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
+index 83f01cf..2019454 100644
+--- a/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
++++ b/lib/Dialect/TritonGPU/Transforms/CMakeLists.txt
+@@ -27,6 +27,7 @@ add_triton_library(TritonGPUTransforms
+   RemoveLayoutConversions.cpp
+   ReorderInstructions.cpp
+   CoalesceAsyncCopy.cpp
++  ThreadRegion.cpp
+   Utility.cpp
+   CoalesceUtils.cpp
+   LayoutPropagationUtility.cpp
+diff --git a/python/src/passes.cc b/python/src/passes.cc
+index 608d93e..4c36c47 100644
+--- a/python/src/passes.cc
++++ b/python/src/passes.cc
+@@ -61,6 +61,7 @@ void init_triton_passes_ttgpuir(py::module_ &m) {
+   using namespace mlir::triton::gpu;
+   using namespace mlir::triton::instrument;
+   ADD_PASS_WRAPPER_0("add_coalesce", createTritonGPUCoalesce);
++  ADD_PASS_WRAPPER_0("add_thread_region", createTritonGPUThreadRegion);
+   ADD_PASS_WRAPPER_0("add_optimize_thread_locality",
+                      createTritonGPUOptimizeThreadLocality);
+   ADD_PASS_OPTION_WRAPPER_1("add_hoist_tmem_alloc",
+diff --git a/third_party/nvidia/backend/compiler.py b/third_party/nvidia/backend/compiler.py
+index 8b713cb..42ee642 100644
+--- a/third_party/nvidia/backend/compiler.py
++++ b/third_party/nvidia/backend/compiler.py
+@@ -267,6 +267,10 @@ class CUDABackend(BaseBackend):
+         dump_enabled = pm.enable_debug()
+         emuTF32 = (capability // 10 >= 8)
+         passes.ttir.add_convert_to_ttgpuir(pm, f"cuda:{capability}", opt.num_warps, 32, opt.num_ctas)
++        # gpufsm research pass: detect lock-step irregular regions (thread_region candidates).
++        # Gated by env var so it is a no-op for normal compilation. See docs/P2_PASS_DESIGN.md.
++        if os.environ.get("GPUFSM_THREAD_REGION"):
++            passes.ttgpuir.add_thread_region(pm)
+         # optimize TTGIR
+         passes.ttgpuir.add_coalesce(pm)
+         passes.ttgpuir.add_f32_dot_tc(pm, emuTF32)
