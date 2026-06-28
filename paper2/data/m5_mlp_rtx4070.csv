@@ -1,0 +1,3 @@
+kernel,states,n_strings,duration_us,issue_active_pct,stall_long_scoreboard,stall_short_scoreboard,stall_wait,stall_not_selected,l2_read_sectors,lsu_read_wavefronts,gpu
+wp2_perlane_triton,32,16384,121.22,9.89,195900.55,9466.18,19428.37,917.89,568145,4165375,RTX4070
+cuda_worklist,32,16384,34.91,41.00,12811.20,232.65,21887.49,4886.79,21629,49758,RTX4070

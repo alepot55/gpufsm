@@ -113,12 +113,13 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
   instruction-roofline placement, Gluon `scalar_program` prototype, capability-generalization table.
 
 ## Next concrete actions (FULL-AMBITION program, user green-lit; sequence to de-risk)
-0. **M5 — DIRECT MLP MEASUREMENT (decisive, top priority, local-GPU).** Nsight on WP2 vs cuda/worklist
-   at matched occupancy: stall-reason `smsp__warp_issue_stalled_long_scoreboard*` (expect Triton
-   dominated by waiting-on-dependent-load) + outstanding L2/DRAM sectors per active warp (expect CUDA
-   sustains MORE in-flight requests = higher MLP). Converts "latency-bound" (inferred) into a measured
-   MLP differential; then Little's law (Volkov/Hong-Kim) predicts the throughput ratio from the
-   in-flight-request ratio. THE most reviewer-proof addition. → paper2/data/m5_mlp_*.csv.
+0. [x] **M5 DONE — latency-bound mechanism MEASURED (one hypothesis corrected).** `m5_mlp_rtx4070.csv`:
+   at matched occupancy WP2 `long_scoreboard` stall = **15.3× CUDA**, issue activity **9.9% vs 41%** →
+   latency-bound on dependent loads, confirmed; issue-ratio 4.1× ≈ time-ratio 3.5× (Little's-law check).
+   CORRECTED my own sub-hypothesis: WP2 issues **26–84× MORE** memory requests (masked-lane gathers +
+   int64), not fewer — the tile model pays twice (excess masked traffic + no dependent-load hiding).
+   DRAFT + RELATED_WORK reworded to the measured framing (stall composition + issue rate, NOT request
+   count). The central claim is now measurement, not inference — the decisive reviewer-proof addition.
 0b. **M5b — instruction-roofline placement** of WP2 vs CUDA (GIPS vs inst-intensity): show Triton below
    the issue ceiling at low GIPS despite fewer instructions. Answers "did you just write a worse kernel?"
 0c. **M6 — Gluon `scalar_program` prototype** (Linear Layout per-lane state + predicated ffs/while):
@@ -173,6 +174,11 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M5 — the latency-bound mechanism is now MEASURED (stall-reason analysis).** At matched
+  occupancy, WP2's long_scoreboard (dependent-load wait) stall is 15.3× CUDA's and it issues at 9.9%
+  vs 41%; issue-ratio 4.1× ≈ throughput-ratio 3.5× (Little's-law-consistent). Self-correction #N: WP2
+  issues 26–84× MORE memory requests (masked gathers), not fewer — tile pays twice. Converts the
+  central §4.4 claim from inference to measurement (the reviewer-proof addition the lit sweep wanted).
 - 2026-06-28: **M4 — cure residual is regime-dependent; unifies NFA & DFA via latency.** DFA
   lane-packing beats scalar Triton ~12× and, in the DRAM-table regime (>L2), MATCHES CUDA
   (PK/CU=1.05×) vs 0.55–0.62× in cache. The intra-warp latency-hiding advantage (CUDA) only matters

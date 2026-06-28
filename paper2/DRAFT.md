@@ -96,13 +96,19 @@ issue *independent in-flight loads* (memory-level parallelism), so a dependent l
 overlapped by the others' outstanding requests; a Triton warp is 32 lock-step lanes of one
 instruction stream, so the dependent next-state load serializes them and latency can be hidden only
 *across* warps (occupancy-bound). The pure-Triton ceiling is ~0.49× CUDA; only per-lane independent
-control flow (the thread model) restores intra-warp MLP. We ground this in the latency-hiding /
+control flow (the thread model) restores latency hiding. We ground this in the latency-hiding /
 MLP-vs-occupancy literature (Volkov 2016; Hong & Kim ISCA'09) and the instruction-roofline model
 (Ding & Williams), and distinguish it from the *hardware* fix of intra-warp stalls (Subwarp
 Interleaving, HPCA'22): the same SM is fast under CUDA and slow under Triton at equal occupancy and
-fewer instructions, so the loss is *abstraction-imposed*, not hardware. (A direct MLP measurement —
-outstanding sectors/warp and the `long_scoreboard` stall reason — is the decisive confirmation, in
-progress; see `RELATED_WORK.md §8`.)
+fewer instructions, so the loss is *abstraction-imposed*, not hardware. **Direct measurement (M5,
+`m5_mlp_rtx4070.csv`) confirms it:** at matched occupancy, WP2 spends **15.3× more cycles in the
+`long_scoreboard` stall** (waiting on a dependent memory load) than CUDA and issues at only **9.9%
+vs 41%** of peak — it cannot overlap dependent loads, while CUDA's per-lane independent streams keep
+the scheduler fed (healthy `not_selected`). The issue-rate ratio (4.1×) tracks the throughput ratio
+(3.5×), a Little's-law-consistent check. *Honest refinement (corrects an intermediate hypothesis):*
+WP2 does NOT issue fewer memory requests — it issues **26–84× MORE** (masked inactive-lane gathers
++ int64), yet still stalls. So the tile model pays twice: excess masked memory traffic *and* an
+inability to hide the dependent-load latency.
 
 ## 5. Regime-dependence (DFA) — the unification
 

@@ -114,10 +114,14 @@ future work": Jia et al. "Dissecting Volta" (arXiv:1804.06826), Volkov, Pennycoo
 - Stake priority on **arXiv now**; PMBS@SC as the methodology-friendly workshop for the term.
 
 ## 8. Prioritized expansions to make it bulletproof (→ feeds CURE_PROGRESS next actions)
-1. **Measure MLP directly (decisive).** Nsight stall-reason `smsp__warp_issue_stalled_long_scoreboard`
-   (expect dominant for Triton = waiting on dependent load) + outstanding L2/DRAM sectors per active
-   warp (expect CUDA > Triton at equal occupancy). Converts "latency-bound" to a measured MLP
-   differential; Little's law (Volkov/Hong-Kim) then *predicts* the throughput ratio. Local-GPU doable.
+1. [x] **MLP measured (M5, DONE) — confirmed, with one hypothesis corrected.** `m5_mlp_rtx4070.csv`:
+   at matched occupancy WP2's `long_scoreboard` stall is **15.3× CUDA's** and it issues at **9.9% vs
+   41%** — latency-bound on dependent loads, confirmed; issue-ratio 4.1× ≈ throughput-ratio 3.5×
+   (Little's-law-consistent). CORRECTION: the predicted "Triton sustains FEWER in-flight requests"
+   was WRONG — WP2 issues **26–84× MORE** memory requests (masked-lane gathers + int64) and still
+   stalls. So the tile cost is *excess masked memory traffic + inability to hide dependent-load
+   latency*, not a request-count deficit. (Phrase the mechanism via stall composition + issue rate,
+   not request count.)
 2. **Instruction Roofline placement** of both kernels (GIPS vs instruction intensity) — visual proof
    it's neither instruction- nor bandwidth-bound. Answers "did you just write a worse kernel?"
 3. **Gluon prototype of `scalar_program`** (Linear Layout per-lane state + predicated ffs/while) — show
