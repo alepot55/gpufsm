@@ -60,10 +60,13 @@ control-flow/latency-bound; DFA simulation (one dependent table gather \texttt{t
 symbol) is memory-bound. CUDA and NVIDIA Warp~\cite{warp2022} are thread-SIMT (one thread per string);
 Triton~\cite{triton2019} is tile/SPMD (a program operates on tiles). Correctness gates speed: every
 kernel/config is validated bit-for-bit against a CPU oracle before any throughput is reported. We
-report medians over warmup${+}9$ reps at a GPU-saturating batch~\cite{hoefler2015}, sweep batch (the
-lane-packing benefit is occupancy-gated), and confirm the mechanism behind each claim with Nsight
-Compute. Negative and partial results, and two corrected intermediate hypotheses, are reported.
-Hardware: RTX 4070 (sm\_89), Triton 3.5.1, CUDA 13.3.
+report medians over warmup${+}9$ reps at a GPU-saturating batch~\cite{hoefler2015} (timings on GPUs
+are non-Gaussian, so we avoid mean$\pm$std and best-of-$N$), and sweep batch because the lane-packing
+benefit is occupancy-gated. Every mechanism claim is backed by Nsight Compute, not just wall-clock:
+the issue-stall composition (the \texttt{long\_scoreboard} reason isolates dependent-load waits),
+achieved occupancy, issue activity, warp- and thread-instruction counts, and DRAM/L2 traffic. We report negative and partial results and correct
+two of our own intermediate hypotheses (Secs.~\ref{sec:decomp}, \ref{sec:resid}). Hardware: RTX 4070
+(sm\_89, 46 SMs), Triton 3.5.1, torch 2.9.1+cu128, CUDA 13.3 / driver 580.
 
 \section{The Decomposition (NFA worklist)}\label{sec:decomp}
 
@@ -111,6 +114,32 @@ from branch/memory divergence~\cite{fung2007}: the lanes can be perfectly coales
 a dependent load. We distinguish it from the \emph{hardware} fix of intra-warp stalls~\cite{subwarp2022}:
 the same SM is fast under CUDA and slow under Triton at equal occupancy and fewer instructions, so the
 loss is abstraction-imposed.
+
+\begin{table}[t]\centering\small
+\caption{The worklist regret decomposes multiplicatively (batch 16384, $\le 64$ states,
+oracle-gated). Each stage removes one component; $28 \rightarrow 735$ is $3.7\times 3.7 \times
+1.9 = 26\times$.}
+\label{tab:decomp}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Kernel & Gbps & Component removed \\
+\midrule
+Triton worklist (\texttt{nw=4}) & 28 & --- \\
+\quad $+$ \texttt{nw=1} & 104 & launch artifact ($3.7\times$) \\
+\quad $+$ lane-packing & 383 & warp redundancy ($3.7\times$) \\
+CUDA worklist (thread-SIMT) & 735 & irreducible latency ($1.9\times$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:decomp} summarizes the multiplicative decomposition: removing the launch artifact
+and the warp redundancy each recovers $3.7\times$, leaving the irreducible $1.9\times$ latency
+residual. By Little's law (concurrency $=$ throughput $\times$ latency), the latency-bound kernel's
+throughput is set by the in-flight-request concurrency it can sustain; the per-lane Triton kernel's
+$9.9\%$ issue activity and $15.3\times$ dependent-load stall mean it sustains far less effective
+concurrency than CUDA at the same occupancy, and the issue-rate ratio ($4.1\times$) tracking the
+throughput ratio ($3.5\times$) is exactly the relation Little's law predicts when latency is fixed.
 
 \section{Regime-Dependence (DFA): the unification}\label{sec:regime}
 The DFA (memory-bound) decomposes the same way but the residual \emph{closes in the DRAM regime}
@@ -168,20 +197,31 @@ report one config---rebutting the autotuning counter-thesis~\cite{ringlein2025}:
 same-MLIR control plus the disclosed sweep separate \emph{tuning} (closes A and part of B) from
 \emph{expressibility} (the residual C), with a falsifiable probe.
 
-\section{Related Work}
-\textbf{GPU automata} are an \emph{algorithmic} axis, all single-implementation CUDA:
-ngAP~\cite{ngap2024}, HybridSA~\cite{hybridsa2024}, BitGen~\cite{bitgen2025},
-AsyncAP~\cite{asyncap2023}, AutomataBLAS~\cite{automatablas2025}, the Hopps
-ASIC~\cite{hopps2025}. None compares GPU programming models or holds the algorithm fixed across DSLs;
-the only IR-for-automata work~\cite{mlirregex2025} lowers regex to one fixed accelerator, not a GPU
-paradigm/expressibility study. \textbf{Tile GPU DSLs}~\cite{triton2019,linearlayouts2025,descend2024}
-target regular tensor work; the closest, Gluon's per-thread layout, is data placement, not control flow.
-\textbf{Mechanism}: latency hiding and MLP-vs-occupancy~\cite{volkov2016latency,hongkim2009}, the
-instruction roofline~\cite{instroofline2022}, distinguished from a hardware
-fix~\cite{subwarp2022,fung2007}. \textbf{Methodology/lineage}:
-\cite{hoefler2015,roofline2009,pennycook2016}. The gap we fill: no constructive, instruction-level
-account of \emph{why} a tile DSL pays on irregular control flow, naming the missing primitive, with a
-regime-dependent residual.
+\textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA: ngAP's
+non-blocking multi-symbol processing~\cite{ngap2024}, HybridSA's bit-parallel
+shift-and~\cite{hybridsa2024}, BitGen's Parabix bitstreams~\cite{bitgen2025}, AsyncAP's
+input-symbol asynchrony~\cite{asyncap2023}, AutomataBLAS's AP-as-SpMV~\cite{automatablas2025}, and
+the Hopps sparsity ASIC~\cite{hopps2025}. Each \emph{varies the algorithm} on one CUDA
+implementation; none compares GPU programming models or holds the algorithm fixed across DSLs. The
+sole IR-for-automata work~\cite{mlirregex2025} lowers regex to one fixed domain-specific accelerator
+---a hardware target, not a GPU-paradigm/expressibility study, and with no tile-vs-thread cost. Our
+axis is orthogonal: fixed algorithm, varied programming model.
+\textbf{Tile GPU DSLs}: Triton~\cite{triton2019} and the 2024--26 wave exposing more thread/warp
+control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025}, give per-thread \emph{data
+placement} but not per-lane \emph{control flow} (our probe shows the data-dependent loop cannot
+lower); Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
+drop-to-scalar escape. Warp~\cite{warp2022} is the thread-SIMT existence proof.
+\textbf{Mechanism}: we ground the residual in latency-hiding / MLP-vs-occupancy
+analysis~\cite{volkov2016latency,hongkim2009} and place both kernels on the instruction
+roofline~\cite{instroofline2022}; we distinguish it from divergence~\cite{fung2007} and from the
+\emph{hardware} intra-warp-stall fix of Subwarp Interleaving~\cite{subwarp2022} (we attribute the
+same stall to the DSL, at equal occupancy and fewer instructions).
+\textbf{Methodology and lineage}: rigorous benchmarking~\cite{hoefler2015}, roofline~\cite{roofline2009},
+and the performance-portability metric~\cite{pennycook2016} (per-hardware; we measure per-\emph{capability}
+regret); we rebut the autotuning counter-thesis~\cite{ringlein2025} via the Triton/Gluon same-MLIR
+control and the disclosed \texttt{num\_warps} sweep. The gap we fill: no constructive,
+instruction-level account of \emph{why} a tile DSL pays on irregular control flow, naming the missing
+primitive, with a regime-dependent residual.
 
 \section{Conclusion}
 The abstraction regret on irregular automata is not a monolith: a launch artifact, a recoverable
