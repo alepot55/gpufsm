@@ -193,6 +193,17 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **PAPER INTEGRATION — regret law folded into gpufsm2.tex (positioning → measured).**
+  Replaced the speculative `\subsection{Generality (positioning)}` + hand-wavy capability table with
+  `\subsection{Generality: the regret law}` (`sec:law`) backed by the 6 measured witnesses + a new
+  figure (`fig:law`, fig_regret_law.png) + a new contribution bullet. The section now STATES the law
+  ("regret tracks the tile's issue deficit relative to thread, created by scalar control, not memory
+  irregularity"), anchors it on the pointer-chase negative control (1.00×, tile≡thread on every Nsight
+  axis), and honestly notes the multi-component refinement (tile-lowering baseline + divergence
+  increment, including the falsified SpMV-uniform ≈1× guess). Compiles clean: **6pp, 0 undefined refs,
+  0 overfull hbox, 0 bibtex warnings**. This is the single biggest paper upgrade — the generality claim
+  is now empirical, not positioning. (Paper grew 5→6pp; fine for the ASPLOS/PLDI target; if a 6pp-cap
+  venue, the DFA or roofline figure is the trim candidate.)
 - 2026-06-28: **LANDMARK P1 witness #4 (graph pointer-chase) — THE TRUE NEGATIVE CONTROL, regret 1.00×.**
   `experiments/cure/landmark_bfs.py`: 1M independent random walkers × 64 FIXED steps on a power-law CSR
   graph (deg cv=3.79). Each step is a dependent gather (pointer-chase): the next address depends on the

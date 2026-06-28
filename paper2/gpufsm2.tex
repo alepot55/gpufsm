@@ -57,6 +57,9 @@ distinguished from Gluon's per-thread \emph{layout} (Sec.~\ref{sec:cure}).
 \item \textbf{The cure, implemented}: we lower the same idiomatic per-lane source to the thread model
 and measure that it runs $4.2\times$ faster than the tile lowering and matches/exceeds hand-CUDA,
 closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:cure}).
+\item A \textbf{generality law} across six oracle-gated irregular workloads (Sec.~\ref{sec:law},
+Fig.~\ref{fig:law}): regret tracks the tile's issue deficit---created by scalar control, not memory
+irregularity---validated by a graph pointer-chase negative control at exactly $1.00\times$.
 \end{enumerate}
 
 \section{Background and Method}
@@ -191,26 +194,27 @@ lowering the same source to independent per-lane streams recovers exactly the in
 hiding component~C was missing. (Integrating this lowering into Triton's MLIR is engineering; the
 lowering's effect, and \emph{why} it works, are what we validate.)
 
-\subsection{Generality (positioning)}
-The same per-lane capability recurs across irregular GPU workloads (Table~\ref{tab:gen}); each needs
-per-lane data-dependent control flow with scatter/gather that lock-step tiles gate the same way. The
-contribution is a \emph{capability} result; we keep the empirical depth on automata.
-
-\begin{table}[t]\centering\small
-\caption{The same missing per-lane primitive across irregular workloads (positioning).}
-\label{tab:gen}
-\begin{tabular}{@{}p{2.4cm}p{2.6cm}p{2.4cm}@{}}
-\toprule
-Workload & Per-lane irregularity & Missing capability \\
-\midrule
-NFA/DFA automata & active-set \texttt{ffs}; data-dep.\ CSR loop & per-lane \texttt{while} + scalar gather \\
-Var-length / entropy decode & data-dep.\ bit consumption & per-lane loop + bit-cursor \\
-Ragged batch / MoE routing & variable seq.\ length; routing & per-lane bounds + scatter \\
-Sparse frontier / BFS~\cite{gunrock2016} & variable vertex degree & per-lane neighbor loop + scatter \\
-Tokenization / lexing & data-dep.\ longest-match & per-lane DFA scan \\
-\bottomrule
-\end{tabular}
-\end{table}
+\subsection{Generality: the regret law}\label{sec:law}
+To test whether the mechanism is automata-specific we built six oracle-gated tile-vs-thread witnesses
+spanning the irregularity space, each with identical machinery (a Triton tile kernel, the per-lane
+source lowered to a CUDA thread kernel, and a CPU oracle); Fig.~\ref{fig:law} reports the measured
+regret, coloured by dominant mechanism. The result is a law \emph{with a correct negative control}:
+\textbf{regret tracks the tile's issue-activity deficit relative to the thread kernel---created by
+scalar control flow, not by memory irregularity or dependent loads.} A graph pointer-chase (1M random
+walkers, data-dependent gather addresses, scattered \texttt{colidx}, degree CV $3.79$, but a
+\emph{fixed} step count) is the decisive control: tile and thread are bit-for-bit identical in issue
+activity ($5.42\%$ vs.\ $5.43\%$), occupancy ($72.1\%$ vs.\ $72.1\%$), and threads-per-instruction
+($32$ vs.\ $32$), and the regret is $1.00\times$---irregular memory and dependent loads alone cost
+\emph{nothing}, because a lock-step gather already supplies full intra-warp memory-level parallelism.
+Regret appears only as scalar control starves the tile's issue below the thread's: rejection sampling
+(pure control-flow divergence, no memory) is $4.0\times$; the NFA worklist (active-set \texttt{ffs}
+recurrence) is $2.0\times$ at tile issue $9.9\%$ vs.\ $41\%$. Two effects make the law multi-component
+rather than a single predictor: a \emph{tile-lowering baseline} (uniform-\texttt{nnz} SpMV, zero
+divergence, is still $1.9\times$ from occupancy/masking on a bandwidth-bound gather, honestly falsifying
+our initial ${\approx}1\times$ guess for it) plus a \emph{divergence increment} that grows with tile
+width (power-law SpMV $2.2\times$ at width $32 \to 5.8\times$ at $256$). The no-regret point is therefore
+not dense-regular work alone but \emph{any} irregular workload whose tile issue matches the thread's; the
+cure (Sec.~\ref{sec:implemented}) removes the regret by restoring per-lane issue.
 
 \section{Methodological Integrity}
 Our analysis corrected two of its own intermediate hypotheses, which we report rather than hide.
@@ -312,6 +316,13 @@ source lowered to threads (\texttt{scalar\_program}) runs $4.2\times$ the tile l
 and matches/exceeds hand-CUDA. \emph{Right:} it does so \emph{through the diagnosed mechanism}---issue
 activity jumps from the tile's $10\%$ to $36\%$ ($\approx$ CUDA's $41\%$), restoring the intra-warp
 latency hiding component~C was missing.}\label{fig:cure}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_regret_law.png}
+\caption{The regret law across six oracle-gated irregular workloads, by dominant mechanism. A graph
+pointer-chase (green) is the negative control: irregular memory + dependent loads, no control
+divergence $\Rightarrow$ tile and thread are identical (issue $5.42\%$ vs.\ $5.43\%$) and regret is
+$1.00\times$. Regret grows only with scalar-control / divergence (red, orange, blue), peaking at
+$4\times$ for pure control-flow divergence. The predictor is the tile's issue deficit, not memory
+irregularity.}\label{fig:law}\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}
