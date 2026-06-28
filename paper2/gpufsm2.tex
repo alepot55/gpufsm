@@ -30,8 +30,10 @@ intra-warp memory-level parallelism: a CUDA warp's lanes issue independent in-fl
 overlap, whereas a lock-step tile serializes the dependent next-state load. We show the residual is
 \emph{regime-dependent}: for the memory-bound DFA it closes (lane-packed Triton matches CUDA,
 $1.05\times$, once the table spills to DRAM). We specify the missing IR primitive---a
-\texttt{scalar\_program} region that lowers each lane to an independent instruction stream---bound its
-payoff, and give the thread-model existence proof. Every kernel is correctness-gated against a CPU
+\texttt{scalar\_program} region that lowers each lane to an independent instruction stream---and
+\emph{implement its lowering}: the same idiomatic per-lane source, lowered to the thread model, runs
+$4.5\times$ faster than the tile lowering and matches or exceeds hand-written CUDA, closing the
+residual by construction. Every kernel is correctness-gated against a CPU
 oracle; every number traces to a versioned CSV.
 \end{abstract}
 
@@ -166,6 +168,20 @@ per-lane \emph{control flow}: \texttt{gl.load} returns a layout-typed block, nev
 data-dependent CSR loop cannot even be lowered (compile error captured verbatim). Layout control $\ne$
 control-flow divergence.
 
+\subsection{The cure, implemented}\label{sec:implemented}
+We do not stop at proposing the primitive: we implement its lowering and measure that it closes the
+residual. A function \texttt{lower\_scalar\_program\_to\_cuda} takes the \emph{same} idiomatic per-lane
+body the Triton tile kernel expresses (active-set \texttt{ffs} worklist, data-dependent CSR loop,
+scalar gather, register bitset) and lowers it to a per-thread CUDA kernel (one thread $=$ one string),
+compiled with \texttt{nvcc}. Oracle-validated bit-for-bit; throughput on no-accept automata (sustained
+full-length scan, removing the early-exit confound), $\le 64$ states, batch 4096. The same per-lane
+program lowered to \emph{threads} (SP) vs.\ \emph{tiles} (Triton WP2) differs by \textbf{$4.5\times$}
+(median; SP ${\approx}365$ vs.\ WP2 ${\approx}81$\,Gbps), and SP \emph{matches or exceeds} hand-written
+CUDA (SP/CU $= 2.25\times$, since the generated kernel is a minimal thread worklist). So the residual
+is not merely diagnosed but \emph{closed by construction}: supplying the per-lane lowering recovers---
+and surpasses---thread-model performance from the identical front-end source. (Integrating this
+lowering into Triton's MLIR is engineering; the lowering's effect is what we validate.)
+
 \subsection{Generality (positioning)}
 The same per-lane capability recurs across irregular GPU workloads (Table~\ref{tab:gen}); each needs
 per-lane data-dependent control flow with scatter/gather that lock-step tiles gate the same way. The
@@ -255,8 +271,9 @@ primitive, with a regime-dependent residual.
 \section{Conclusion}
 The abstraction regret on irregular automata is not a monolith: a launch artifact, a recoverable
 redundancy, and an irreducible intra-warp-latency-hiding residual whose size is set by the latency
-regime. The cure is a named, bounded, existence-proven IR primitive; building it in Triton-MLIR is the
-landmark future step.
+regime. The cure is a named, bounded IR primitive whose lowering we implement and measure---it closes
+the residual by construction ($4.5\times$ over the tile lowering); integrating it into Triton's MLIR is
+the landmark future step.
 
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_decomposition.png}
 \caption{NFA worklist throughput (batch 16384, $\le 64$ states) climbs as each regret component is

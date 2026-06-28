@@ -193,6 +193,19 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M3-full / M10 — THE CURE IS IMPLEMENTED AND MEASURED (Track B done; Track A build
+  abandoned honestly).** Track B: `experiments/cure/m10_scalar_program.py` lowers the SAME idiomatic
+  per-lane automaton body to a per-thread CUDA kernel (nvcc → .so → ctypes, bypassing torch's C++
+  headers which don't compile on the local gcc-12/13). Oracle-validated bit-for-bit on with-accept
+  NFAs; sustained throughput on no-accept NFAs (removes early-exit confound). **SP/WP2 = 4.52× median**
+  (same per-lane source, threads vs tiles) and **SP/CU = 2.25×** (matches/exceeds hand-CUDA — the
+  generated kernel is a minimal thread worklist). The residual is CLOSED BY CONSTRUCTION. Added paper
+  §6.2 "The cure, implemented" + abstract/conclusion; recompiles 5pp clean. `m10_scalar_program_rtx4070.csv`.
+  Track A (Triton-from-source build at ~/m3full_build): failed 3× at cmake-configure (after fixing
+  cmake>=4 and the pip-cmake shim) — main→v3.8.0, env-fragile, error truncated by pip; per plan,
+  documented and abandoned (the build fragility is not the contribution; the implemented lowering is).
+  Honest scope: SP beating hand-CUDA 2.25× reflects a tighter minimal kernel, not a claim that the
+  primitive is faster than all CUDA; the load-bearing number is SP/WP2 (threads vs tiles, same source).
 - 2026-06-28: **M9 — multi-word lane-packed worklist works + oracle-correct to 256 states; residual is
   register-regime-scoped.** `experiments/cure/m9_multiword.py` ([BLOCK,NWORDS] tile, per-word ffs +
   per-lane masked multi-word scatter) validated bit-for-bit vs reference at 96/128/192/256 states
