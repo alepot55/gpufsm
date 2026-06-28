@@ -19,19 +19,18 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from gpufsm.api import run
-from gpufsm.registry import Backend
-
 # reuse the validated kernel + helpers from M2e (import does not run its main())
 from experiments.cure.m2e_worklist_packed import (
+    SAMPLES,
     SLEN,
     WARMUP,
-    SAMPLES,
     _wl_scalar,
-    make_batch,
     random_nfa,
     to_device,
 )
+
+from gpufsm.api import run
+from gpufsm.registry import Backend
 
 BATCHES = [int(b) for b in os.environ.get("M2F_BATCHES", "4096,16384,65536").split(",")]
 NUM_WARPS = [1, 2, 4, 8]
@@ -134,7 +133,7 @@ def main() -> int:
 
 
 def make_batch_for(ns, batch):
-    # make_batch from m2e reads its module-level N_STRINGS; build directly here for an explicit batch
+    # build a batch of an explicit size (m2e.make_batch reads a module-level N_STRINGS)
     rng = np.random.default_rng(0)
     flat = rng.integers(ord("a"), ord("a") + 5, size=batch * SLEN, dtype=np.uint8)
     return flat.reshape(batch, SLEN)
