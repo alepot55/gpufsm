@@ -180,6 +180,11 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M7 + DRAFT polish — submission-grade.** Added §6.1 capability-generalization table
+  (decode / ragged batching / BFS / tokenization all need the same per-lane primitive) pre-empting
+  "automata-only narrow"; figure refs (a–e) wired through; contributions tightened to the measured
+  numbers; re-verified every headline number traces to a CSV (WP2/CU 0.51, DFA 0.55–1.05, anchor 10.1
+  all confirmed). DRAFT now complete & internally consistent.
 - 2026-06-28: **M5 — the latency-bound mechanism is now MEASURED (stall-reason analysis).** At matched
   occupancy, WP2's long_scoreboard (dependent-load wait) stall is 15.3× CUDA's and it issues at 9.9%
   vs 41%; issue-ratio 4.1× ≈ throughput-ratio 3.5× (Little's-law-consistent). Self-correction #N: WP2

@@ -4,7 +4,9 @@ Working draft (paper 2). Companion to the HPEC "Two Faces of Abstraction Regret"
 diagnosis). All numbers trace to `paper2/data/*.csv`, RTX 4070 (sm_89), Triton 3.5.1, torch
 2.9.1+cu128, CUDA 13.3/driver 580. Every kernel is validated bit-for-bit against the `reference.py`
 NFA oracle / `simulate_dfa` DFA oracle before any throughput is reported. Timings are medians over
-warmup+9 reps at GPU-saturating batch.
+warmup+9 reps at GPU-saturating batch. Figures regenerate from the CSVs (`paper2/figures.py`):
+(a) `fig_decomposition`, (b) `fig_occupancy_gating`, (c) `fig_mechanism`, (d) `fig_dfa_crossover`,
+(e) `fig_roofline`.
 
 ## Abstract (draft)
 
@@ -33,9 +35,11 @@ bound what it can buy, and give the thread-model existence proof.
 
 1. A **falsifiable decomposition** of the tile-SPMD automata regret into artifact + recoverable +
    irreducible, each measured and Nsight-attributed (§4).
-2. Identification of the irreducible residual as **intra-warp latency hiding** — not redundancy,
-   occupancy, instruction count, or bandwidth — via a per-lane Triton worklist that has fewer
-   warp-instructions than CUDA yet is 3.3× slower at 10% issue activity (§4.4).
+2. Identification of the irreducible residual as **abstraction-denied intra-warp latency hiding** —
+   not redundancy, occupancy, instruction count, or bandwidth — *measured*: a per-lane Triton worklist
+   has fewer warp-instructions than CUDA, the same occupancy, sits below both the issue and bandwidth
+   roofline ceilings, yet spends 15.3× more cycles in the dependent-load stall and issues at 9.9% vs
+   41% (§4.4, Figs. c/e).
 3. A demonstration that the residual is **regime-dependent** (control-flow/latency-bound NFA vs
    memory-bound DFA), unifying both with paper 1's two faces through a single latency mechanism (§5).
 4. A **launch-configuration finding** (default `num_warps=4` inflates the worklist regret ~3.4×) that
@@ -58,7 +62,7 @@ mechanism behind every throughput claim, not just the wall-clock. Negative/parti
 corrected over-claims are reported (the analysis below corrected two of our own intermediate
 hypotheses — see §4.3, §4.4).
 
-## 4. The decomposition (NFA worklist)
+## 4. The decomposition (NFA worklist) — Fig. (a)
 
 ### 4.1 The anchor
 Work-efficient register-resident worklist, ≤64 states, batch 4096, 12 configs (16/32/48/64 states ×
@@ -79,11 +83,11 @@ inst = 32.00` (Triton) vs 30.34 (CUDA), the same number with opposite meaning (C
 [`m1_nsight_rtx4070.csv`] *Lane-packing* (pack 32 strings into the 32 lanes, exploiting the shared
 CSR so inner-loop bounds stay scalar) removes this. On the dense scan, pure lane-packing (work held
 equal) recovers **3.2×@4096 → 9.8×@16384 → 19.4×@65536** toward the ideal 32×; it is **occupancy-
-gated** (small batch starves it). [`m2_batch_scaling_rtx4070.csv`] *Correction:* M1 framed the ~90×
+gated** (small batch starves it) — Fig. (b). [`m2_batch_scaling_rtx4070.csv`] *Correction:* M1 framed the ~90×
 warp-redundancy as the bottleneck; Nsight on the lane-packed kernel shows the redundancy is removed
 ~26× yet throughput moves only 3.8× — it was largely hidden by occupancy. [`m2_nsight_rtx4070.csv`]
 
-### 4.4 Component C — the irreducible residual = intra-warp latency hiding (~2×)
+### 4.4 Component C — the irreducible residual = intra-warp latency hiding (~2×) — Figs. (c), (e)
 A per-lane Triton worklist (each lane its own `ffs` + per-lane CSR gather, no cross-lane reduce, no
 active-set union — the cleanest pure-Triton "scalar-lane program") beats the union variant 1.27× but
 is still **0.51× of CUDA** (≈2× slower). [`m3_lite_rtx4070.csv`] Nsight is decisive: it has **fewer
@@ -115,7 +119,7 @@ so neither is instruction- nor bandwidth-bound; and WP2 issues **fewer** total w
 (4.66M vs 5.07M) yet runs 3.5× slower. The kernel is structurally stall/latency-bound, not a worse
 implementation.
 
-## 5. Regime-dependence (DFA) — the unification
+## 5. Regime-dependence (DFA) — the unification — Fig. (d)
 
 The DFA (memory-bound) decomposes the same way but the *residual closes in the DRAM regime*. Across
 table sizes (cache→L2→DRAM), oracle-gated: scalar Triton DFA is **flat ~29 Gbps** for all sizes
@@ -146,6 +150,24 @@ holds which datum), not per-lane *control flow*: a runnable probe (`scripts/gluo
 `gl.load` returns a layout-typed block, never a scalar, so the data-dependent CSR loop
 `for k in range(row_ptr[s], row_ptr[s+1])` cannot even be lowered (compile error, captured verbatim).
 Layout control ≠ control-flow divergence — the `scalar_program` region is the missing capability.
+
+### 6.1 Generality of the missing primitive (positioning, not new benchmarks)
+We keep the *empirical* depth on automata, but the same per-lane capability the tile model gates
+recurs across irregular GPU workloads — each needs per-lane *data-dependent control flow* (variable
+trip counts, per-lane gather/scatter) that lock-step tiles cannot express without union/masking and
+that loses intra-warp latency hiding for the same reason. This argues the contribution is a
+*capability* result, not an automata curiosity:
+
+| Workload | Per-lane irregularity | Missing per-lane capability | Known-irregular |
+|---|---|---|---|
+| NFA/DFA automata (this paper) | active-set `ffs`; data-dependent CSR loop; next-state gather | per-lane `while` + scalar gather + register bitset | ngAP, HybridSA |
+| Variable-length / entropy decode (Huffman/ANS, varint) | per-stream data-dependent bit consumption | per-lane data-dependent loop + bit-cursor | inherently serial-per-stream |
+| Ragged / jagged batched inference; MoE routing | per-row variable sequence length; per-token expert routing | per-lane variable loop bounds + scatter | ragged batching |
+| Sparse graph frontier / BFS | per-vertex variable degree; frontier expansion | per-lane neighbor loop + atomic scatter | Gunrock (PPoPP'16) |
+| Tokenization / lexing | data-dependent longest-match scan | per-lane DFA-style scan | streaming tokenization (ASPLOS'26) |
+
+All five share "per-lane data-dependent control flow + scatter/gather"; a `scalar_program` region
+would serve each. (We evaluate only automata; this table is positioning, deliberately scoped.)
 
 ## 7. Threats to validity
 - Single GPU (RTX 4070); the mechanism (intra-warp latency hiding, issue activity, the DRAM
