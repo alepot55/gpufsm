@@ -187,16 +187,42 @@ Tokenization / lexing & data-dep.\ longest-match & per-lane DFA scan \\
 \end{tabular}
 \end{table}
 
-\section{Threats to Validity}
-Single GPU (RTX 4070); the mechanism (intra-warp latency hiding, issue activity, DRAM convergence) is
-architecture-general but absolute factors need an A100/H100 re-run. The lane-packed prototypes are
-single-word ($\le 64$ states); real ANMLZoo automata (Levenshtein 2787, Brill 42661, Fermi 40786) run
-oracle-valid but sub-Gbps (algorithmic, orthogonal to the regret), and testing lane-packing on them
-needs a multi-word kernel. \texttt{num\_warps} is a tuning knob; we disclose the sweep rather than
-report one config---rebutting the autotuning counter-thesis~\cite{ringlein2025}: the Triton/Gluon
-same-MLIR control plus the disclosed sweep separate \emph{tuning} (closes A and part of B) from
-\emph{expressibility} (the residual C), with a falsifiable probe.
+\section{Methodological Integrity}
+Our analysis corrected two of its own intermediate hypotheses, which we report rather than hide.
+First, an early reading framed the ${\sim}90\times$ warp-instruction redundancy (Sec.~\ref{sec:decomp})
+as the bottleneck; profiling the lane-packed kernel showed the redundancy is removed ${\sim}26\times$
+yet throughput moves only $3.8\times$---it was largely hidden by occupancy, so warp-redundancy is real
+but not load-bearing. Second, we predicted (following the latency-hiding literature) that the per-lane
+Triton kernel would sustain \emph{fewer} in-flight memory requests than CUDA; direct measurement
+refuted this---it issues $26$--$84\times$ \emph{more} (masked inactive-lane gathers) and still stalls,
+so the residual is the inability to \emph{hide} dependent-load latency, not a request-count deficit.
+We therefore phrase the mechanism via stall composition and issue activity, not request counts. Both
+corrections sharpened, rather than weakened, the central claim.
 
+\section{Threats to Validity}
+\emph{Single GPU.} Results are on one RTX 4070; the \emph{mechanism} (intra-warp latency hiding, the
+issue-activity differential, the DRAM convergence) is a property of the SIMT execution model and the
+tile-vs-thread lowering, hence architecture-general, but the absolute decomposition factors should be
+re-measured on an A100/H100 (larger L2 shifts the DFA crossover). \emph{Prototype scope.} The
+lane-packed kernels are single-word ($\le 64$ states); real ANMLZoo automata (Levenshtein 2787, Brill
+42661, Fermi 40786) run oracle-valid but at sub-Gbps---an \emph{algorithmic} cost of large/deep
+automata, orthogonal to the abstraction regret (consistent with prior work), and testing lane-packing
+on them needs a multi-word kernel (future work). \emph{Tuning.} \texttt{num\_warps} is a knob; we
+disclose the full sweep rather than a single config, rebutting the autotuning
+counter-thesis~\cite{ringlein2025}: the Triton/Gluon same-MLIR control plus the disclosed sweep
+separate \emph{tuning} (which closes component A and part of B) from \emph{expressibility} (the
+residual C), with a probe that is falsifiable by construction.
+
+\section{Reproducibility}
+Correctness gates every measurement: each kernel/config is checked bit-for-bit against the CPU oracle
+(NFA \texttt{reference.py} / \texttt{simulate\_dfa}) before any throughput is reported. Every number in
+this paper traces to a versioned CSV; all figures regenerate from those CSVs by a single script, so the
+plots cannot drift from the measurements. The Gluon expressibility claim is a runnable probe that exits
+$0$ on the expected compile failure and $1$ if a future Gluon ever compiles it---falsifiable by
+construction. The artifact (kernels, oracle, sweeps, profiling commands, CSVs) supports one-command
+regeneration.
+
+\section{Related Work}
 \textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA: ngAP's
 non-blocking multi-symbol processing~\cite{ngap2024}, HybridSA's bit-parallel
 shift-and~\cite{hybridsa2024}, BitGen's Parabix bitstreams~\cite{bitgen2025}, AsyncAP's
@@ -230,17 +256,26 @@ regime. The cure is a named, bounded, existence-proven IR primitive; building it
 landmark future step.
 
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_decomposition.png}
-\caption{The NFA worklist regret decomposes into artifact, recoverable, and irreducible.}
+\caption{NFA worklist throughput (batch 16384, $\le 64$ states) climbs as each regret component is
+removed: \texttt{nw=4}$\rightarrow$\texttt{nw=1} (launch artifact), $\rightarrow$lane-packing (warp
+redundancy), $\rightarrow$CUDA (irreducible latency). All oracle-gated.}
 \label{fig:decomp}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_occupancy_gating.png}
-\caption{Lane-packing is occupancy-gated.}\label{fig:occ}\end{figure}
+\caption{Lane-packing's benefit is occupancy-gated: the pure-packing speedup grows
+$3.2\times\rightarrow19.4\times$ with batch (toward the ideal $32\times$) as more warps fill the GPU.}
+\label{fig:occ}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_mechanism.png}
-\caption{Same occupancy and warps, fewer warp-instructions---yet slower (latency-bound).}
+\caption{Per-lane Triton vs.\ CUDA (16384 strings, 32 states): same occupancy, \emph{fewer}
+warp-instructions, yet $3.3\times$ slower at $9.9\%$ vs.\ $41\%$ issue activity---latency-bound.}
 \label{fig:mech}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_roofline.png}
-\caption{Neither kernel is instruction- or bandwidth-bound.}\label{fig:roof}\end{figure}
+\caption{Instruction roofline (16384 strings, 32 states): both kernels sit far below the issue
+\emph{and} DRAM-bandwidth ceilings ($8.3\%/27\%$ for Triton, $32\%/3.4\%$ for CUDA), so neither is
+instruction- nor bandwidth-bound---the residual is latency.}\label{fig:roof}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_dfa_crossover.png}
-\caption{DFA: the gap closes in the DRAM regime.}\label{fig:dfa}\end{figure}
+\caption{DFA: lane-packed Triton trails CUDA $\sim$1.7$\times$ while the table is cache-resident but
+\emph{matches} it ($1.05\times$) once the $16$\,MB table spills past L2---both then rely on cross-warp
+parallelism. The residual is regime-dependent.}\label{fig:dfa}\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}
