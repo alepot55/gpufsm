@@ -99,7 +99,31 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
       idiomatic front end + new primitive lands within ~1.5–2× of CUDA. The landmark "cure".
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
+## LITERATURE ANALYSIS DONE (2026-06-28, 4 parallel verified sweeps → `paper2/RELATED_WORK.md`)
+Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded into the plan:
+- **Rigor fix applied to DRAFT:** the mechanism is **abstraction-denied MLP** (independent in-flight
+  loads), not "independent issue" (SIMT issues 1 inst/cycle/warp); and it's distinct from memory
+  divergence. Reworded abstract + §4.4.
+- **Two desk-reject risks + rebuttals locked:** (A) "didn't tune Triton" → Triton↔Gluon control +
+  num_warps sweep (M2f) separate tuning from expressibility; (B) "Gluon already does per-thread" →
+  layout ≠ control flow. Closest threats: MLIR-regex→DSA (CGO'25), Subwarp Interleaving (HPCA'22),
+  Gluon Linear Layouts — all distinguished in RELATED_WORK.md.
+- **Venue:** CGO 2027 R2 (~Sep 10 2026), Standard Research Paper track; backstop TACO; arXiv now.
+- **Top new experiments to make it bulletproof** (added to actions below): direct MLP measurement,
+  instruction-roofline placement, Gluon `scalar_program` prototype, capability-generalization table.
+
 ## Next concrete actions (FULL-AMBITION program, user green-lit; sequence to de-risk)
+0. **M5 — DIRECT MLP MEASUREMENT (decisive, top priority, local-GPU).** Nsight on WP2 vs cuda/worklist
+   at matched occupancy: stall-reason `smsp__warp_issue_stalled_long_scoreboard*` (expect Triton
+   dominated by waiting-on-dependent-load) + outstanding L2/DRAM sectors per active warp (expect CUDA
+   sustains MORE in-flight requests = higher MLP). Converts "latency-bound" (inferred) into a measured
+   MLP differential; then Little's law (Volkov/Hong-Kim) predicts the throughput ratio from the
+   in-flight-request ratio. THE most reviewer-proof addition. → paper2/data/m5_mlp_*.csv.
+0b. **M5b — instruction-roofline placement** of WP2 vs CUDA (GIPS vs inst-intensity): show Triton below
+   the issue ceiling at low GIPS despite fewer instructions. Answers "did you just write a worse kernel?"
+0c. **M6 — Gluon `scalar_program` prototype** (Linear Layout per-lane state + predicated ffs/while):
+   show it recovers a measurable fraction of CUDA/Warp and exactly what plain Gluon CANNOT express →
+   neutralizes Risk B, turns "we propose" into "we demonstrate realizable". (Gluon @jit must be in a .py.)
 1. [x] **M2f DONE — num_warps artifact = 3.4× median** (2.77×@4096 → 3.44×@16384 → 3.69×@65536),
    monotone ~halving per num_warps doubling. `paper2/data/m2f_numwarps_rtx4070.csv`. Sizes the
    launch-config component of the anchor; underpins paper-1 disclosure.

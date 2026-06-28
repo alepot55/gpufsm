@@ -17,9 +17,13 @@ level, the single missing primitive. On a work-efficient NFA worklist the 10× a
 component (warp-redundant scalar execution), and (C) an irreducible ~2× residual**. Component C is
 *not* instruction count, occupancy, or memory bandwidth: at matched occupancy, matched warp count,
 and fewer warp-instructions than CUDA, a per-lane Triton worklist is still 3.3× slower because it is
-latency-bound (10% issue activity). The root cause is **intra-warp latency hiding**: a CUDA warp is
-32 independent scalar threads that hide each other's memory latency, whereas a Triton warp is 32
-lock-step lanes of one instruction stream and cannot. We show this residual is *regime-dependent*:
+latency-bound (10% issue activity). The root cause is **abstraction-denied memory-level parallelism
+(MLP)**: a CUDA warp's 32 lanes issue *independent in-flight loads* that overlap and hide each other's
+latency, whereas a Triton tile/SPMD warp is 32 lock-step lanes of one instruction stream whose
+data-dependent loads serialize — latency can be hidden only *across* warps (occupancy-bound). (Under
+SIMT both issue one instruction/cycle/warp; the independence that matters is in the memory pipeline,
+not the issue stage — and this is distinct from branch/memory divergence: the lanes can be perfectly
+coalesced and still stall together on a dependent load.) We show this residual is *regime-dependent*:
 for the memory-bound DFA it closes (lane-packed Triton matches CUDA, 1.05×, once the table spills to
 DRAM) because both paradigms then rely on cross-warp memory-level parallelism. We specify the missing
 IR primitive (a `scalar_program` region lowering each lane to an independent instruction stream),
@@ -87,11 +91,18 @@ warp-instructions than CUDA (4.66M vs 5.07M) and the same occupancy (22.5%)**, y
 because **issue activity is 10.1%** and warp-latency is 27 cyc/inst — *latency-bound*.
 [`m3_lite_nsight_rtx4070.csv`] Raising occupancy does not help: a BLOCK sweep {32,64,128,256} only
 *worsens* it (0.49×→0.31×) — bigger lock-step tiles add divergence (the `while max` runs to the
-busiest of more lanes). [`m3_lite_b_occupancy_rtx4070.csv`] **Root cause:** a CUDA warp is 32
-*independent* threads, so a stalled load on one lane is hidden by 31 others; a Triton warp is 32
-lock-step lanes of one instruction stream and can hide latency only *across* warps (occupancy-bound).
-The pure-Triton ceiling is ~0.49× CUDA; only per-lane independent instruction streams (the thread
-model) close it.
+busiest of more lanes). [`m3_lite_b_occupancy_rtx4070.csv`] **Root cause (abstraction-denied MLP):** a CUDA warp's 32 lanes
+issue *independent in-flight loads* (memory-level parallelism), so a dependent load on one lane is
+overlapped by the others' outstanding requests; a Triton warp is 32 lock-step lanes of one
+instruction stream, so the dependent next-state load serializes them and latency can be hidden only
+*across* warps (occupancy-bound). The pure-Triton ceiling is ~0.49× CUDA; only per-lane independent
+control flow (the thread model) restores intra-warp MLP. We ground this in the latency-hiding /
+MLP-vs-occupancy literature (Volkov 2016; Hong & Kim ISCA'09) and the instruction-roofline model
+(Ding & Williams), and distinguish it from the *hardware* fix of intra-warp stalls (Subwarp
+Interleaving, HPCA'22): the same SM is fast under CUDA and slow under Triton at equal occupancy and
+fewer instructions, so the loss is *abstraction-imposed*, not hardware. (A direct MLP measurement —
+outstanding sectors/warp and the `long_scoreboard` stall reason — is the decisive confirmation, in
+progress; see `RELATED_WORK.md §8`.)
 
 ## 5. Regime-dependence (DFA) — the unification
 
@@ -128,11 +139,26 @@ the paradigm the tile DSL lacks. A full Triton-MLIR implementation is a separate
 - `num_warps` is a tuning knob; we disclose the sweep rather than report a single config (the
   "did you tune Triton?" de-risk).
 
-## 8. Related work (to expand)
-Paper 1 (diagnosis); Triton/MLIR; NVIDIA Warp (thread-SIMT existence proof); Hexcute/Tawa/Descend
-(layout/dataflow decomposition on dense tensors — off the irregular axis); ngAP/HybridSA/BitGen
-(CUDA-only automata, orthogonal axis). Gap: no constructive, instruction-level account of *why* a
-tile DSL pays on irregular control flow, nor the regime-dependent cure.
+## 8. Related work (full positioning in `RELATED_WORK.md`)
+A 4-axis verified sweep confirms the niche is empty; we live on two distinctions.
+- **GPU automata (algorithmic axis, all single-implementation CUDA):** ngAP (ASPLOS'24 + TOCS),
+  HybridSA (OOPSLA'24), BitGen (MICRO'25), AsyncAP (POMACS'23), AutomataBLAS (TACO'25), Hopps
+  (ASPLOS'25, ASIC). None compares GPU programming models or holds the algorithm fixed across DSLs.
+  The only IR-for-automata work, **MLIR-regex→DSA (CGO'25)**, lowers regex to one fixed accelerator —
+  not a GPU-paradigm/expressibility study; we distinguish it prominently.
+- **Tile GPU DSLs (regular tensor axis):** Triton (MAPL'19), and the 2024–26 wave exposing more
+  thread/warp control — Gluon+Linear-Layouts, TLX, Tawa (CGO'26), TileLang, Hexcute, cuTile, Graphene.
+  *Closest risk = Gluon's per-thread layout*, which is data placement, **not** independent per-lane
+  control flow (`gl.load` has no scalar load; layout ≠ divergence). Existence proof: NVIDIA Warp /
+  Descend (PLDI'24) / Taichi (thread-SIMT for irregular).
+- **Mechanism:** Volkov (latency hiding / MLP-vs-occupancy), Hong & Kim (ISCA'09 MWP/CWP), Ding &
+  Williams (instruction roofline); distinguished from Subwarp Interleaving (HPCA'22, a *hardware* fix).
+- **Methodology/lineage:** Hoefler & Belli (SC'15), Roofline, Pennycook (per-hardware PP — we measure
+  per-*capability* regret), and the **autotuning counter-thesis (Ringlein et al., arXiv:2505.03780)**
+  which we rebut: the Triton↔Gluon same-MLIR control + the disclosed `num_warps` sweep (§4.2) separate
+  *tuning* (closes A and part of B) from *expressibility* (the residual C), with a falsifiable probe.
+Gap: no constructive, instruction-level account of *why* a tile DSL pays on irregular control flow,
+naming the missing primitive, with a regime-dependent residual.
 
 ## 9. Conclusion
 The abstraction regret on irregular automata is not a monolith: it is a launch artifact, a recoverable
