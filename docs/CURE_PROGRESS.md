@@ -193,6 +193,22 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LANDMARK regret-law SYNTHESIS — the multi-component law, assembled across 5 witnesses.**
+  `paper2/data/landmark/regret_law.csv` + `fig_regret_law()` in `paper2/figures.py`. Five oracle-gated
+  tile-vs-thread witnesses, ordered by mechanism, each Nsight-attributed:
+  spmv_uniform **1.94×** (baseline_occupancy, 50% vs 94% occ, ZERO divergence) → hashprobe **1.40×**
+  (masked-waste diluted by a clean 32-wide gather, tile issue 48% ≈ thread 49%) → automata_nfa **1.96×**
+  (latency-starvation: heavy scalar ffs/while recurrence, tile issue 9.9% vs 41%) → spmv_powerlaw **2.17×**
+  (baseline + divergence increment, grows to 5.8× @ BLOCK 256) → rejection **4.00×** (masked-waste, pure
+  compute, lockstep to max trip). **HONEST framing (the landmark claim, stated precisely):** regret is NOT
+  a single-predictor law — it is **tile-lowering baseline (occupancy/register/masking, present even
+  divergence-free) + a divergence increment** that splits into two measured sub-mechanisms,
+  **latency-starvation** (scalar-control density starves issue) and **masked-lane waste** (divergent trips →
+  the lockstep tile pays for idle lanes). The clean ~1× negative control is **dense-regular** work
+  (Triton≈cuBLAS), drawn as the green reference line — NOT irregular SpMV. This multi-component attribution,
+  isolated by independent witnesses with the SAME nvcc-lowering machinery, is stronger and more falsifiable
+  than the original single "MLP denied" story. ⇒ the cure must recover BOTH the occupancy baseline AND
+  per-lane control; front-end lane-packing alone (M2a) recovers only the masked-waste fraction.
 - 2026-06-28: **LANDMARK P1 witness #3 (SpMV) — PREDICTION FALSIFIED (honest, important correction).**
   `experiments/cure/landmark_spmv.py`: SpMV CSR, uniform-nnz (no control divergence) vs power-law-nnz
   (divergent), same kernels, oracle-validated. PREDICTED uniform regret ~1× (clean negative control).

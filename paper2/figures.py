@@ -242,6 +242,45 @@ def fig_cure() -> None:
     plt.close(fig)
 
 
+def fig_regret_law() -> None:
+    """(g) Generality: tile-vs-thread regret across irregular workloads, by mechanism. landmark."""
+    rows = _read("landmark/regret_law.csv")
+    order = ["spmv_uniform", "hashprobe", "automata_nfa", "spmv_powerlaw", "rejection"]
+    nice = {
+        "spmv_uniform": "SpMV\nuniform",
+        "hashprobe": "hash\nprobe",
+        "automata_nfa": "automata\n(NFA)",
+        "spmv_powerlaw": "SpMV\npower-law",
+        "rejection": "rejection\nsampling",
+    }
+    mech_color = {
+        "baseline_occupancy_50v94": "#7f8c8d",
+        "masked_waste_gather_diluted": "#2980b9",
+        "latency_starvation": "#c0392b",
+        "baseline_plus_divergence": "#8e44ad",
+        "masked_waste_pure_compute": "#e67e22",
+    }
+    by = {r["workload"]: r for r in rows}
+    labels = [nice[w] for w in order]
+    vals = [float(by[w]["regret"]) for w in order]
+    colors = [mech_color[by[w]["dominant_mechanism"]] for w in order]
+    fig, ax = plt.subplots(figsize=(7, 4))
+    for b, v in zip(ax.bar(labels, vals, color=colors), vals, strict=True):
+        ax.text(b.get_x() + b.get_width() / 2, v + 0.05, f"{v:.2f}×", ha="center", fontsize=9)
+    ax.axhline(1.0, color="green", ls="--", lw=1)
+    ax.text(0, 1.04, "dense-regular control (Triton ≈ cuBLAS)", fontsize=8, color="green")
+    ax.set_ylabel("tile-vs-thread regret (×)")
+    ax.set_ylim(0, max(vals) * 1.15)
+    ax.set_title(
+        "Lowering scalar irregular work to a tile costs 1.4–4×, by mechanism\n"
+        "(grey=occupancy baseline, red=latency-starvation, orange/blue=masked-waste)",
+        fontsize=9,
+    )
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_regret_law.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> int:
     fig_decomposition()
     fig_occupancy_gating()
@@ -249,6 +288,7 @@ def main() -> int:
     fig_dfa_crossover()
     fig_roofline()
     fig_cure()
+    fig_regret_law()
     print(f"wrote figures to {OUT}/:")
     for p in sorted(OUT.glob("*.png")):
         print(f"  {p.name}")

@@ -1,0 +1,6 @@
+workload,regret,tile_issue_pct,thread_issue_pct,tile_tipi,thread_tipi,divergence,dominant_mechanism,gpu
+spmv_uniform,1.94,2.55,1.57,32.0,32.0,none_cv0,baseline_occupancy_50v94,RTX4070
+hashprobe,1.40,48.34,49.24,32.0,3.65,divergent_probes,masked_waste_gather_diluted,RTX4070
+spmv_powerlaw,2.17,,,,,cv_3.79,baseline_plus_divergence,RTX4070
+automata_nfa,1.96,9.89,41.00,32.0,30.34,divergent_activeset_scalar_control,latency_starvation,RTX4070
+rejection,4.00,53.33,39.33,32.0,17.12,divergent_trips_max_over_mean_5,masked_waste_pure_compute,RTX4070
