@@ -292,9 +292,8 @@ def main() -> int:
     print(f"4-way worklist head-to-head (batch={N_STRINGS}, BLOCK={BLOCK}), all oracle-gated:")
     print("  CU=cuda/worklist  WT=triton/worklist gpufsm (num_warps=4, the M0 baseline)")
     print("  WS=my scalar worklist (num_warps=1)  WP=lane-packed worklist")
-    print(
-        "  regret_M0 = CU/WT (the 10x anchor)   regret_nw1 = CU/WS   WP/CU = does packed Triton beat CUDA?\n"
-    )
+    print("  regret_M0 = CU/WT (the 10x anchor)   regret_nw1 = CU/WS")
+    print("  WP/CU = does lane-packed Triton beat hand-CUDA?\n")
     print(
         f"{'st':>4}{'sd':>3}{'CU':>9}{'WT':>9}{'WS':>9}{'WP':>9}{'CU/WT':>7}{'CU/WS':>7}{'WP/CU':>7}{'ok':>4}"
     )
