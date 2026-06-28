@@ -20,10 +20,16 @@ automata:
    kernel and lower them to per-thread ("thread-mode") execution within the tile DSL — recovering the
    thread model's intra-warp latency hiding — leaving the regular part tiled. THIS IS THE MAKE-OR-BREAK
    (characterization alone = IISWC, not ASPLOS).
-3. **A predictive "regret law":** regret is a monotone function of a measurable a-priori predictor
-   (exposed dependent-load-latency / achieved-vs-needed MLP), validated by a CORRECT NEGATIVE (SpMV =
-   irregular but bandwidth-bound → low regret, predicted). "Paradigm, not abstraction height, predicts
-   regret."
+3. **A predictive "regret law":** regret tracks a measurable a-priori predictor, validated by a CORRECT
+   NEGATIVE. ⚠️ REFINED by the hash-probe witness (P1, 2026-06-28): the predictor is NOT "dependent-load
+   count" (FALSIFIED — hash-probe regret is flat ~1.4× while probe length grows 35×). The right
+   predictor is the **tile's issue-activity deficit = how much per-element SCALAR CONTROL / control-flow
+   divergence the lock-step tile must serialize**. Nsight: tile `tl.load` gather already gives full
+   intra-warp MLP (32-wide), so hash-probe (clean gather, light control) keeps tile issue ≈ thread
+   (48% vs 49%) → small regret; automata (heavy ffs/while/register recurrence) starves tile issue
+   (9.9% vs 41%) → large regret. Two sub-mechanisms: (a) **latency starvation** (heavy scalar control →
+   low issue), (b) **masked-lane waste** (divergent trip counts → tile does 32-wide gathers vs thread's
+   active-only: thread_inst/inst 32 vs 3.65). SpMV (aligned gather, no divergence) → predict ~1× regret.
 4. **Generality across a workload suite** + multi-GPU (≥2 arch; ideally H100/Blackwell).
 
 ## Novelty boundary (verified; defend precisely)

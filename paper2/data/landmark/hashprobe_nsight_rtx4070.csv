@@ -1,0 +1,3 @@
+kernel,load,issue_active_pct,thread_inst_per_inst,long_scoreboard,duration_us,gpu
+hashprobe_tile,0.9,48.34,32.0,23495.46,730.21,RTX4070
+hashprobe_thread,0.9,49.24,3.65,26595.10,579.26,RTX4070

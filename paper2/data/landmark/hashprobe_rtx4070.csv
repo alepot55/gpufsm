@@ -1,0 +1,5 @@
+workload,logT,n_queries,load_factor,avg_probe_len,tile_mprobe_s,thread_mprobe_s,regret,gpu
+hashprobe,22,1048576,0.5,1.774,15233.8,21333.3,1.4,RTX4070
+hashprobe,22,1048576,0.75,4.689,6440.3,9764.0,1.516,RTX4070
+hashprobe,22,1048576,0.9,20.025,1424.8,1914.0,1.343,RTX4070
+hashprobe,22,1048576,0.95,62.503,395.2,511.9,1.295,RTX4070

@@ -193,6 +193,17 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LANDMARK P1 witness #1 (hash-probe) — refines the regret predictor (honest, important).**
+  `experiments/cure/landmark_hashprobe.py`: GPU hash table, data-dependent probe loop, tile (Triton
+  lane-packed) vs thread (CUDA per-key) vs CPU oracle. Oracle-validated. Regret = ~1.4× and FLAT across
+  load 0.5→0.95 (avg probe 1.8→62) → FALSIFIES the naive "regret ∝ dependent-load count" predictor.
+  Nsight (`hashprobe_nsight_rtx4070.csv`): tile issues at 48% ≈ thread 49% (vs automata tile 9.9% vs
+  41%) — the tile's `tl.load` gather already provides full 32-wide intra-warp MLP, so hash-probe is NOT
+  latency-starved in the tile; its 1.4× is masked-lane waste (thread_inst/inst 32 vs 3.65). ⇒ the
+  regret predictor is the tile's ISSUE-ACTIVITY DEFICIT (per-element scalar-control / divergence the
+  tile serializes), not dependent-load count. Two sub-mechanisms: latency-starvation (automata) vs
+  masked-lane-waste (hash-probe). Sharper, falsifiable cost model. Next P1: rejection sampling (pure
+  control, isolates masking) + SpMV (aligned gather → predict ~1× = the negative control).
 - 2026-06-28: **QUALITY UPGRADE (user: "migliora ancora") — the cure now proven to act VIA the
   mechanism, + 2-panel figure + reproduce.sh.** (1) Nsight-profiled the SP (scalar_program→threads)
   kernel: issue activity **36.2%** (vs the tile's 9.9%, ≈ CUDA's 41%) and long_scoreboard stall **29×
