@@ -245,8 +245,16 @@ def fig_cure() -> None:
 def fig_regret_law() -> None:
     """(g) Generality: tile-vs-thread regret across irregular workloads, by mechanism. landmark."""
     rows = _read("landmark/regret_law.csv")
-    order = ["spmv_uniform", "hashprobe", "automata_nfa", "spmv_powerlaw", "rejection"]
+    order = [
+        "pointer_chase",
+        "spmv_uniform",
+        "hashprobe",
+        "automata_nfa",
+        "spmv_powerlaw",
+        "rejection",
+    ]
     nice = {
+        "pointer_chase": "graph\npointer-chase",
         "spmv_uniform": "SpMV\nuniform",
         "hashprobe": "hash\nprobe",
         "automata_nfa": "automata\n(NFA)",
@@ -254,6 +262,7 @@ def fig_regret_law() -> None:
         "rejection": "rejection\nsampling",
     }
     mech_color = {
+        "negative_control_latency_equal": "#27ae60",
         "baseline_occupancy_50v94": "#7f8c8d",
         "masked_waste_gather_diluted": "#2980b9",
         "latency_starvation": "#c0392b",
@@ -268,13 +277,14 @@ def fig_regret_law() -> None:
     for b, v in zip(ax.bar(labels, vals, color=colors), vals, strict=True):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.05, f"{v:.2f}×", ha="center", fontsize=9)
     ax.axhline(1.0, color="green", ls="--", lw=1)
-    ax.text(0, 1.04, "dense-regular control (Triton ≈ cuBLAS)", fontsize=8, color="green")
+    ax.text(0, 1.06, "no-regret line (tile issue ≈ thread issue)", fontsize=8, color="green")
     ax.set_ylabel("tile-vs-thread regret (×)")
     ax.set_ylim(0, max(vals) * 1.15)
     ax.set_title(
-        "Lowering scalar irregular work to a tile costs 1.4–4×, by mechanism\n"
-        "(grey=occupancy baseline, red=latency-starvation, orange/blue=masked-waste)",
-        fontsize=9,
+        "Regret tracks the tile's issue deficit, not memory irregularity: 1.0–4×, by mechanism\n"
+        "(green=irregular negative control, grey=occupancy, red=latency-starvation, "
+        "orange/blue=masked-waste)",
+        fontsize=8,
     )
     fig.tight_layout()
     fig.savefig(OUT / "fig_regret_law.png", dpi=150)

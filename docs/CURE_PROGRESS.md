@@ -193,6 +193,23 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LANDMARK P1 witness #4 (graph pointer-chase) — THE TRUE NEGATIVE CONTROL, regret 1.00×.**
+  `experiments/cure/landmark_bfs.py`: 1M independent random walkers × 64 FIXED steps on a power-law CSR
+  graph (deg cv=3.79). Each step is a dependent gather (pointer-chase): the next address depends on the
+  previous load — the canonical MLP-bound / latency-bound pattern — with irregular memory (scattered
+  colidx, variable degree) but ZERO control-flow trip divergence (fixed step count). Tile (Triton, one
+  walker/lane) vs thread (CUDA via nvcc/ctypes) vs exact numpy oracle (deterministic hash, both
+  oracle-matched bit-for-bit). **regret = 1.00×** (tile 12098 vs thread 12157 Mstep/s). Nsight is the
+  punchline — tile and thread are IDENTICAL on every axis: issue_active **5.42% vs 5.43%**, occupancy
+  **72.11% vs 72.11%**, thread_inst/inst **32 vs 32**. ⇒ DECISIVE confirmation of the refined predictor:
+  **regret = the tile's issue-activity DEFICIT RELATIVE TO thread**, and that deficit is created by
+  SCALAR CONTROL, not by dependent loads or memory irregularity. Pointer-chase starves issue *equally*
+  on both (latency hidden by occupancy identically) → paradigm makes no difference → regret 1. Automata's
+  regret (1.96×) came specifically because scalar ffs/while recurrence starves the TILE's issue (9.9%) far
+  below thread's (41%). This is a *better* negative control than dense-regular (cuBLAS) and than
+  SpMV-uniform (whose 1.94× was a bandwidth/occupancy baseline, not latency) — an honest IRREGULAR
+  workload sitting exactly on the no-regret line. Added to `regret_law.csv` (leftmost, green) + figure
+  retitled "Regret tracks the tile's issue deficit, not memory irregularity". `bfs_rtx4070.csv`.
 - 2026-06-28: **LANDMARK regret-law SYNTHESIS — the multi-component law, assembled across 5 witnesses.**
   `paper2/data/landmark/regret_law.csv` + `fig_regret_law()` in `paper2/figures.py`. Five oracle-gated
   tile-vs-thread witnesses, ordered by mechanism, each Nsight-attributed:

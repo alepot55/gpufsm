@@ -1,0 +1,2 @@
+workload,n_walk,steps,deg_cv,tile_mstep_s,thread_mstep_s,regret,gpu
+pointer_chase,1048576,64,3.789,12098.21,12156.56,1.005,RTX4070
