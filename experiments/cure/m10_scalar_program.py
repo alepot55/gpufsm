@@ -6,11 +6,12 @@ implement that lowering constructively and measure that it CLOSES the residual.
 
 `lower_scalar_program_to_cuda(spec)` takes the SAME idiomatic per-lane automaton step the Triton WP2
 kernel expresses (active-set `ffs` worklist over a register bitset, data-dependent CSR loop, scalar
-gather) and emits a thread-model CUDA kernel (one thread = one string), compiled via
-torch.utils.cpp_extension.load_inline (nvcc). The front-end is per-lane scalar logic; the lowering
-target is threads, not tiles. Claim: the generated kernel recovers CUDA-level throughput (~the
-hand-written cuda/worklist), i.e. the ~2x tile-SPMD residual (Triton WP2 = 0.51x of CUDA) vanishes
-once the same per-lane program is lowered to the thread model.
+gather) and emits a thread-model CUDA kernel (one thread = one string), compiled with nvcc to a .so
+called via ctypes. The front-end is per-lane scalar logic; the lowering target is threads, not tiles.
+Claim: the generated kernel recovers CUDA-level throughput (~the hand-written cuda/worklist), i.e. the
+~2x tile-SPMD residual (Triton WP2 = 0.51x of CUDA) vanishes once the same per-lane program is lowered
+to the thread model. Profiling SP (`profile <ns>` arg + ncu) confirms it acts via the diagnosed
+mechanism: issue activity ~36% (vs the tile's 9.9%) and long_scoreboard stall ~29x lower.
 
 Oracle-gated bit-for-bit vs reference.py. Compares: SP (scalar_program->CUDA, the cure), CU
 (hand-written cuda/worklist), WP2 (Triton tile per-lane, the residual). <=64 states (single int64,
@@ -129,8 +130,11 @@ extern "C" float sp_launch(
     d = Path(tempfile.mkdtemp(prefix="sp_", dir=str(cache)))
     cu, so = d / "sp.cu", d / "sp.so"
     cu.write_text(src)
+    nvcc = (
+        "nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() is False else "/usr/local/cuda/bin/nvcc"
+    )
     subprocess.run(
-        ["nvcc", "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
+        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
         check=True,
         capture_output=True,
         text=True,
@@ -199,6 +203,11 @@ def oracle_ok(nfa, data2d, g, n_check=64) -> bool:
 def main() -> int:
     if not torch.cuda.is_available():
         print("SKIP: no CUDA")
+        return 0
+    if len(sys.argv) >= 3 and sys.argv[1] == "profile":
+        ns = int(sys.argv[2])
+        nfa = random_nfa_noaccept(ns, seed=1000 + ns)
+        sp_run(nfa, to_device(nfa), make_batch_local(0))  # one profiled SP launch
         return 0
     total_bits = N_STRINGS * SLEN * 8
     print(

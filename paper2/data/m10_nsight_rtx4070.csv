@@ -1,0 +1,4 @@
+kernel,states,n_strings,duration_us,issue_active_pct,long_scoreboard_stall,occupancy_pct,gpu
+wp2_tile,32,16384,121.22,9.89,195900.55,22.48,RTX4070
+sp_threads_cure,32,16384,16.06,36.19,6676.75,15.39,RTX4070
+cuda_worklist,32,16384,34.91,41.00,12811.20,22.41,RTX4070

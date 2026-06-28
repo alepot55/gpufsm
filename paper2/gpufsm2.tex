@@ -183,8 +183,13 @@ program lowered to \emph{threads} (SP) vs.\ \emph{tiles} (Triton WP2) differs by
 or exceeds} hand-written CUDA (SP/CU $= 2.15\times$, since the generated kernel is a minimal thread
 worklist). So the residual
 is not merely diagnosed but \emph{closed by construction}: supplying the per-lane lowering recovers---
-and surpasses---thread-model performance from the identical front-end source. (Integrating this
-lowering into Triton's MLIR is engineering; the lowering's effect is what we validate.)
+and surpasses---thread-model performance from the identical front-end source.
+\textbf{The cure acts through the diagnosed mechanism}, not by accident: profiling SP shows it
+restores the thread-model signature---issue activity $36\%$ (vs.\ the tile's $9.9\%$, $\approx$ CUDA's
+$41\%$) and the \texttt{long\_scoreboard} dependent-load stall $29\times$ lower than the tile---so
+lowering the same source to independent per-lane streams recovers exactly the intra-warp latency
+hiding component~C was missing. (Integrating this lowering into Triton's MLIR is engineering; the
+lowering's effect, and \emph{why} it works, are what we validate.)
 
 \subsection{Generality (positioning)}
 The same per-lane capability recurs across irregular GPU workloads (Table~\ref{tab:gen}); each needs
