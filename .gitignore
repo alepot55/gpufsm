@@ -133,3 +133,10 @@ paper/gpufsm_hpec.out
 paper/*.aux
 paper/*.out
 paper/*.log
+
+# paper2 LaTeX build artifacts
+paper2/*.aux
+paper2/*.log
+paper2/*.out
+paper2/*.bbl
+paper2/*.blg
