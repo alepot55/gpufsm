@@ -1,0 +1,3 @@
+kernel,states,n_strings,duration_ms,warp_inst,thread_inst,thread_inst_per_inst,occupancy_pct,grid,block,gpu
+noskip_scalar,32,4096,1.930,490605816,15699132160,32.00,45.67,4096,32,RTX4070
+lane_packed,32,4096,0.509,18953950,562309655,29.67,5.62,128,32,RTX4070

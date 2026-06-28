@@ -24,33 +24,55 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
   second-order (95× redundancy ≫ any 2–4× int64 factor); H3 not separately needed. The 90× warp-inst
   overhead becomes "only" 6–10× time because Triton's huge grid (90% occ) hides much of it — but
   it caps throughput. → the cure (M2) must make each program process 32 strings, one per lane.
-- [ ] **M2 — cure prototype, no compiler rebuild** (lane-packed P-strings/program; inline-PTX).
-- [ ] **M3 — constructive MLIR primitive** (gated on M2).
+- [~] **M2a — lane-packed Triton: PARTIAL cure (~2–4×), corrects M1's over-claim.** Done +
+  oracle-validated + Nsight-confirmed. `experiments/cure/m2_lane_packed.py` →
+  `paper2/data/m2_lane_packed_rtx4070.csv`, `m2_nsight_rtx4070.csv`. Three-way isolation on the
+  DENSE scan (A=skip-scalar O(active), B=noskip-scalar O(NS), C=lane-packed O(NS)/warp):
+  **pure lane-packing C/B = 3.2× median** (work held equal), **realistic C/A = 1.8×**. Nsight
+  (B→C, ns=32, 4096): lane-packing **removes ~26× warp-instructions** (near the ideal 32×, exactly
+  as the missing-primitive predicted) **but throughput only improves 3.8×**. ⇒ DECISIVE: the ~90×
+  warp-redundancy M1 measured is **largely hidden by occupancy — NOT the dominant throughput
+  bottleneck**. Lane-packing also DROPS occupancy to 5.6% (128 warps total at batch 4096) → becomes
+  latency-bound on the per-lane data-dependent scalar chain, and reintroduces costs it can't avoid:
+  active-set UNION (no per-lane skip) and EARLY-TERMINATION divergence (the 0.14× outlier = strings
+  that accept early; scalar exits, packed can't). **Honest correction of M1:** the cure is NOT a
+  front-end packing trick. CUDA wins by getting BOTH full lane use AND occupancy AND per-lane
+  control flow — tile/SPMD cannot. This sharpens the missing primitive to **genuine per-lane
+  independent control flow + thread-style scheduling**, strengthening the paradigm thesis.
+- [ ] **M3 — constructive MLIR primitive** (gated on M2; M2 shows the Triton-expressible cure caps
+  at ~2–4×, so the full cure likely needs the IR-level thread/scalar-program lowering).
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
 ## Next concrete actions (do these in order)
-1. **M2a — lane-packed Triton worklist (THE cure prototype).** Make each Triton program process
-   `BLOCK` strings, one per lane: state working set = a `[BLOCK]`-shaped int64 tile (lane j =
-   string j's `cur` bitmask). The per-string inner loops (`while bits`, `for k in CSR row`) have
-   per-lane-divergent trip counts → cannot use `range(load,load)`. Express via a UNIFORM outer
-   structure + per-lane masking:
-     - outer symbol loop: `for pos in range(max_len)` (uniform; mask lanes past their length).
-     - state-extraction: vectorize `ffs` over the `[BLOCK]` tile (libdevice.ffs is elementwise).
-     - CSR inner loop: the hard part — per-lane rows differ. Options to try, in order:
-       (i) gather row bounds as tiles, loop `k` to a uniform max bound, mask inactive lanes
-           (`tl.where`), accept wasted lanes; measure if still a net win (warp-inst should drop ~32×).
-       (ii) if (i) too divergent, restrict M2a to NFAs with bounded out-degree (pad CSR rows to a
-            constant D) so the inner loop is a uniform `for k in range(D)` over a `[BLOCK,D]` gather.
-   Oracle-gate (bit-for-bit vs reference) BEFORE any Gbps. Start ≤32 states / int64 tile (int64
-   ok; H2 is second-order). Target: recover ≥2× of the 10× (→ ≤5×); ideally approach ~32× warp-inst
-   reduction. Write `experiments/cure/m2_lane_packed.py` + `paper2/data/m2_lane_packed_rtx4070.csv`.
-   Re-profile with Nsight to confirm warp-inst/string drops ~32× (the mechanism, not just the time).
-2. **M2b (bound H2/H3):** `tl.inline_asm_elementwise` PTX for the bitset ops — bounds the residual
-   after lane-packing. Only if M2a leaves a meaningful gap.
-3. **M3 decision:** if M2a closes the gap → "latent primitive + front-end" paper; if masking
-   overhead caps it → motivates the MLIR `tl.scalar_program`/per-lane-serial-range lowering (M3).
+1. **M2c — DISAMBIGUATE occupancy-starvation vs fundamental latency gap (the decisive test).**
+   Lane-packed C dropped to 5.6% occupancy at batch 4096 (full lane-packing → only 4096/32 = 128
+   warps, under-filling 46 SMs). Re-run the A/B/C sweep at LARGE batch (16384, 65536) where C has
+   enough warps for occupancy. TWO outcomes, both decisive:
+     - C approaches CUDA (gap → ~2×) at large batch ⇒ lane-packing IS most of the cure, just
+       occupancy-starved at small batch ⇒ paper = "latent primitive, scale-gated."
+     - C stays ~3–4× off ⇒ the residual is fundamental per-lane control-flow/latency ⇒ M3 needed.
+   Also profile C at batch 16384 (occupancy should rise; does throughput rise proportionally?).
+2. **M2d — cheap, high-value: does the REAL triton/worklist waste Nx from default num_warps?**
+   The gpufsm `_worklist_kernel` launches with default num_warps=4 → 4 warps/program ALL run one
+   string redundantly (M1 saw 128 threads/program). Test triton/worklist at num_warps=1 vs 4 — if
+   ~4× free, a big chunk of the 10× anchor is just a launch-config artifact (must be disclosed, and
+   re-baselines the anchor). Quick edit/standalone.
+3. **M2b (only if a gap remains):** `tl.inline_asm_elementwise` PTX for the int64 bitset ops —
+   bounds the residual H2/H3 (codegen/int64) after the control-flow effects are accounted.
+4. **M3 / USER DECISION POINT:** once M2c/M2d are in, the picture determines whether the full cure
+   needs building the MLIR `tl.scalar_program` lowering (weeks, Triton-from-source) or whether the
+   paper stands on "the obvious tile-level cure recovers only ~Nx → the missing primitive is
+   IR-level per-lane control flow" (strong CGO/CC story WITHOUT the build). Surface to user then.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M2a — the obvious cure is only partial, and Nsight proves WHY.** Lane-packing
+  removes ~26× warp-instructions (B→C) but moves throughput only 3.8× → M1's warp-redundancy is
+  hidden by occupancy, not the bottleneck. Pure packing 3.2× / realistic 1.8×. New tile-only costs:
+  active-set union (no per-lane skip) + early-term divergence (0.14× outlier) + occupancy collapse
+  (5.6%). This is a more interesting result than "packing fixes it": it localizes the residual to
+  per-lane data-dependent control flow + thread-scheduling, which tile/SPMD structurally lacks.
+  Skeptical-scientist: M2 corrected M1's premature "H1 IS the primitive" — H1 is real but mostly
+  hidden; the binding constraint is deeper. Next: M2c batch-scaling disambiguation.
 - 2026-06-28: M0 done. Fair anchor = **10.1×**. CUDA register worklist ~227 Gbps is remarkably
   flat across 16–64 states (work-efficient); Triton ~22 Gbps equally flat → the gap is a constant
   multiplier, consistent with a paradigm/codegen cause (H1/H3), not a per-state algorithmic cost.
