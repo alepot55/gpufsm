@@ -1,0 +1,3 @@
+workload,kind,detected,route,nfa_sp_over_wp2,gpu
+NFA worklist,lockstep,1,thread,3.899,RTX4070
+pointer-chase (neg ctrl),fixedtrip,0,tile,,RTX4070

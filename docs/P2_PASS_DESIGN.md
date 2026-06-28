@@ -104,10 +104,17 @@ engineering is making the compiler do automatically what M10 does by hand.
   hand-tuned in-IR rewrite: it proves the abstraction regret is structural in the loop construct, not a
   layout or tuning artifact. **This is the central NVIDIA/landmark point**: the missing IR primitive is a
   per-lane (sub-tile) loop/exit op; today's tile IR cannot express it.
-- REMAINING (the realized automatic cure): a cost-model **selector** that, on detecting the lock-step
-  signature (the pass already does this), routes the region to the M10 thread-model lowering — automatic
-  detect-and-lower at the source/codegen boundary, since the in-TritonGPU lowering is structurally
-  blocked. This is the honest P2 endpoint per LANDMARK_PLAN.
+- DONE (2026-06-29): **the automatic SELECTOR — P2 endpoint reached.** `experiments/cure/p2_selector.py`
+  closes the detect-and-lower loop automatically: it runs the in-libtriton detection pass (subprocess,
+  from-source Triton, `GPUFSM_THREAD_REGION=1`) to check `ttg.thread_region_candidate`, then ROUTES —
+  lock-step present → the M10 thread-model lowering (the realized cure); absent → the Triton tile path.
+  Verified oracle-gated: the NFA worklist is auto-routed to threads and achieves **SP/WP2 = 3.9×** over
+  the tile (consistent with M10's ~4.2× headline), while a fixed-trip negative-control kernel is detected
+  =0 and correctly left on the tile path. So the full landmark loop is realized: detect (real pass) →
+  decide (signature) → lower (thread model, since in-IR is structurally blocked) → measured gap-closing.
+  Data: `paper2/data/landmark/p2_selector_rtx4070.csv`.
+- REMAINING: fold P2 (detection pass + structural wall + missing primitive + automatic selector) into
+  paper2/gpufsm2.tex as an "implemented in the compiler" subsection; multi-GPU re-validation (P3).
 - RISK: step 2 (per-lane independent `scf.while` via ITS inside one Triton program) may require lowering
   below TritonGPU to the LLVM/NVVM stage; if in-TritonGPU lowering proves infeasible, the honest
   fallback (per LANDMARK_PLAN P2) is the **automatic selector over the M10 lowering** + this IR design —

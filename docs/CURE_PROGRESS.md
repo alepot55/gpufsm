@@ -193,6 +193,19 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P2 ENDPOINT REACHED — automatic SELECTOR closes the detect→lower loop (realized cure).**
+  `experiments/cure/p2_selector.py`: given a per-lane kernel, AUTOMATICALLY detects the lock-step
+  signature by running the real in-libtriton pass (subprocess under the from-source Triton with
+  GPUFSM_THREAD_REGION=1, checks `ttg.thread_region_candidate` in the TTGIR), then ROUTES — lock-step →
+  the M10 thread-model lowering (the cure, since in-IR lowering is structurally blocked); no signature →
+  the Triton tile path. Two Tritons can't share a process (from-source 3.8 for detection vs system 3.5.1
+  + gpufsm for measurement), so detection is a subprocess re-entry of the same file. VERIFIED oracle-gated:
+  NFA worklist detect=1 → route=thread → **SP/WP2 = 3.9×** over the tile (consistent with M10's ~4.2×
+  headline; state sweep 16/32/48/64 × 2 seeds), and a fixed-trip negative-control kernel detect=0 → left
+  on tile. ⇒ the FULL landmark loop is now realized end-to-end: detect (real MLIR pass in libtriton) →
+  decide (lock-step signature) → lower (thread model) → measured automatic gap-closing, with a correct
+  negative control. `paper2/data/landmark/p2_selector_rtx4070.csv`. P2 = detection ✓ + structural-wall ✓
+  + missing-primitive named ✓ + automatic selector ✓. Next: fold P2 into gpufsm2.tex; P3 multi-GPU.
 - 2026-06-29: **P2 LOWERING WALL — the regret is STRUCTURAL in the loop construct (demonstrated, the
   landmark point).** Two facts from the real matched IR (paper2/data/landmark/p2_lockstep.ttgir): (1) the
   carried tile tensors are ALREADY `#blocked sizePerThread=[1], threadsPerWarp=[32]` — one element per
