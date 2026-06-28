@@ -74,8 +74,9 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
 ## Next concrete actions (FULL-AMBITION program, user green-lit; sequence to de-risk)
-1. **M2f — num_warps PRECISION sweep** (nw=1,2,4,8) on triton/worklist: pure measurement, exact
-   artifact size → `paper2/data/m2f_numwarps_rtx4070.csv`. Underpins the paper-1 disclosure.
+1. [x] **M2f DONE — num_warps artifact = 3.4× median** (2.77×@4096 → 3.44×@16384 → 3.69×@65536),
+   monotone ~halving per num_warps doubling. `paper2/data/m2f_numwarps_rtx4070.csv`. Sizes the
+   launch-config component of the anchor; underpins paper-1 disclosure.
 2. **M3-lite — escape-hatch scalar-lane program** (`tl.inline_asm_elementwise` PTX / warp
    intrinsics): express a per-lane ffs worklist with NO cross-lane reduce + NO masking; measure
    whether removing the M2e tile-tax sources closes the gap to CUDA. Nsight to confirm. This decides
