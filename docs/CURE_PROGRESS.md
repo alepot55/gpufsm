@@ -116,9 +116,22 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
    throughput worse). ⇒ you cannot close the ~2× by throwing warps at it in pure Triton; the
    per-lane-independent-stream (thread-model) primitive is the only lever → motivates M3-full.
    `paper2/data/m3_lite_b_occupancy_rtx4070.csv`. **The pure-Triton ceiling is WP2/CU ≈ 0.49×.**
-3. **M4 — generalize the decomposition to the DFA gather kernel** (paper-1's memory-bound second
-   face): does artifact/recoverable/irreducible hold there too? Strengthens generality. Plus real
-   ANMLZoo automata (gpufsm.io.datasets) — sparser active sets may change the union/divergence costs.
+3. [x] **M4 DONE — the cure's residual is REGIME-DEPENDENT (generality + unification).** DFA
+   decomposition across table sizes (cache→L2→DRAM), oracle-gated by simulate_dfa.
+   `paper2/data/m4_dfa_rtx4070.csv` + `m4_dfa_nsight_rtx4070.csv`. (1) Scalar Triton DFA (nw=4) is
+   FLAT at ~29 Gbps for ALL table sizes = independent confirmation of paper-1's scalar-gather
+   ceiling. (2) Lane-packing gives **~12× over scalar Triton** (PK/TR), much more than the NFA's ~3×
+   (the scalar DFA was extra-penalized). (3) KEY: **PK/CU is regime-dependent** — 0.55–0.62× in cache
+   (≤4MB table, CUDA leads ~1.7×) but **1.05× at 16MB (>L2 DRAM) — lane-packed Triton MATCHES CUDA**.
+   Mechanism (honest; DRAM% only 14.6% so it's memory-LATENCY not saturated bandwidth): when per-
+   symbol latency is moderate (cache-resident), CUDA's intra-warp hiding across 32 independent
+   threads wins ~1.7×; when latency is huge (DRAM), BOTH paradigms must hide it via cross-warp MLP
+   and they CONVERGE. This UNIFIES the NFA (moderate latency → intra-warp matters → fundamental ~2×
+   residual) and the DFA-DRAM (huge latency → cross-warp dominates → gap closes). ⇒ the abstraction
+   regret / cure efficacy is set by the latency regime, mapping onto paper-1's two faces (control-flow
+   vs memory). STRONG generalization of the decomposition.
+4. **M4b — real ANMLZoo automata** (gpufsm.io.datasets: Levenshtein/Brill/Fermi): confirm the NFA
+   decomposition on non-synthetic NFAs (sparser active sets). Then start the paper-2 DRAFT.
 4. **Real automata** (ANMLZoo: Levenshtein/Brill/Fermi via gpufsm.io.datasets): confirm the
    decomposition on non-synthetic NFAs (sparser active sets → union cost smaller → packing better?).
 5. **M3-full — build the Triton MLIR `tl.scalar_program` primitive** (Triton from source, new op +
@@ -128,6 +141,13 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M4 — cure residual is regime-dependent; unifies NFA & DFA via latency.** DFA
+  lane-packing beats scalar Triton ~12× and, in the DRAM-table regime (>L2), MATCHES CUDA
+  (PK/CU=1.05×) vs 0.55–0.62× in cache. The intra-warp latency-hiding advantage (CUDA) only matters
+  at moderate latency; at DRAM latency both rely on cross-warp MLP and converge. So the NFA's
+  fundamental ~2× residual and the DFA's closeable gap are the SAME mechanism at different latency
+  scales — mapping onto paper-1's control-flow vs memory faces. Scalar Triton DFA flat ~29 Gbps
+  reconfirms the scalar-gather ceiling.
 - 2026-06-28: **M3-lite-b — occupancy lever exhausted, intra-warp limit confirmed fundamental.**
   WP2/CU = 0.49× at BLOCK=32 and only WORSENS with bigger BLOCK (0.31× at 256): more warps/program
   raise issue rate slightly but the larger lockstep tile adds divergence that cancels it. Pure-Triton
