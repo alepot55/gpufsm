@@ -307,9 +307,11 @@ instruction- nor bandwidth-bound---the residual is latency.}\label{fig:roof}\end
 \emph{matches} it ($1.05\times$) once the $16$\,MB table spills past L2---both then rely on cross-warp
 parallelism. The residual is regime-dependent.}\label{fig:dfa}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_cure.png}
-\caption{The cure, implemented (batch 16384, $\le 64$ states): the \emph{same} per-lane source lowered
-to threads (\texttt{scalar\_program}) runs $4.2\times$ the tile lowering (Triton WP2) and matches/exceeds
-hand-CUDA---the residual closed by construction.}\label{fig:cure}\end{figure}
+\caption{The cure, implemented (batch 16384, $\le 64$ states). \emph{Left:} the \emph{same} per-lane
+source lowered to threads (\texttt{scalar\_program}) runs $4.2\times$ the tile lowering (Triton WP2)
+and matches/exceeds hand-CUDA. \emph{Right:} it does so \emph{through the diagnosed mechanism}---issue
+activity jumps from the tile's $10\%$ to $36\%$ ($\approx$ CUDA's $41\%$), restoring the intra-warp
+latency hiding component~C was missing.}\label{fig:cure}\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}

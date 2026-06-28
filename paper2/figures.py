@@ -211,23 +211,30 @@ def fig_roofline() -> None:
 
 
 def fig_cure() -> None:
-    """(f) The cure implemented: per-lane source -> threads (SP) vs tiles (WP2) vs CUDA. m10."""
+    """(f) The cure: same per-lane source -> threads (SP) recovers BOTH throughput AND the
+    thread-model issue signature vs the tile (WP2). m10 + m10_nsight."""
     rows = _read("m10_scalar_program_rtx4070.csv")
     sp = statistics.median(float(r["sp_gbps"]) for r in rows)
     cu = statistics.median(float(r["cu_gbps"]) for r in rows)
     wp2 = statistics.median(float(r["wp2_gbps"]) for r in rows)
-    labels = ["Triton tile\n(WP2)", "hand-CUDA\n(worklist)", "scalar_program\n→ threads (cure)"]
-    vals = [wp2, cu, sp]
+    iss = {r["kernel"]: float(r["issue_active_pct"]) for r in _read("m10_nsight_rtx4070.csv")}
+    labels = ["Triton\ntile (WP2)", "hand\nCUDA", "scalar_program\n→threads"]
     colors = ["#2980b9", "#7f8c8d", "#27ae60"]
-    fig, ax = plt.subplots(figsize=(6, 4))
-    bars = ax.bar(labels, vals, color=colors)
-    for b, v in zip(bars, vals, strict=True):
-        ax.text(b.get_x() + b.get_width() / 2, v + 20, f"{v:.0f}", ha="center", fontsize=9)
-    ax.set_ylabel("Throughput (Gbps)")
-    ax.set_ylim(0, max(vals) * 1.18)
-    ax.set_title(
-        "The cure, implemented: same per-lane source, threads vs tiles\n"
-        f"(SP/WP2 = {sp / wp2:.1f}×, SP/CU = {sp / cu:.1f}×; batch 16384, ≤64 states)",
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.5, 3.8))
+    tput = [wp2, cu, sp]
+    for b, v in zip(ax1.bar(labels, tput, color=colors), tput, strict=True):
+        ax1.text(b.get_x() + b.get_width() / 2, v + 20, f"{v:.0f}", ha="center", fontsize=8)
+    ax1.set_ylabel("Throughput (Gbps)")
+    ax1.set_ylim(0, max(tput) * 1.18)
+    ax1.set_title(f"Throughput (SP/WP2 = {sp / wp2:.1f}×)", fontsize=9)
+    issue = [iss["wp2_tile"], iss["cuda_worklist"], iss["sp_threads_cure"]]
+    for b, v in zip(ax2.bar(labels, issue, color=colors), issue, strict=True):
+        ax2.text(b.get_x() + b.get_width() / 2, v + 1, f"{v:.0f}%", ha="center", fontsize=8)
+    ax2.set_ylabel("Issue-slot activity (%)")
+    ax2.set_ylim(0, max(issue) * 1.25)
+    ax2.set_title("Mechanism: the cure restores issue activity", fontsize=9)
+    fig.suptitle(
+        "The cure: lowering the same source to threads recovers throughput AND mechanism",
         fontsize=9,
     )
     fig.tight_layout()
