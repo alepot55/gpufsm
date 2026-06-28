@@ -57,42 +57,38 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
       for the active-set union, masking/predication, weaker scalar ILP. THIS is the IR-level missing
       primitive — a zero-cost scalar/lane program. Honest arc: M1(redundancy)→M2(packing removes it)
       →M2e(residual is per-instruction tile execution overhead, confirmed at matched occupancy).
-- [ ] **M3 / ⛔ USER DECISION POINT (reached).** The picture is complete: anchor = num_warps artifact
-  (~3.3×) × lane-packing-recoverable (~3×) × irreducible per-instruction tile tax (~2–6×, widens
-  with batch). The paper has a strong honest quantified story NOW without building Triton. M3 (MLIR
-  scalar-program lowering, weeks, Triton-from-source) is upside, NOT required. SURFACED to user;
-  do not start M3 without go-ahead.
+- [x] **DECISION RESOLVED (user, 2026-06-28):** (1) Paper 1 — "ignore deadlines": handle the
+  num_warps finding THOROUGHLY (no rush, no shortcuts); disclosing/re-baselining paper 1 is OK when
+  the analysis is solid. (2) Paper 2 — "fai tutto il possibile, cerca il meglio; ti fermo io":
+  FULL AMBITION GREEN-LIT, including M3 (build the real IR primitive). Max quality, max scope.
+- [ ] **M3 — build the IR-level "scalar/lane program" primitive (GREEN-LIT, sequence smartly).**
+  M2e localized the residual to per-instruction tile tax (cross-lane `tl.reduce` for the union +
+  masking + weak scalar ILP). De-risk in order:
+    - **M3-lite (do first):** probe escape hatches — `tl.inline_asm_elementwise` (PTX) and warp
+      intrinsics — to express a per-lane scalar worklist with NO cross-lane reduce and NO masking
+      (each lane runs its own ffs loop). Measure: does removing the tile-tax sources close the gap
+      to CUDA? This bounds whether the primitive is latent-but-unexposed vs needs real compiler work.
+    - **M3-full (if lite insufficient/promising):** add a `tl.scalar_program` / per-lane serial
+      construct in the Triton MLIR stack (build Triton from source, new IR op + lowering); show the
+      idiomatic front end + new primitive lands within ~1.5–2× of CUDA. The landmark "cure".
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
-## Next concrete actions (do these in order)
-0. **⛔ AWAITING USER DECISION (see end of milestone list).** Two threads to resolve with user:
-   (a) M3 go/no-go (build the MLIR scalar-program primitive vs ship the decomposition story);
-   (b) ⚠️ PAPER-1 INTEGRITY: the HPEC worklist Triton number (~24 Gbps / ~6.5×) is the num_warps=4
-   default; num_warps=1 is ~3.3× faster. Must disclose / re-baseline / sweep num_warps before the
-   July-7 submission, framed as the "did you tune Triton?" de-risk. Likely a quick paper-1 fix.
-1. **(if user OKs, cheap) M2d-followup — fix gpufsm backend default to num_warps=1** for the Triton
-   worklist + re-run paper-1 worklist numbers; disclose the sweep. Strengthens both papers.
-2. **M2e — lane-pack the WORK-EFFICIENT worklist (the crux that reconnects to the M0 anchor).**
-   M2c settled the dense case: lane-packing IS occupancy-gated and recovers most of the warp-
-   redundancy at scale (see finding). But the M0 anchor (10×) was the WORKLIST (ffs O(active)), not
-   the dense scan. The genuine missing primitive should bite HERE: lane-packing the worklist forces
-   processing the active-set UNION across 32 lanes (can't ffs-skip per-lane) + no per-lane early
-   exit. Build a lane-packed worklist and measure: does it FAIL to beat the scalar worklist (union
-   cost) even at large batch? If so, that isolates per-lane data-dependent control flow as the
-   irreducible primitive (dense is lane-packable, work-efficient is NOT). Oracle-gate; sweep batch.
-   This is the decisive figure: "lane-packing rescues the dense kernel but NOT the work-efficient
-   one → the regret that survives is per-lane control flow."
-2. **M2d — cheap, high-value: does the REAL triton/worklist waste Nx from default num_warps?**
-   The gpufsm `_worklist_kernel` launches with default num_warps=4 → 4 warps/program ALL run one
-   string redundantly (M1 saw 128 threads/program). Test triton/worklist at num_warps=1 vs 4 — if
-   ~4× free, a big chunk of the 10× anchor is just a launch-config artifact (must be disclosed, and
-   re-baselines the anchor). Quick edit/standalone.
-3. **M2b (only if a gap remains):** `tl.inline_asm_elementwise` PTX for the int64 bitset ops —
-   bounds the residual H2/H3 (codegen/int64) after the control-flow effects are accounted.
-4. **M3 / USER DECISION POINT:** once M2c/M2d are in, the picture determines whether the full cure
-   needs building the MLIR `tl.scalar_program` lowering (weeks, Triton-from-source) or whether the
-   paper stands on "the obvious tile-level cure recovers only ~Nx → the missing primitive is
-   IR-level per-lane control flow" (strong CGO/CC story WITHOUT the build). Surface to user then.
+## Next concrete actions (FULL-AMBITION program, user green-lit; sequence to de-risk)
+1. **M2f — num_warps PRECISION sweep** (nw=1,2,4,8) on triton/worklist: pure measurement, exact
+   artifact size → `paper2/data/m2f_numwarps_rtx4070.csv`. Underpins the paper-1 disclosure.
+2. **M3-lite — escape-hatch scalar-lane program** (`tl.inline_asm_elementwise` PTX / warp
+   intrinsics): express a per-lane ffs worklist with NO cross-lane reduce + NO masking; measure
+   whether removing the M2e tile-tax sources closes the gap to CUDA. Nsight to confirm. This decides
+   how much M3-full can possibly buy.
+3. **M4 — generalize the decomposition to the DFA gather kernel** (paper-1's memory-bound second
+   face): does artifact/recoverable/irreducible hold there too? Strengthens generality.
+4. **Real automata** (ANMLZoo: Levenshtein/Brill/Fermi via gpufsm.io.datasets): confirm the
+   decomposition on non-synthetic NFAs (sparser active sets → union cost smaller → packing better?).
+5. **M3-full — build the Triton MLIR `tl.scalar_program` primitive** (Triton from source, new op +
+   lowering). The landmark cure. Gated on M3-lite's signal but green-lit to attempt.
+6. **Paper-1 num_warps disclosure** (thorough, no deadline pressure): once M2f is solid, update the
+   paper-1 worklist number + add the num_warps sweep as methodology ("we tuned Triton").
+7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
 - 2026-06-28: **M2e — anchor decomposed; residual is per-instruction tile tax; num_warps artifact
