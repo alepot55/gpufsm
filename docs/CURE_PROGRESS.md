@@ -96,8 +96,17 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
    - **M3-lite-b (cheap): BLOCK/occupancy sweep on WP2** (BLOCK=64,128,256 → more warps/program →
      higher occupancy → more cross-warp latency hiding). Does WP2/CU close toward ~0.7–0.8×? Bounds
      the occupancy lever vs the fundamental intra-warp limit. Also try int32 tile for ≤32 states.
+2b. [x] **M3-lite-b DONE — occupancy lever is EXHAUSTED; the intra-warp limit is fundamental.**
+   WP2 BLOCK sweep {32,64,128,256} (num_warps=BLOCK/32), oracle-gated, event-timed @16384:
+   WP2/CU = **0.49× (B=32, best)** → 0.34× (64) → 0.35× (128) → 0.31× (256). Bigger BLOCK HURTS:
+   the lockstep `while tl.max` runs to the busiest of more lanes → more divergence/wasted masked
+   iterations, cancelling any occupancy gain (Nsight B=128: occ 23% ≈ same, issue 10→18% but net
+   throughput worse). ⇒ you cannot close the ~2× by throwing warps at it in pure Triton; the
+   per-lane-independent-stream (thread-model) primitive is the only lever → motivates M3-full.
+   `paper2/data/m3_lite_b_occupancy_rtx4070.csv`. **The pure-Triton ceiling is WP2/CU ≈ 0.49×.**
 3. **M4 — generalize the decomposition to the DFA gather kernel** (paper-1's memory-bound second
-   face): does artifact/recoverable/irreducible hold there too? Strengthens generality.
+   face): does artifact/recoverable/irreducible hold there too? Strengthens generality. Plus real
+   ANMLZoo automata (gpufsm.io.datasets) — sparser active sets may change the union/divergence costs.
 4. **Real automata** (ANMLZoo: Levenshtein/Brill/Fermi via gpufsm.io.datasets): confirm the
    decomposition on non-synthetic NFAs (sparser active sets → union cost smaller → packing better?).
 5. **M3-full — build the Triton MLIR `tl.scalar_program` primitive** (Triton from source, new op +
@@ -107,6 +116,11 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M3-lite-b — occupancy lever exhausted, intra-warp limit confirmed fundamental.**
+  WP2/CU = 0.49× at BLOCK=32 and only WORSENS with bigger BLOCK (0.31× at 256): more warps/program
+  raise issue rate slightly but the larger lockstep tile adds divergence that cancels it. Pure-Triton
+  ceiling ≈ 0.49× CUDA (~2× regret). Only a thread-model primitive (independent per-lane streams) can
+  close it → the constructive case for M3-full.
 - 2026-06-28: **M3-lite — the missing primitive is intra-warp latency hiding.** A per-lane scalar
   worklist in pure Triton (own ffs + per-lane gather, no cross-lane reduce) beats the M2e union
   worklist 1.27× but is still 2× under CUDA. Nsight: FEWER warp-inst than CUDA + same occupancy yet
