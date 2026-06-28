@@ -180,6 +180,14 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **Paper expanded to 5pp (clean).** Added Methodological Integrity (the 2 self-corrected
+  hypotheses), fuller Threats, Reproducibility section, self-contained figure captions; fixed a lost
+  `\section{Related Work}` header. 0 undefined/0 overfull, every number CSV-traced. **Assessment: the
+  paper is submission-ready and dense; further LaTeX expansion toward 11pp is low marginal value
+  (CGO does not require it).** The remaining HIGH-value frontiers are (i) the multi-word lane-packed
+  kernel to test on real ANMLZoo automata (removes the ≤64-state threat — tractable strengthening),
+  and (ii) M3-full (the real Triton-MLIR primitive — high value, multi-hour fragile, user-gated).
+  Next: attempt the multi-word kernel (strengthening) before considering M3-full.
 - 2026-06-28: **LaTeX expanded — results table + Little's-law prose + denser method/related-work,
   still 0 undefined / 0 overfull.** Table I = multiplicative decomposition (28→104→383→735 Gbps =
   3.7×·3.7×·1.9× @16384, CSV-traced). Decided M8-as-new-experiment would mostly reconfirm M4 (DFA
