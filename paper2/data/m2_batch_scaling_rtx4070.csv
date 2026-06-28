@@ -1,0 +1,4 @@
+n_strings,total_warps,pure_packing_C_over_B_median,realistic_C_over_A_median,C_packed_gbps_max,gpu
+4096,128,3.19,1.78,47.1,RTX4070
+16384,512,9.79,5.55,145.7,RTX4070
+65536,2048,19.35,10.79,266.9,RTX4070

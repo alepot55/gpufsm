@@ -23,6 +23,7 @@ Usage:  .venv/bin/python experiments/cure/m2_lane_packed.py
 
 from __future__ import annotations
 
+import os
 import random
 import statistics
 import sys
@@ -38,7 +39,7 @@ from gpufsm.nfa import ANY_SYMBOL, NFABuilder
 from gpufsm.registry import Backend
 
 SLEN = 256
-N_STRINGS = 4096
+N_STRINGS = int(os.environ.get("M2_N_STRINGS", "4096"))  # M2c sweeps batch to test occupancy
 ALPHABET = "abcde"
 WARMUP, SAMPLES = 3, 9
 BLOCK = 32  # one warp: 32 strings packed into 32 lanes

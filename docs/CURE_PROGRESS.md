@@ -44,14 +44,16 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 - [ ] **M4 — generalize (DFA gather) + write-up + artifact.**
 
 ## Next concrete actions (do these in order)
-1. **M2c — DISAMBIGUATE occupancy-starvation vs fundamental latency gap (the decisive test).**
-   Lane-packed C dropped to 5.6% occupancy at batch 4096 (full lane-packing → only 4096/32 = 128
-   warps, under-filling 46 SMs). Re-run the A/B/C sweep at LARGE batch (16384, 65536) where C has
-   enough warps for occupancy. TWO outcomes, both decisive:
-     - C approaches CUDA (gap → ~2×) at large batch ⇒ lane-packing IS most of the cure, just
-       occupancy-starved at small batch ⇒ paper = "latent primitive, scale-gated."
-     - C stays ~3–4× off ⇒ the residual is fundamental per-lane control-flow/latency ⇒ M3 needed.
-   Also profile C at batch 16384 (occupancy should rise; does throughput rise proportionally?).
+1. **M2e — lane-pack the WORK-EFFICIENT worklist (the crux that reconnects to the M0 anchor).**
+   M2c settled the dense case: lane-packing IS occupancy-gated and recovers most of the warp-
+   redundancy at scale (see finding). But the M0 anchor (10×) was the WORKLIST (ffs O(active)), not
+   the dense scan. The genuine missing primitive should bite HERE: lane-packing the worklist forces
+   processing the active-set UNION across 32 lanes (can't ffs-skip per-lane) + no per-lane early
+   exit. Build a lane-packed worklist and measure: does it FAIL to beat the scalar worklist (union
+   cost) even at large batch? If so, that isolates per-lane data-dependent control flow as the
+   irreducible primitive (dense is lane-packable, work-efficient is NOT). Oracle-gate; sweep batch.
+   This is the decisive figure: "lane-packing rescues the dense kernel but NOT the work-efficient
+   one → the regret that survives is per-lane control flow."
 2. **M2d — cheap, high-value: does the REAL triton/worklist waste Nx from default num_warps?**
    The gpufsm `_worklist_kernel` launches with default num_warps=4 → 4 warps/program ALL run one
    string redundantly (M1 saw 128 threads/program). Test triton/worklist at num_warps=1 vs 4 — if
@@ -65,6 +67,16 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
    IR-level per-lane control flow" (strong CGO/CC story WITHOUT the build). Surface to user then.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M2c — lane-packing's benefit is OCCUPANCY-GATED; at scale it recovers most of the
+  redundancy.** Batch-scaling the pure-packing ratio C/B: **3.2× @4096 → 9.8× @16384 → 19.4×
+  @65536** (toward the ideal 32×), realistic C/A → 10.8× @65536. Absolute lane-packed dense Triton
+  reaches **108–267 Gbps** at batch 65536 — IN THE RANGE of the CUDA worklist anchor (227 Gbps).
+  So M2a's "only 3.2×" was small-batch occupancy starvation, not a fundamental wall. Revised
+  picture: for the DENSE algorithm, lane-packing (Triton-expressible via the SHARED-CSR uniformity
+  that keeps inner-loop bounds scalar) closes most of the regret given enough strings. The
+  IRREDUCIBLE regret lives on the WORK-EFFICIENT worklist, where per-lane ffs-skipping + early-exit
+  can't be lane-packed (active-set union) — the 0.53× outlier (early-accepting strings) is the
+  early-exit-divergence fingerprint. → M2e tests exactly this. `m2_batch_scaling_rtx4070.csv`.
 - 2026-06-28: **M2a — the obvious cure is only partial, and Nsight proves WHY.** Lane-packing
   removes ~26× warp-instructions (B→C) but moves throughput only 3.8× → M1's warp-redundancy is
   hidden by occupancy, not the bottleneck. Pure packing 3.2× / realistic 1.8×. New tile-only costs:
