@@ -6,12 +6,12 @@ implement that lowering constructively and measure that it CLOSES the residual.
 
 `lower_scalar_program_to_cuda(spec)` takes the SAME idiomatic per-lane automaton step the Triton WP2
 kernel expresses (active-set `ffs` worklist over a register bitset, data-dependent CSR loop, scalar
-gather) and emits a thread-model CUDA kernel (one thread = one string), compiled with nvcc to a .so
-called via ctypes. The front-end is per-lane scalar logic; the lowering target is threads, not tiles.
-Claim: the generated kernel recovers CUDA-level throughput (~the hand-written cuda/worklist), i.e. the
-~2x tile-SPMD residual (Triton WP2 = 0.51x of CUDA) vanishes once the same per-lane program is lowered
-to the thread model. Profiling SP (`profile <ns>` arg + ncu) confirms it acts via the diagnosed
-mechanism: issue activity ~36% (vs the tile's 9.9%) and long_scoreboard stall ~29x lower.
+gather) and emits a thread-model CUDA kernel (one thread = one string), compiled with nvcc to a
+.so called via ctypes. The front-end is per-lane scalar logic; the lowering target is threads.
+Claim: the generated kernel recovers CUDA-level throughput, i.e. the ~2x tile-SPMD residual (WP2
+= 0.51x of CUDA) vanishes once the same per-lane program is lowered to threads. Profiling SP
+(`profile <ns>` + ncu) confirms it acts via the diagnosed mechanism: issue activity ~36% (vs the
+tile's 9.9%) and long_scoreboard stall ~29x lower.
 
 Oracle-gated bit-for-bit vs reference.py. Compares: SP (scalar_program->CUDA, the cure), CU
 (hand-written cuda/worklist), WP2 (Triton tile per-lane, the residual). <=64 states (single int64,
