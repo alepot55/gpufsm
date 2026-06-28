@@ -61,6 +61,20 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
   num_warps finding THOROUGHLY (no rush, no shortcuts); disclosing/re-baselining paper 1 is OK when
   the analysis is solid. (2) Paper 2 — "fai tutto il possibile, cerca il meglio; ti fermo io":
   FULL AMBITION GREEN-LIT, including M3 (build the real IR primitive). Max quality, max scope.
+- [x] **M3-lite DONE — the missing primitive is INTRA-WARP LATENCY HIDING (decisive mechanism).**
+  Built WP2: a per-lane scalar worklist in PURE Triton (each lane its own ffs + per-lane CSR gather,
+  NO cross-lane reduce, NO union). `experiments/cure/m3_lite_scalarlane.py` → `m3_lite_rtx4070.csv`,
+  `m3_lite_nsight_rtx4070.csv`. Oracle-validated. Results @16384: **WP2/WP = 1.27×** (removing the
+  cross-lane union reduce helped, confirming it was a tile-tax source) but **WP2/CU = 0.51×** (still
+  ~2× slower than CUDA). Nsight nails WHY: WP2 has **FEWER warp-inst than CUDA (4.66M vs 5.07M)** and
+  SAME occupancy (22.5%), yet 3.3× slower because **issue_active = 10.1%**, warp-latency = 27 cyc/inst
+  → LATENCY-BOUND. Root cause: in CUDA a warp = 32 INDEPENDENT threads (32 strings) → a stalled load
+  on one lane is hidden by 31 independent lanes' work; in Triton a warp = 32 lanes in LOCKSTEP on one
+  instruction stream → a gather stalls all lanes together, hiding only ACROSS warps (occupancy-bound).
+  **THE missing primitive = intra-warp latency hiding via independent per-lane instruction streams**,
+  which the thread model (CUDA/Warp) has and tile/SPMD structurally lacks. Reconnects exactly to
+  paper-1's "paradigm not abstraction-height". Bounds M3-full: closing the residual ~2× means giving
+  each lane an independent instruction stream = emitting thread-model (Warp-like) code for the region.
 - [ ] **M3 — build the IR-level "scalar/lane program" primitive (GREEN-LIT, sequence smartly).**
   M2e localized the residual to per-instruction tile tax (cross-lane `tl.reduce` for the union +
   masking + weak scalar ILP). De-risk in order:
@@ -77,10 +91,11 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 1. [x] **M2f DONE — num_warps artifact = 3.4× median** (2.77×@4096 → 3.44×@16384 → 3.69×@65536),
    monotone ~halving per num_warps doubling. `paper2/data/m2f_numwarps_rtx4070.csv`. Sizes the
    launch-config component of the anchor; underpins paper-1 disclosure.
-2. **M3-lite — escape-hatch scalar-lane program** (`tl.inline_asm_elementwise` PTX / warp
-   intrinsics): express a per-lane ffs worklist with NO cross-lane reduce + NO masking; measure
-   whether removing the M2e tile-tax sources closes the gap to CUDA. Nsight to confirm. This decides
-   how much M3-full can possibly buy.
+2. [x] **M3-lite DONE** — see milestone. Residual ~2× is intra-warp latency hiding (latency-bound,
+   issue 10%). Next sub-steps before M3-full:
+   - **M3-lite-b (cheap): BLOCK/occupancy sweep on WP2** (BLOCK=64,128,256 → more warps/program →
+     higher occupancy → more cross-warp latency hiding). Does WP2/CU close toward ~0.7–0.8×? Bounds
+     the occupancy lever vs the fundamental intra-warp limit. Also try int32 tile for ≤32 states.
 3. **M4 — generalize the decomposition to the DFA gather kernel** (paper-1's memory-bound second
    face): does artifact/recoverable/irreducible hold there too? Strengthens generality.
 4. **Real automata** (ANMLZoo: Levenshtein/Brill/Fermi via gpufsm.io.datasets): confirm the
@@ -92,6 +107,13 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M3-lite — the missing primitive is intra-warp latency hiding.** A per-lane scalar
+  worklist in pure Triton (own ffs + per-lane gather, no cross-lane reduce) beats the M2e union
+  worklist 1.27× but is still 2× under CUDA. Nsight: FEWER warp-inst than CUDA + same occupancy yet
+  3.3× slower, issue_active 10% → latency-bound. CUDA's warp = 32 independent threads hides
+  per-element load latency intra-warp; Triton's warp = 32 lockstep lanes cannot. That is the
+  irreducible primitive and it bounds M3-full (must emit thread-model code). Also M2f: num_warps
+  artifact = 3.4×.
 - 2026-06-28: **M2e — anchor decomposed; residual is per-instruction tile tax; num_warps artifact
   found.** 4-way worklist head-to-head across batch. (1) gpufsm triton/worklist default num_warps=4
   wastes ~3.3× vs nw=1 → re-baselines the anchor and ⚠️ implicates paper-1's worklist number.
