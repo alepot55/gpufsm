@@ -34,7 +34,6 @@ from experiments.cure.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
-    make_batch,
     random_nfa,
     to_device,
 )
@@ -44,7 +43,13 @@ from gpufsm.api import run, run_batch
 from gpufsm.nfa import ANY_SYMBOL, NFABuilder
 from gpufsm.registry import Backend
 
-N_STRINGS = 4096
+N_STRINGS = int(__import__("os").environ.get("M2_N_STRINGS", "4096"))
+
+
+def make_batch_local(seed: int):
+    rng = np.random.default_rng(seed)
+    flat = rng.integers(ord("a"), ord("a") + 5, size=N_STRINGS * SLEN, dtype=np.uint8)
+    return flat.reshape(N_STRINGS, SLEN)
 
 
 def random_nfa_noaccept(n: int, seed: int):
@@ -206,7 +211,7 @@ def main() -> int:
     rows = []
     for ns in (16, 32, 48, 64):
         for seed in (0, 1):
-            data = make_batch(seed)
+            data = make_batch_local(seed)
             # correctness on a WITH-accept NFA (real matches); throughput on a no-accept variant
             # (sustained full-length scan, no early-termination / per-lane early-exit confound).
             nfa_acc = random_nfa(ns, seed=1000 + ns + seed)
@@ -251,9 +256,7 @@ def main() -> int:
         spcu = [r[2] / r[3] for r in rows]
         spwp2 = [r[2] / r[4] for r in rows]
         print(f"\nSP/CU (cure vs hand-CUDA): median {statistics.median(spcu):.2f}x (>=1)")
-        print(
-            f"SP/WP2 (cure vs tile): median {statistics.median(spwp2):.2f}x (residual closed)"
-        )
+        print(f"SP/WP2 (cure vs tile): median {statistics.median(spwp2):.2f}x (residual closed)")
         outp = Path("paper2/data/m10_scalar_program_rtx4070.csv")
         outp.parent.mkdir(parents=True, exist_ok=True)
         with outp.open("w") as f:
