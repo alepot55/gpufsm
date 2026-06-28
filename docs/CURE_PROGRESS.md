@@ -180,6 +180,12 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LaTeX expanded — results table + Little's-law prose + denser method/related-work,
+  still 0 undefined / 0 overfull.** Table I = multiplicative decomposition (28→104→383→735 Gbps =
+  3.7×·3.7×·1.9× @16384, CSV-traced). Decided M8-as-new-experiment would mostly reconfirm M4 (DFA
+  crossover already = Little's-law made quantitative) → folded the argument into prose, no weak rerun.
+  Remaining: push toward CGO ~11pp (port honest-corrections narrative, full threats, artifact
+  appendix); M3-full still deferred. Paper is submission-ready in skeleton; expansions are incremental.
 - 2026-06-28: **LaTeX paper built — `paper2/gpufsm2.tex` compiles clean.** 4pp IEEE conference
   (IEEEtran.cls copied locally; unsrt bibstyle since IEEEtran.bst absent), 5 figures, 21-entry
   refs.bib from the verified citations, 0 undefined refs, 0 overfull hboxes; every number matches the
