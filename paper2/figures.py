@@ -210,12 +210,38 @@ def fig_roofline() -> None:
     plt.close(fig)
 
 
+def fig_cure() -> None:
+    """(f) The cure implemented: per-lane source -> threads (SP) vs tiles (WP2) vs CUDA. m10."""
+    rows = _read("m10_scalar_program_rtx4070.csv")
+    sp = statistics.median(float(r["sp_gbps"]) for r in rows)
+    cu = statistics.median(float(r["cu_gbps"]) for r in rows)
+    wp2 = statistics.median(float(r["wp2_gbps"]) for r in rows)
+    labels = ["Triton tile\n(WP2)", "hand-CUDA\n(worklist)", "scalar_program\n→ threads (cure)"]
+    vals = [wp2, cu, sp]
+    colors = ["#2980b9", "#7f8c8d", "#27ae60"]
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bars = ax.bar(labels, vals, color=colors)
+    for b, v in zip(bars, vals, strict=True):
+        ax.text(b.get_x() + b.get_width() / 2, v + 20, f"{v:.0f}", ha="center", fontsize=9)
+    ax.set_ylabel("Throughput (Gbps)")
+    ax.set_ylim(0, max(vals) * 1.18)
+    ax.set_title(
+        "The cure, implemented: same per-lane source, threads vs tiles\n"
+        f"(SP/WP2 = {sp / wp2:.1f}×, SP/CU = {sp / cu:.1f}×; batch 16384, ≤64 states)",
+        fontsize=9,
+    )
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_cure.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> int:
     fig_decomposition()
     fig_occupancy_gating()
     fig_mechanism()
     fig_dfa_crossover()
     fig_roofline()
+    fig_cure()
     print(f"wrote figures to {OUT}/:")
     for p in sorted(OUT.glob("*.png")):
         print(f"  {p.name}")

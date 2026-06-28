@@ -5,6 +5,13 @@ publisher/arXiv pages, uncertainties flagged). Companion to `docs/LITERATURE_REV
 automata + abstraction-cost). This doc covers the axes specific to paper 2: GPU execution-model /
 latency-hiding, tile-DSL design space, and the venue/threat strategy.
 
+> UPDATE (M10): the cure is no longer just a design proposal — its lowering is IMPLEMENTED and
+> measured (the same per-lane source → thread-model CUDA runs 4.2× the tile lowering, matches/exceeds
+> hand-CUDA; `experiments/cure/m10_scalar_program.py`). This moves the contribution from
+> "characterization + design" toward "characterization + diagnosis + demonstrated cure", which raises
+> the strongest desk-reject risk's bar (the cure is shown to work, not just argued). The two
+> distinctions below (layout≠control-flow; not-just-autotuning) still anchor the novelty.
+
 ## 1. Verdict: the niche is EMPTY, novelty holds — but on two sharp distinctions
 
 Confirmed across all four sweeps: **no work studies the GPU execution-paradigm / DSL-expressibility

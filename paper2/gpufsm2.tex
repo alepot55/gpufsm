@@ -54,6 +54,9 @@ memory-bound DFA), unifying both faces through one latency mechanism (Sec.~\ref{
 regret ${\sim}3.4\times$), a methodological caution for DSL benchmarking (Sec.~\ref{sec:artifact}).
 \item The \textbf{missing-primitive design} + a bound on its payoff + the thread-model existence proof,
 distinguished from Gluon's per-thread \emph{layout} (Sec.~\ref{sec:cure}).
+\item \textbf{The cure, implemented}: we lower the same idiomatic per-lane source to the thread model
+and measure that it runs $4.2\times$ faster than the tile lowering and matches/exceeds hand-CUDA,
+closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:cure}).
 \end{enumerate}
 
 \section{Background and Method}
@@ -239,8 +242,9 @@ Correctness gates every measurement: each kernel/config is checked bit-for-bit a
 this paper traces to a versioned CSV; all figures regenerate from those CSVs by a single script, so the
 plots cannot drift from the measurements. The Gluon expressibility claim is a runnable probe that exits
 $0$ on the expected compile failure and $1$ if a future Gluon ever compiles it---falsifiable by
-construction. The artifact (kernels, oracle, sweeps, profiling commands, CSVs) supports one-command
-regeneration.
+construction. The artifact (kernels, oracle, sweeps, profiling commands, CSVs, and the
+\texttt{scalar\_program} lowering) supports one-command regeneration; all figures here are emitted
+from the versioned CSVs by a single script.
 
 \section{Related Work}
 \textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA: ngAP's
@@ -297,6 +301,10 @@ instruction- nor bandwidth-bound---the residual is latency.}\label{fig:roof}\end
 \caption{DFA: lane-packed Triton trails CUDA $\sim$1.7$\times$ while the table is cache-resident but
 \emph{matches} it ($1.05\times$) once the $16$\,MB table spills past L2---both then rely on cross-warp
 parallelism. The residual is regime-dependent.}\label{fig:dfa}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_cure.png}
+\caption{The cure, implemented (batch 16384, $\le 64$ states): the \emph{same} per-lane source lowered
+to threads (\texttt{scalar\_program}) runs $4.2\times$ the tile lowering (Triton WP2) and matches/exceeds
+hand-CUDA---the residual closed by construction.}\label{fig:cure}\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}

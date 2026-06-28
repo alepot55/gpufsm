@@ -193,6 +193,13 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **FINAL QA — paper consistency-verified + cure figure + 6th contribution.** Re-grepped
+  EVERY headline number against the CSVs — all match (anchor 10.11, num_warps 2.77/3.44/3.69,
+  lane-pack 3.19/9.79/19.35, residual 0.51, long_scoreboard 15.3, issue 9.89/41.00, DFA 0.55–1.05,
+  SP/WP2 4.16, SP/CU 2.15). Added Fig. (f) `fig_cure` (SP vs CU vs WP2, from m10 CSV), a 6th
+  contribution ("the cure, implemented"), and an artifact-availability note. RELATED_WORK updated:
+  cure is now implemented, not just designed. Paper compiles 5pp, 0 undefined/0 overfull, 6 figures.
+  **The paper is complete, internally consistent, and submission-ready (diagnosis→implemented cure).**
 - 2026-06-28: **M3-full / M10 — THE CURE IS IMPLEMENTED AND MEASURED (Track B done; Track A build
   abandoned honestly).** Track B: `experiments/cure/m10_scalar_program.py` lowers the SAME idiomatic
   per-lane automaton body to a per-thread CUDA kernel (nvcc → .so → ctypes, bypassing torch's C++
