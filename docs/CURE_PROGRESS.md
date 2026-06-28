@@ -180,6 +180,15 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **M9 — multi-word lane-packed worklist works + oracle-correct to 256 states; residual is
+  register-regime-scoped.** `experiments/cure/m9_multiword.py` ([BLOCK,NWORDS] tile, per-word ffs +
+  per-lane masked multi-word scatter) validated bit-for-bit vs reference at 96/128/192/256 states
+  (NWORDS 2–4). `m9_multiword_rtx4070.csv`: MW/CU = 1.50/2.15/1.44/1.69 — but this FLIPS above 1 not
+  because Triton closed the residual; **cuda/worklist's register fast-path degrades past 64 states**
+  (227 Gbps @≤64 → 13–27 @96–256, register pressure), so the >64 head-to-head is CONFOUNDED. Honest
+  scope: the clean ~2× residual is a ≤64-state register-resident-regime result. Threat "prototype is
+  ≤64 states" addressed (it generalizes + stays correct); ANMLZoo-scale needs the per-lane multi-word
+  scatter which explodes — itself the tile limitation we study. Paper Threats updated; recompiles 5pp clean.
 - 2026-06-28: **Paper expanded to 5pp (clean).** Added Methodological Integrity (the 2 self-corrected
   hypotheses), fuller Threats, Reproducibility section, self-contained figure captions; fixed a lost
   `\section{Related Work}` header. 0 undefined/0 overfull, every number CSV-traced. **Assessment: the

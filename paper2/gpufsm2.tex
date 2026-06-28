@@ -203,11 +203,14 @@ corrections sharpened, rather than weakened, the central claim.
 \emph{Single GPU.} Results are on one RTX 4070; the \emph{mechanism} (intra-warp latency hiding, the
 issue-activity differential, the DRAM convergence) is a property of the SIMT execution model and the
 tile-vs-thread lowering, hence architecture-general, but the absolute decomposition factors should be
-re-measured on an A100/H100 (larger L2 shifts the DFA crossover). \emph{Prototype scope.} The
-lane-packed kernels are single-word ($\le 64$ states); real ANMLZoo automata (Levenshtein 2787, Brill
-42661, Fermi 40786) run oracle-valid but at sub-Gbps---an \emph{algorithmic} cost of large/deep
-automata, orthogonal to the abstraction regret (consistent with prior work), and testing lane-packing
-on them needs a multi-word kernel (future work). \emph{Tuning.} \texttt{num\_warps} is a knob; we
+re-measured on an A100/H100 (larger L2 shifts the DFA crossover). \emph{Prototype scope.} A multi-word
+generalization of the lane-packed kernel (NWORDS int64 words/lane) is oracle-validated to 256 states,
+so the prototype is not artificially limited; but the clean ${\sim}2\times$ residual is a
+\emph{register-resident-regime} ($\le 64$-state) result---past 64 states the CUDA register worklist
+itself degrades (register pressure), so the head-to-head is confounded by both baselines losing the
+register-resident advantage, and ANMLZoo-scale automata (Brill 42661 $=$ 667 words) make the per-lane
+multi-word scatter explode---itself a manifestation of the tile limitation we study. Real automata run
+oracle-valid but sub-Gbps (an \emph{algorithmic} cost, orthogonal to the regret). \emph{Tuning.} \texttt{num\_warps} is a knob; we
 disclose the full sweep rather than a single config, rebutting the autotuning
 counter-thesis~\cite{ringlein2025}: the Triton/Gluon same-MLIR control plus the disclosed sweep
 separate \emph{tuning} (which closes component A and part of B) from \emph{expressibility} (the
