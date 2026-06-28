@@ -75,7 +75,19 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
   which the thread model (CUDA/Warp) has and tile/SPMD structurally lacks. Reconnects exactly to
   paper-1's "paradigm not abstraction-height". Bounds M3-full: closing the residual ~2× means giving
   each lane an independent instruction stream = emitting thread-model (Warp-like) code for the region.
-- [ ] **M3 — build the IR-level "scalar/lane program" primitive (GREEN-LIT, sequence smartly).**
+- [~] **M3-full FEASIBILITY assessed (2026-06-28) → deprioritized as loop work, kept as future
+  work / dedicated effort.** Shallow-cloned Triton (`/tmp/m3full/triton-src`, main @c05aa65). Build
+  reqs: setuptools+cmake+ninja+nanobind + a pinned LLVM (downloaded/built — the heavy part, 20–60+
+  min, GB disk). Working env is triton **3.5.1** + torch 2.9.1+cu128; building modified main would
+  mismatch torch's bundled triton and needs an isolated venv → fragile, multi-hour, version-coupled.
+  JUDGEMENT (user mandate "cerca il meglio", "ti fermo io"): the paper's scientific contribution is
+  COMPLETE without it — the constructive cure is already bounded+demonstrated: pure-Triton ceiling
+  PROVEN at 0.49× (M3-lite-b) + thread model (CUDA here, Warp in paper 1) achieves 1.0× = existence
+  proof that supplying the primitive closes the gap + we can specify the IR primitive precisely
+  (`tl.scalar_program` region lowering each lane to an independent instruction stream). Building it
+  in Triton-MLIR is arguably a SEPARATE systems paper. So: frame as design + existence proof + future
+  work; revisit a real build only after the paper-2 core (decomposition + M4 generality) is written.
+- [ ] **M3-full (deferred) — actual Triton-MLIR `tl.scalar_program` op + lowering.** Future work.
   M2e localized the residual to per-instruction tile tax (cross-lane `tl.reduce` for the union +
   masking + weak scalar ILP). De-risk in order:
     - **M3-lite (do first):** probe escape hatches — `tl.inline_asm_elementwise` (PTX) and warp
