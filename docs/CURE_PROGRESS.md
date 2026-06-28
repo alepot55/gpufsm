@@ -130,8 +130,16 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
    residual) and the DFA-DRAM (huge latency → cross-warp dominates → gap closes). ⇒ the abstraction
    regret / cure efficacy is set by the latency regime, mapping onto paper-1's two faces (control-flow
    vs memory). STRONG generalization of the decomposition.
-4. **M4b — real ANMLZoo automata** (gpufsm.io.datasets: Levenshtein/Brill/Fermi): confirm the NFA
-   decomposition on non-synthetic NFAs (sparser active sets). Then start the paper-2 DRAFT.
+4. [~] **M4b PARTIAL — real automata run+oracle-valid but exceed the ≤64-state prototype.** Download
+   works (Levenshtein 2787, Brill 42661, Fermi 40786 states). cuda/worklist_global is oracle-valid on
+   Levenshtein but absolute throughput is **sub-Gbps (0.1–0.4)** = algorithmic cost of large/deep
+   automata, ORTHOGONAL to the regret thesis (consistent with paper 1). The lane-packed Triton
+   prototype is single-int64-word (≤64 states), so testing lane-packing on real automata needs a
+   MULTI-WORD kernel (per-word ffs + multi-word per-lane gather) — substantial, bug-prone, and the
+   decomposition is a PARADIGM property not a size property. Documented as future strengthening, not
+   blocking. → pivot to the DRAFT (now primary deliverable).
+5. **DRAFT (primary) — paper2/DRAFT.md**: spine = the decomposition + regime-dependence + IR-primitive
+   design + thread-model existence proof + threats. Every number from paper2/data/*.csv.
 4. **Real automata** (ANMLZoo: Levenshtein/Brill/Fermi via gpufsm.io.datasets): confirm the
    decomposition on non-synthetic NFAs (sparser active sets → union cost smaller → packing better?).
 5. **M3-full — build the Triton MLIR `tl.scalar_program` primitive** (Triton from source, new op +
