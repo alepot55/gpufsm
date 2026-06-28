@@ -193,6 +193,22 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P2 PLATFORM LIVE — Triton-from-source 3.8.0 builds, runs, and the pass target is pinned
+  on real IR.** The make-or-break prerequisite is DONE: `libtriton.so` (823 MB) built; Triton 3.8.0
+  imports via `PYTHONPATH=$HOME/m3full_build/triton-src/python`, JITs a kernel, runs correctly on GPU,
+  full pipeline ttir→ttgir→llir→ptx→cubin. `experiments/cure/p2_ttgir_probe.py` (lint-clean, runnable)
+  dumps the TTGIR of a per-lane data-dependent `while tl.max(active)>0` loop and ASSERTS the lock-step
+  signature (falsifiable): an `scf.while` carrying `#blocked` tile tensors whose `scf.condition` is gated
+  by a **`tt.reduce`-to-scalar** of the per-lane predicate → the whole 32-lane tile loops to the BUSIEST
+  lane, idle lanes masked. That reduce-gate IS the masked-lane waste / issue-deficit made syntactic — the
+  exact thing the `thread_region` pass must rewrite. IR saved to `paper2/data/landmark/p2_lockstep.ttgir`.
+  `docs/P2_PASS_DESIGN.md` written: the working build recipe (cmake<4 + nanobind 2.10.2 + python3.12-dev
+  + direct `cmake --build`), the pipeline insertion point (`make_ttgir` in nvidia/backend/compiler.py;
+  passes in lib/Dialect/TritonGPU/Transforms/), the transformation (Approach B: re-encode sizePerThread=1,
+  drop the tt.reduce gate, per-lane scf.while via ITS, disable pipeliner, reconverge at exit), and the
+  pre-measured payoff bound (M10 = the out-of-band existence proof, 4.2×). REMAINING: the C++
+  ThreadRegion.cpp + binding + selector, then incremental ninja relink + measure. Honest fallback if
+  in-TritonGPU lowering is infeasible: automatic selector over the M10 lowering + this IR design.
 - 2026-06-29: **PAPER INTEGRATION — regret law folded into gpufsm2.tex (positioning → measured).**
   Replaced the speculative `\subsection{Generality (positioning)}` + hand-wavy capability table with
   `\subsection{Generality: the regret law}` (`sec:law`) backed by the 6 measured witnesses + a new
