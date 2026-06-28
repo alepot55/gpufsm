@@ -1,0 +1,2 @@
+workload,n,tile_melem_s,thread_melem_s,regret,gpu
+rejection,1048576,17066.67,68266.67,4.000,RTX4070

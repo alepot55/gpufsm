@@ -193,6 +193,16 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **LANDMARK P1 witness #2 (rejection sampling) — regret 4.0×, isolates masked-lane waste.**
+  `experiments/cure/landmark_rejection.py`: PURE control-flow divergence (data-dependent trip count via
+  a deterministic hash, ~no memory), tile vs thread vs CPU oracle (exact 64-bit-wrap). Oracle-validated;
+  trips min 0/mean 2/max 11 (divergent). **regret = 4.0×** (>> hash-probe's 1.4×). Nsight
+  (`rejection_nsight_rtx4070.csv`): tile thread_inst/inst = 32 (full-width masked, lockstep to max trip)
+  vs thread 17.1 (independent retire); tile issues MORE (53% vs 39%) but wastes it → 4× regret =
+  masked-lane waste, fully exposed because there's no gather-MLP to dilute it (unlike hash-probe).
+  SPECTRUM forming: rejection 4.0× (pure compute divergence) > automata ~2× (divergence diluted by
+  memory latency) > hash-probe 1.4× (gather preserves MLP) > SpMV predict ~1× (aligned, no divergence).
+  Unifying predictor: regret ≈ warp divergence factor × (compute-vs-gather-MLP-preserved fraction).
 - 2026-06-28: **LANDMARK P1 witness #1 (hash-probe) — refines the regret predictor (honest, important).**
   `experiments/cure/landmark_hashprobe.py`: GPU hash table, data-dependent probe loop, tile (Triton
   lane-packed) vs thread (CUDA per-key) vs CPU oracle. Oracle-validated. Regret = ~1.4× and FLAT across

@@ -1,0 +1,3 @@
+kernel,issue_active_pct,thread_inst_per_inst,duration_us,gpu
+rejection_tile,53.33,32.0,29.38,RTX4070
+rejection_thread,39.33,17.12,19.84,RTX4070
