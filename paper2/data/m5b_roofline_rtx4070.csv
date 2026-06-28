@@ -1,0 +1,3 @@
+kernel,warp_inst,thread_inst,duration_us,dram_bytes,issue_active_pct,warp_gips,pct_peak_issue,dram_gbs,pct_peak_dram,gpu
+wp2_perlane_triton,4660276,146973992,123.17,16670000,9.8,37.84,8.30,135.34,26.85,RTX4070
+cuda_worklist,5065274,148000776,34.94,604420,40.68,144.97,31.79,17.30,3.43,RTX4070

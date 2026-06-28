@@ -108,7 +108,12 @@ the scheduler fed (healthy `not_selected`). The issue-rate ratio (4.1×) tracks 
 (3.5×), a Little's-law-consistent check. *Honest refinement (corrects an intermediate hypothesis):*
 WP2 does NOT issue fewer memory requests — it issues **26–84× MORE** (masked inactive-lane gathers
 + int64), yet still stalls. So the tile model pays twice: excess masked memory traffic *and* an
-inability to hide the dependent-load latency.
+inability to hide the dependent-load latency. **Instruction-roofline placement (M5b,
+`m5b_roofline_rtx4070.csv`) settles "did you just write a worse kernel?":** WP2 issues at **8.3% of
+peak warp-issue and 27% of peak DRAM bandwidth**, CUDA at 32% / 3.4% — *both far below both ceilings*,
+so neither is instruction- nor bandwidth-bound; and WP2 issues **fewer** total warp-instructions
+(4.66M vs 5.07M) yet runs 3.5× slower. The kernel is structurally stall/latency-bound, not a worse
+implementation.
 
 ## 5. Regime-dependence (DFA) — the unification
 
@@ -135,6 +140,12 @@ nothing extra in the already-converged DRAM-DFA regime — a regime-dependent, f
 high-level *Warp* DSL (thread-SIMT Python) reaches 0.9× — so the primitive is not hypothetical, it is
 the paradigm the tile DSL lacks. A full Triton-MLIR implementation is a separate systems effort
 (future work; feasibility assessed in `docs/CURE_PROGRESS.md`).
+**Why the primitive is genuinely missing (not already in Gluon).** A reviewer may object that Triton's
+low-level Gluon frontend already exposes per-thread values. It exposes per-thread *layout* (which lane
+holds which datum), not per-lane *control flow*: a runnable probe (`scripts/gluon_probe.py`) shows
+`gl.load` returns a layout-typed block, never a scalar, so the data-dependent CSR loop
+`for k in range(row_ptr[s], row_ptr[s+1])` cannot even be lowered (compile error, captured verbatim).
+Layout control ≠ control-flow divergence — the `scalar_program` region is the missing capability.
 
 ## 7. Threats to validity
 - Single GPU (RTX 4070); the mechanism (intra-warp latency hiding, issue activity, the DRAM

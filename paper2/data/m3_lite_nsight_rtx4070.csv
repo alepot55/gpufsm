@@ -1,3 +1,3 @@
 kernel,states,n_strings,duration_us,warp_inst,thread_inst,occupancy_pct,issue_active_pct,warp_latency_cycles,gpu
 wp2_perlane_triton,32,16384,118.43,4660276,146973992,22.48,10.11,27.05,RTX4070
-cuda_worklist,32,16384,35.46,5065274,18388861,22.41,,,RTX4070
+cuda_worklist,32,16384,34.94,5065274,148000776,22.41,40.68,,RTX4070

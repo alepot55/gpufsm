@@ -37,7 +37,12 @@ def fig_decomposition() -> None:
     ws = statistics.median(float(r["ws_gbps"]) for r in e)  # nw=1 (artifact removed)
     wp2 = statistics.median(float(r["wp2_gbps"]) for r in t)  # lane-packed per-lane
     cu = statistics.median(float(r["cu_gbps"]) for r in e)  # hand-CUDA
-    labels = ["Triton\nworklist\n(nw=4)", "+ nw=1\n(−artifact)", "+ lane-pack\n(WP2)", "CUDA\n(thread)"]
+    labels = [
+        "Triton\nworklist\n(nw=4)",
+        "+ nw=1\n(−artifact)",
+        "+ lane-pack\n(WP2)",
+        "CUDA\n(thread)",
+    ]
     vals = [wt, ws, wp2, cu]
     colors = ["#c0392b", "#e67e22", "#2980b9", "#27ae60"]
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -47,12 +52,30 @@ def fig_decomposition() -> None:
     ax.set_ylabel("Throughput (Gbps)")
     ax.set_title("Decomposing the NFA worklist regret (batch 16384, ≤64 states)")
     ax.set_ylim(0, max(vals) * 1.18)
-    ax.annotate(f"artifact ≈{ws / wt:.1f}×", (1, ws), (1, ws + 90), ha="center", fontsize=8,
-                arrowprops=dict(arrowstyle="->"))
-    ax.annotate(f"lane-pack ≈{wp2 / ws:.1f}×", (2, wp2), (1.45, wp2 + 80), ha="center", fontsize=8,
-                arrowprops=dict(arrowstyle="->"))
-    ax.annotate(f"irreducible ≈{cu / wp2:.1f}×", (3, cu), (3, cu - 130), ha="center", fontsize=8,
-                arrowprops=dict(arrowstyle="->"))
+    ax.annotate(
+        f"artifact ≈{ws / wt:.1f}×",
+        (1, ws),
+        (1, ws + 90),
+        ha="center",
+        fontsize=8,
+        arrowprops=dict(arrowstyle="->"),
+    )
+    ax.annotate(
+        f"lane-pack ≈{wp2 / ws:.1f}×",
+        (2, wp2),
+        (1.45, wp2 + 80),
+        ha="center",
+        fontsize=8,
+        arrowprops=dict(arrowstyle="->"),
+    )
+    ax.annotate(
+        f"irreducible ≈{cu / wp2:.1f}×",
+        (3, cu),
+        (3, cu - 130),
+        ha="center",
+        fontsize=8,
+        arrowprops=dict(arrowstyle="->"),
+    )
     fig.tight_layout()
     fig.savefig(OUT / "fig_decomposition.png", dpi=150)
     plt.close(fig)
@@ -87,10 +110,18 @@ def fig_mechanism() -> None:
     wp2 = next(r for r in rows if r["kernel"].startswith("wp2"))
     cu = next(r for r in rows if r["kernel"].startswith("cuda"))
     metrics = ["warp-inst\n(M)", "occupancy\n(%)", "issue active\n(%)", "duration\n(µs)"]
-    wp2_v = [float(wp2["warp_inst"]) / 1e6, float(wp2["occupancy_pct"]),
-             float(wp2["issue_active_pct"]), float(wp2["duration_us"])]
-    cu_v = [float(cu["warp_inst"]) / 1e6, float(cu["occupancy_pct"]),
-            float(cu["issue_active_pct"] or 0) or float("nan"), float(cu["duration_us"])]
+    wp2_v = [
+        float(wp2["warp_inst"]) / 1e6,
+        float(wp2["occupancy_pct"]),
+        float(wp2["issue_active_pct"]),
+        float(wp2["duration_us"]),
+    ]
+    cu_v = [
+        float(cu["warp_inst"]) / 1e6,
+        float(cu["occupancy_pct"]),
+        float(cu["issue_active_pct"] or 0) or float("nan"),
+        float(cu["duration_us"]),
+    ]
     x = range(len(metrics))
     w = 0.38
     fig, ax = plt.subplots(figsize=(6.5, 4))
@@ -138,11 +169,53 @@ def fig_dfa_crossover() -> None:
     plt.close(fig)
 
 
+def fig_roofline() -> None:
+    """(e) Both kernels sit far below the issue AND bandwidth ceilings -> latency-bound. m5b."""
+    rows = _read("m5b_roofline_rtx4070.csv")
+    labels = ["% of peak\nissue rate", "% of peak\nDRAM BW"]
+    wp2 = next(r for r in rows if r["kernel"].startswith("wp2"))
+    cu = next(r for r in rows if r["kernel"].startswith("cuda"))
+    wp2_v = [float(wp2["pct_peak_issue"]), float(wp2["pct_peak_dram"])]
+    cu_v = [float(cu["pct_peak_issue"]), float(cu["pct_peak_dram"])]
+    x = range(len(labels))
+    w = 0.38
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar([i - w / 2 for i in x], wp2_v, w, label="Triton WP2 (per-lane)", color="#2980b9")
+    ax.bar([i + w / 2 for i in x], cu_v, w, label="CUDA worklist", color="#27ae60")
+    ax.axhline(100, color="red", ls="--", lw=1)
+    ax.text(
+        0.5,
+        102,
+        "hardware ceiling (instruction- or bandwidth-bound)",
+        fontsize=8,
+        color="red",
+        ha="center",
+    )
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("% of peak")
+    ax.set_ylim(0, 115)
+    ax.set_title(
+        "Neither kernel is instruction- or bandwidth-bound → latency-bound\n"
+        f"(WP2 issues FEWER warp-inst: {int(wp2['warp_inst']):,} vs {int(cu['warp_inst']):,}, "
+        "yet 3.5× slower)",
+        fontsize=9,
+    )
+    for i, (a, b) in enumerate(zip(wp2_v, cu_v, strict=True)):
+        ax.text(i - w / 2, a + 1, f"{a:.0f}", ha="center", fontsize=8)
+        ax.text(i + w / 2, b + 1, f"{b:.0f}", ha="center", fontsize=8)
+    ax.legend(fontsize=8, loc="upper right")
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_roofline.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> int:
     fig_decomposition()
     fig_occupancy_gating()
     fig_mechanism()
     fig_dfa_crossover()
+    fig_roofline()
     print(f"wrote figures to {OUT}/:")
     for p in sorted(OUT.glob("*.png")):
         print(f"  {p.name}")

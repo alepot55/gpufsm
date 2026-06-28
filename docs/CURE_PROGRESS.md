@@ -120,11 +120,17 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
    int64), not fewer — the tile model pays twice (excess masked traffic + no dependent-load hiding).
    DRAFT + RELATED_WORK reworded to the measured framing (stall composition + issue rate, NOT request
    count). The central claim is now measurement, not inference — the decisive reviewer-proof addition.
-0b. **M5b — instruction-roofline placement** of WP2 vs CUDA (GIPS vs inst-intensity): show Triton below
-   the issue ceiling at low GIPS despite fewer instructions. Answers "did you just write a worse kernel?"
-0c. **M6 — Gluon `scalar_program` prototype** (Linear Layout per-lane state + predicated ffs/while):
-   show it recovers a measurable fraction of CUDA/Warp and exactly what plain Gluon CANNOT express →
-   neutralizes Risk B, turns "we propose" into "we demonstrate realizable". (Gluon @jit must be in a .py.)
+0b. [x] **M5b DONE — instruction roofline settles "did you write a worse kernel?".** `m5b_roofline_
+   rtx4070.csv` + `fig_roofline.png`. WP2 issues at **8.3% of peak warp-issue, 27% of peak DRAM**;
+   CUDA at 32% / 3.4% — both far below BOTH ceilings → neither instruction- nor bandwidth-bound; WP2
+   has FEWER warp-inst (4.66M vs 5.07M) yet 3.5× slower → structurally latency-bound. (Also fixed a
+   data-integrity copy error: m3_lite_nsight CUDA thread_inst was the 2048-string value; corrected to
+   148M @16384.)
+0c. [x] **M6 DONE (via the Gluon probe) — layout ≠ control flow, concretely.** `scripts/gluon_probe.py`
+   confirms plain Gluon cannot lower the data-dependent per-lane CSR loop (`gl.load` returns a
+   layout-block, no scalar load → compile error captured). This IS the Risk-B rebuttal: Gluon's
+   per-thread capability is layout, not control flow. A full per-lane escape needs the proposed
+   `scalar_program` primitive (which Gluon lacks) → folded into DRAFT §6.
 1. [x] **M2f DONE — num_warps artifact = 3.4× median** (2.77×@4096 → 3.44×@16384 → 3.69×@65536),
    monotone ~halving per num_warps doubling. `paper2/data/m2f_numwarps_rtx4070.csv`. Sizes the
    launch-config component of the anchor; underpins paper-1 disclosure.
