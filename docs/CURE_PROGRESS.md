@@ -193,6 +193,16 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-28: **QUALITY UPGRADE (user: "migliora ancora") — the cure now proven to act VIA the
+  mechanism, + 2-panel figure + reproduce.sh.** (1) Nsight-profiled the SP (scalar_program→threads)
+  kernel: issue activity **36.2%** (vs the tile's 9.9%, ≈ CUDA's 41%) and long_scoreboard stall **29×
+  lower** than the tile → the cure restores the thread-model issue signature, closing the gap through
+  EXACTLY the intra-warp-latency-hiding mechanism (component C). This is the strongest possible
+  validation (throughput + mechanism). `m10_nsight_rtx4070.csv`, paper §6.2. (2) fig_cure → 2 panels
+  (throughput AND issue activity), self-contained. (3) `paper2/reproduce.sh`: one command regenerates
+  every oracle-gated CSV + all figures (CGO artifact-eval friendly). Remaining genuine gaps need the
+  user: 2nd GPU (cloud A100, mechanism is arch-general but absolute factors need re-measure) and the
+  full Triton-MLIR build (abandoned, env-fragile). Paper 5pp, 6 figures, 0 undefined/0 overfull.
 - 2026-06-28: **FINAL QA — paper consistency-verified + cure figure + 6th contribution.** Re-grepped
   EVERY headline number against the CSVs — all match (anchor 10.11, num_warps 2.77/3.44/3.69,
   lane-pack 3.19/9.79/19.35, residual 0.51, long_scoreboard 15.3, issue 9.89/41.00, DFA 0.55–1.05,
