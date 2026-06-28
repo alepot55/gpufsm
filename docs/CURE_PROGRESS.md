@@ -87,7 +87,20 @@ Env: `.venv` (system-site-packages) with gpufsm built `+CUDA`. Run experiments w
   (`tl.scalar_program` region lowering each lane to an independent instruction stream). Building it
   in Triton-MLIR is arguably a SEPARATE systems paper. So: frame as design + existence proof + future
   work; revisit a real build only after the paper-2 core (decomposition + M4 generality) is written.
-- [ ] **M3-full (deferred) — actual Triton-MLIR `tl.scalar_program` op + lowering.** Future work.
+- [→] **M3-full IN PROGRESS (user 2026-06-28: "m3 full, voglio tanta roba, livello top 1").** Two
+  parallel tracks toward a WORKING constructive cure:
+  - **Track A (the literal ask): Triton from source.** Build launched in background at
+    `~/m3full_build/` (home fs, 183GB free; /tmp too small at 4GB). Log: `~/m3full_build/build.log`,
+    venv `~/m3full_build/venv` (--system-site-packages, isolated from the project .venv). triton-src =
+    main @c05aa65. Once it builds, attempt the actual primitive: a TritonGPU op / lowering that emits
+    per-thread (thread-SIMT) code for a marked region. NOTE: even after a successful build, the MLIR
+    C++ op+lowering is the genuinely hard part (may not fully converge autonomously).
+  - **Track B (guaranteed-working cure, the real deliverable): source-to-source `scalar_program`.**
+    A small front-end that takes the idiomatic per-lane automaton and LOWERS it to a thread-model CUDA
+    kernel (via torch.utils.cpp_extension.load_inline / NVRTC — toolchain confirmed available), then
+    show it recovers CUDA-level throughput from the SAME per-lane source = the cure built and measured.
+    This is the top-tier contribution: "we implemented the missing primitive and it closes the gap."
+    Oracle-gate; paper2/data/m10_scalar_program_*.csv; add a "The cure, implemented" section to the paper.
   M2e localized the residual to per-instruction tile tax (cross-lane `tl.reduce` for the union +
   masking + weak scalar ILP). De-risk in order:
     - **M3-lite (do first):** probe escape hatches — `tl.inline_asm_elementwise` (PTX) and warp
