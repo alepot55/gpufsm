@@ -193,6 +193,19 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **SUBMISSION CAPSTONE — docs/SUBMISSION_PAPER2.md captures the path to publication.**
+  Crisp, honest submission plan: 1-paragraph elevator pitch; the 8-item contribution list (condensed
+  from the paper); target-venue rationale (ASPLOS/PLDI/OOPSLA primary — working in-libtriton pass +
+  structural wall naming the missing IR primitive + implemented cure + generality law + AE; CGO strong
+  fit for the compiler angle; IISWC/PACT honest floor); artifact-evaluation pointers (experiments/cure/
+  README.md index, scripts/run_cross_arch.sh, triton_thread_region_pass/ patch, the falsifiable probes);
+  known gaps stated upfront (multi-GPU cloud run pending but harness ready; the clean ~2× is the
+  ≤64-state register-resident regime; in-IR lowering realized below TritonGPU); and the NVIDIA-interview
+  framing (Triton-MLIR pass + named per-lane primitive as an actionable cuTile/Tile-IR proposal; ITS as
+  the substrate; warp-spec is orthogonal/dense). The publication path is now documented end to end. The
+  landmark for paper 2 is COMPLETE: built, written, verified, indexed, submission-honest, with the path
+  captured. Remaining open items are all hardware-gated (the one A100/H100 cross-arch run) or the
+  genuinely-future in-IR primitive.
 - 2026-06-29: **PAPER THREATS/INTEGRITY TIGHTENED — submission-honest on all three fronts.** Surgical
   additions to gpufsm2.tex: (1) Methodological Integrity now reports THREE self-corrections (was two) —
   added the two-channel regret-law correction (we falsified our own single "tile issue deficit"
