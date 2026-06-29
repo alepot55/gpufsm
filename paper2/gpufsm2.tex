@@ -229,8 +229,9 @@ structured tile control flow. This names the missing IR primitive precisely: a \
 (sub-tile) loop/exit op}. The cure must lower \emph{below} the tile IR to the thread model (independent
 thread scheduling)---which is exactly what \S\ref{sec:implemented} does.
 
-\textbf{Automatic detect-and-lower.} A selector closes the loop: it runs the detection pass, and when the
-lock-step signature is present routes the region to the thread lowering, otherwise keeps the tile path.
+\textbf{Automatic detect-and-lower.} A selector closes the loop (Fig.~\ref{fig:selector}): it runs the
+detection pass, and when the lock-step signature is present routes the region to the thread lowering,
+otherwise keeps the tile path.
 Oracle-gated, the NFA worklist is auto-routed to the thread cure for \textbf{$3.9\times$} over the tile
 (state sweep $16$--$64$, consistent with the $4.2\times$ of \S\ref{sec:implemented}), while a fixed-trip
 negative-control kernel is detected-negative and correctly left on the tile path. So the full loop is
@@ -396,6 +397,12 @@ divergence $\Rightarrow$ tile and thread are identical (issue $5.42\%$ vs.\ $5.4
 $1.00\times$. Regret grows only with scalar control / divergence (red, orange, blue), peaking at
 $4\times$ for pure control-flow divergence, via two channels (issue starvation, masked-lane waste) over
 a tile-lowering baseline---scalar control, not memory irregularity.}\label{fig:law}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_selector.png}
+\caption{The automatic detect$\to$route$\to$lower loop (P2). The detection pass (in \texttt{libtriton})
+matches the lock-step signature; the lock-step NFA worklist is routed to the thread lowering
+($378{\to}1555$\,Gbps $=3.9\times$, exceeding hand-CUDA), while a no-signature kernel (pointer-chase)
+stays on the tile path. All routing oracle-gated; numbers from the versioned CSVs.}\label{fig:selector}
+\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}

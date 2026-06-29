@@ -291,6 +291,69 @@ def fig_regret_law() -> None:
     plt.close(fig)
 
 
+def fig_selector() -> None:
+    """(h) The automatic detect->route->lower loop (P2). Schematic, numbers from CSVs. landmark."""
+    sel = _read("landmark/p2_selector_rtx4070.csv")
+    by = {r["kind"]: r for r in sel}
+    speedup = float(by["lockstep"]["nfa_sp_over_wp2"])  # detected NFA: SP/WP2
+    m10 = _read("m10_scalar_program_rtx4070.csv")
+    tile = statistics.median(float(r["wp2_gbps"]) for r in m10)  # tile lowering
+    thread = statistics.median(float(r["sp_gbps"]) for r in m10)  # thread cure
+    cuda = statistics.median(float(r["cu_gbps"]) for r in m10)  # hand-CUDA reference
+
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+    fig, ax = plt.subplots(figsize=(7, 3.0))
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 6)
+    ax.axis("off")
+
+    def box(x, y, w, h, text, fc):
+        ax.add_patch(
+            FancyBboxPatch(
+                (x, y), w, h, boxstyle="round,pad=0.06", fc=fc, ec="#333", lw=1.1, mutation_scale=6
+            )
+        )
+        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=7.5)
+
+    def arrow(x0, y0, x1, y1, color="#333"):
+        ax.add_patch(
+            FancyArrowPatch(
+                (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=11, lw=1.2, color=color
+            )
+        )
+
+    box(0.1, 2.35, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
+    box(
+        2.2,
+        2.0,
+        2.7,
+        2.0,
+        "tritongpu-thread-region\n(detect lock-step:\nscf.while+#blocked\n+tt.reduce)",
+        "#fdebd0",
+    )
+    cure_txt = (
+        f"thread lowering (cure)\n{tile:.0f}→{thread:.0f} Gbps = {speedup:.1f}×\n"
+        f"≥ hand-CUDA ({cuda:.0f})"
+    )
+    box(7.3, 3.4, 4.4, 1.5, cure_txt, "#abebc6")
+    box(7.3, 0.6, 4.4, 1.5, "tile path\n(unchanged)", "#d6dbdf")
+
+    arrow(1.8, 3.0, 2.2, 3.0)  # per-lane -> detect
+    arrow(4.9, 3.3, 7.3, 4.1, "#1e8449")  # detected -> cure (up)
+    arrow(4.9, 2.7, 7.3, 1.5, "#7f8c8d")  # no signature -> tile (down)
+    ax.text(6.0, 4.25, "detected\n(NFA worklist)", ha="center", fontsize=7, color="#1e8449")
+    ax.text(6.0, 1.7, "no signature\n(pointer-chase)", ha="center", fontsize=7, color="#7f8c8d")
+    ax.set_title(
+        "Automatic detect→route→lower: lock-step regions go to the thread cure,\n"
+        "everything else stays on the tile path (oracle-gated)",
+        fontsize=8.5,
+    )
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_selector.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> int:
     fig_decomposition()
     fig_occupancy_gating()
@@ -299,6 +362,7 @@ def main() -> int:
     fig_roofline()
     fig_cure()
     fig_regret_law()
+    fig_selector()
     print(f"wrote figures to {OUT}/:")
     for p in sorted(OUT.glob("*.png")):
         print(f"  {p.name}")

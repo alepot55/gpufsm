@@ -193,6 +193,17 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **FIGURE for sec:compiler — the automatic detect→route→lower loop visualized (fig:selector).**
+  The most novel section (P2: detection pass + structural wall + selector) had no figure. Added
+  `fig_selector()` to `paper2/figures.py`: a clean left-to-right SCHEMATIC (not a redundant speedup bar —
+  fig_cure already shows the 4.2× magnitude) — per-lane kernel → `tritongpu-thread-region` detection →
+  two branches: detected (NFA worklist) → thread lowering (378→1555 Gbps = 3.9×, ≥ hand-CUDA 742) vs no
+  signature (pointer-chase) → tile path unchanged. All numbers pulled from p2_selector + m10 CSVs (no
+  hardcoding). First render had overlapping boxes/labels; fixed the geometry (wider xlim, labels in the
+  inter-box gaps) → professional. Wired into gpufsm2.tex sec:compiler with \label{fig:selector} +
+  precise caption, referenced from the Automatic-detect-and-lower paragraph. TRADEOFF: this took the
+  paper 6pp→7pp; kept it (target venues ASPLOS/PLDI/OOPSLA/CGO allow 11–12pp, and this is the only visual
+  of the automatic detect-and-lower contribution — worth a page). 0 undefined refs, 0 overfull. PDF regen.
 - 2026-06-29: **VERIFICATION PASS — CI green; mechanism rigor assessed as already-complete (no change).**
   Ran the exact CI-parity checks (CI lints src/gpufsm + tests only; experiments/ is outside scope):
   `ruff check src/gpufsm tests` ✓, `ruff format --check` ✓ (36 files), `mypy src/gpufsm` ✓ (23 files),
