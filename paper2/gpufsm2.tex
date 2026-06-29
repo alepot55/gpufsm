@@ -33,8 +33,15 @@ $1.05\times$, once the table spills to DRAM). We specify the missing IR primitiv
 \texttt{scalar\_program} region that lowers each lane to an independent instruction stream---and
 \emph{implement its lowering}: the same idiomatic per-lane source, lowered to the thread model, runs
 $4.2\times$ faster than the tile lowering and matches or exceeds hand-written CUDA, closing the
-residual by construction. Every kernel is correctness-gated against a CPU
-oracle; every number traces to a versioned CSV.
+residual by construction. The phenomenon \emph{generalizes}: across six irregular workloads the
+tile-vs-thread regret is created by scalar control flow---not memory irregularity or dependent
+loads---through two measured channels (issue starvation and masked-lane waste) over a tile-lowering
+baseline, with a graph pointer-chase negative control at exactly $1.00\times$. Finally we take the cure
+into the real compiler: a TritonGPU pass that detects the lock-step region in \texttt{libtriton}, a
+proof that the in-tile-IR lowering is \emph{structurally impossible} (naming the missing per-lane
+loop/exit primitive), and an automatic selector that routes the detected region to the thread cure
+($3.9\times$). Every kernel is correctness-gated against a CPU oracle; every number traces to a
+versioned CSV.
 \end{abstract}
 
 \section{Introduction and Contributions}

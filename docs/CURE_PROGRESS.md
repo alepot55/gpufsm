@@ -193,6 +193,21 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **PAPER END-TO-END HONESTY PASS — every number traced to a CSV; abstract updated to the
+  full story.** Re-read gpufsm2.tex top to bottom and cross-checked all quantitative claims against
+  paper2/data/*.csv: M10 sp/wp2 median 4.16 (paper 4.2× ✓), sp/cu 2.15 ✓; selector 3.899 (3.9× ✓);
+  regret-law witnesses all match regret_law.csv (pointer_chase 1.00, spmv_u 1.94, hashprobe 1.40,
+  spmv_pl 2.17, automata 1.96, rejection 4.00); automata issue 9.89/41.00 (9.9%/41% ✓); DFA m4 csv
+  16MB>L2 pk/cu 1.05× ✓, cache 0.55–0.62× ✓; component-C residual 0.51× reconciles with WP2/CU =
+  378/723 = 0.52× ✓. Confirmed the two automata figures are NOT contradictory and ARE labeled:
+  component-C residual ~2× = per-lane Triton-vs-hand-CUDA, while M10 SP/WP2 4.2× has SP itself 2.15×
+  ABOVE hand-CUDA (minimal thread worklist) → 2×·2× ≈ 4×, stated in sec:implemented. The ONE gap: the
+  abstract omitted the two newest pillars — FIXED by adding (a) the generality law (six workloads,
+  two-channel = issue starvation + masked-lane waste over a tile-lowering baseline, pointer-chase
+  negative control 1.00×) and (b) the compiler work (detection pass in libtriton + structural-impossibility
+  proof naming the missing per-lane loop/exit primitive + automatic selector 3.9×). Paper still 6pp,
+  0 undefined refs, 0 overfull; PDF regenerated. No number drift found — the CSV-traceability discipline
+  held across the whole session.
 - 2026-06-29: **P3 CROSS-ARCH HARNESS BUILT + SELF-VALIDATED — one command, ready for cloud A100/H100.**
   `experiments/cure/p3_cross_arch.py` (+ `scripts/run_cross_arch.sh`): re-runs all regret-law witnesses
   (spmv uniform/powerlaw, rejection, pointer-chase/bfs, hashprobe) + the M10 cure (automata sp/wp2) + the
