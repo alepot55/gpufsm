@@ -67,24 +67,30 @@ ITS whitepaper; Linear Layouts (arXiv:2505.23819); Hidet (ASPLOS'23, 10.1145/357
   (§3, predictor-vs-measured across the suite) is the predictive claim, built fresh with enough points.
 - Do not claim "first to show tile is wrong for irregular" — frame NVIDIA's fallback note as motivation.
 
-## Execution program (phases)
-- **P1 — GENERALITY (autonomous, START NOW; biggest upgrade I can do alone):** implement, in the
-  tile-vs-thread framing with the M10 nvcc-lowering machinery + a Triton tile kernel + CPU oracle, the
-  non-automata witnesses and build the regret law:
-    - **hash / B-tree probe** (cleanest non-automata dependent-load witness),
-    - **rejection sampling** (control-flow face, memory held constant),
-    - **SpMV (CSR, variable nnz)** = the predicted NEGATIVE control (bandwidth-bound → low regret),
-    - **BFS/SSSP worklist** (reviewer credibility; GAP/SuiteSparse inputs).
-  Per workload: a-priori predictor (Nsight long-scoreboard% / MLP from the thread kernel) + measured
-  tile-vs-thread regret; oracle-gate; CSVs in paper2/data/landmark/. Then the regret-law figure.
-- **P2 — the REAL compiler pass (autonomous, hard):** retry the Triton-from-source build with the
-  diagnosed cmake fix; if it builds, prototype a TritonGPU `thread_region` op + lowering (Approach B:
-  force sizePerThread=1 per-lane region, disable pipelining, reconverge at exit via ITS) + an automatic
-  cost-model selector. If the build stays infeasible, deliver the *automatic selector* over the M10
-  lowering as a strong proxy + the IR design, and be honest.
-- **P3 — multi-GPU (needs USER):** cloud A100/H100 cross-arch (the regret follows the paradigm column,
-  arch-independent). Prep a one-command script; the user provides access.
-- **Throughout:** keep correctness-gated, every number CSV-traced, Nsight mechanism, honest corrections.
+## Execution program (phases) — STATUS as of 2026-06-29 (all but the cloud run DONE)
+- **P1 — GENERALITY / the regret law — ✅ DONE.** Six oracle-gated tile-vs-thread witnesses built with
+  the M10 nvcc-lowering machinery + Triton tile kernels + CPU oracles (`experiments/cure/landmark_*`):
+  hash-probe (1.4×), rejection (4.0×), SpMV uniform+power-law (1.9×/2.2–5.8×), graph pointer-chase =
+  the NEGATIVE control (1.00×, tile≡thread on every Nsight axis). Unified `regret_law.csv` + `fig:law`.
+  HONEST refinement: the law is **two-channel** (issue starvation + masked-lane waste over a
+  tile-lowering baseline), NOT a single issue-deficit predictor — corrected after completing the Nsight
+  profiling (rejection's tile issue is ABOVE thread's). Written up in `sec:law`.
+- **P2 — the REAL compiler pass — ✅ DONE (stronger than planned).** Triton-from-source 3.8 builds
+  (libtriton, the cmake/nanobind/python-dev recipe in P2_PASS_DESIGN). A TritonGPU MLIR pass
+  `tritongpu-thread-region` compiles into `libtriton` and DETECTS the lock-step signature (verified:
+  `p2_pass_verify.py`). Approach-B in-IR lowering is **structurally impossible**, demonstrated +
+  falsifiable (`p2_lowering_wall.py`: `scf.condition` takes a single `i1`; tensors already
+  sizePerThread=1) → this NAMES the missing IR primitive (a per-lane sub-tile loop/exit op) and is a
+  stronger result than a hand-tuned rewrite. The automatic SELECTOR (`p2_selector.py`) closes the loop:
+  detect → route to the M10 thread lowering (3.9×), negative control left on the tile. Written up in
+  `sec:compiler`. Sources preserved in `experiments/cure/triton_thread_region_pass/`.
+- **P3 — multi-GPU — HARNESS READY (✅ built + self-validated), cloud run hardware-gated on USER.**
+  `experiments/cure/p3_cross_arch.py` + `scripts/run_cross_arch.sh`: one command re-runs all witnesses +
+  M10 + the selector on any GPU, compares to the RTX4070 baseline, writes `cross_arch/regret_<gpu>.csv`,
+  with the falsifiable paradigm-not-arch prediction baked in. Self-validated on the 4070 (reproduces its
+  own baseline). Just needs the user to grant A100/H100 access.
+- **Throughout:** correctness-gated, every number CSV-traced (verified end-to-end 2026-06-29), Nsight
+  mechanism, honest corrections. Reproducibility index: `experiments/cure/README.md`.
 
 ## Venue calibration (verified bar)
 Top venues want a WORKING artifact + a principle + a surprising general result + ≥2 GPUs + ≥5–10

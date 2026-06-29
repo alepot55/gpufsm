@@ -193,6 +193,16 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **REPRODUCIBILITY INDEX + NORTH-STAR SYNC (navigability hardening).**
+  `experiments/cure/README.md`: a reviewer/AE index mapping every artifact (m0/m2*/m3*/m4/m9 decomposition,
+  m10 cure, landmark_{bfs,spmv,rejection,hashprobe} witnesses, p2_{ttgir_probe,pass_verify,lowering_wall,
+  selector} compiler, p3_cross_arch) to the exact paper claim/section it supports, the run command, and
+  the CSV it writes — flagging which need the from-source Triton ([src-triton], PYTHONPATH=...) vs the
+  system stack. Verified against the live file inventory + each script's CSV-write path (grep), so the
+  table is accurate not guessed. Also synced `docs/LANDMARK_PLAN.md` execution program to reality: P1
+  (regret law, two-channel) ✅ DONE; P2 (build + detection pass + structural wall + missing primitive +
+  selector) ✅ DONE (stronger than planned — the wall is a result, not a failure); P3 (cross-arch harness
+  built + self-validated, cloud run hardware-gated). The north star now matches what's built.
 - 2026-06-29: **PAPER END-TO-END HONESTY PASS — every number traced to a CSV; abstract updated to the
   full story.** Re-read gpufsm2.tex top to bottom and cross-checked all quantitative claims against
   paper2/data/*.csv: M10 sp/wp2 median 4.16 (paper 4.2× ✓), sp/cu 2.15 ✓; selector 3.899 (3.9× ✓);
