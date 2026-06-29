@@ -193,6 +193,16 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29 07:36: **STATE = SUBMISSION-READY, IDLE awaiting cloud access for P3.** Paper-2 ("From
+  Diagnosis to Cure") is complete: every section reviewed, every number CSV-cross-checked, CI green,
+  7pp / 8 figures / 0 undefined / 0 overfull; ~20 commits this overnight session. Regret law (6 witnesses,
+  two-channel) + M10 cure (4.2×) + P2 (detection pass in libtriton + structural wall + named per-lane
+  loop/exit primitive + automatic selector 3.9×, with fig:selector) + P3 cross-arch harness (ready) +
+  SUBMISSION_PAPER2.md + experiments/cure/README.md index. The ONLY substantive remaining work is
+  HARDWARE-GATED: `bash scripts/run_cross_arch.sh` on a cloud A100/H100 (closes the multi-GPU
+  external-validity gap for camera-ready) — needs the user to grant a pod. Until then, loop is in honest
+  idle-verify (tree clean, paper compiles); no padding. Future idle wakes: skip the commit, just verify +
+  reschedule, until the user provides cloud access or new direction.
 - 2026-06-29: **§2 Background/Method read — one real internal inconsistency fixed.** §2 still said we
   "correct TWO of our own intermediate hypotheses (sec:decomp, sec:resid)" — but Methodological Integrity
   was updated to THREE this session (the two-channel regret-law self-correction). Fixed §2 to "three" +
