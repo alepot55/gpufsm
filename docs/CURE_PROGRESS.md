@@ -193,6 +193,18 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **VERIFICATION PASS — CI green; mechanism rigor assessed as already-complete (no change).**
+  Ran the exact CI-parity checks (CI lints src/gpufsm + tests only; experiments/ is outside scope):
+  `ruff check src/gpufsm tests` ✓, `ruff format --check` ✓ (36 files), `mypy src/gpufsm` ✓ (23 files),
+  `pytest -m "not gpu"` → **37 passed, 24 gpu-deselected**. The session's ~10 new experiments/cure/*.py
+  do not touch the CI-linted/tested core, so the repo is green. Assessed the optional long_scoreboard
+  rigor (priority 2) and DECLINED it as padding/misleading: the two regret-law channels are already
+  quantified by the CORRECT metrics in regret_law.csv — issue-starvation by tile_issue vs thread_issue
+  (automata 9.89 vs 41.00), masked-lane waste by tile_tipi vs thread_tipi (rejection 32 vs 17.12). A
+  long_scoreboard (dependent-load-stall) column is the WRONG metric for the masked-waste channel
+  (rejection is pure-compute, no memory stall → it would read ~0 and mislead) and is already reported for
+  the latency-starvation channel (automata 15.3× in m1). Forcing it would weaken, not strengthen. Honest
+  "verified, no change needed" iteration. The landmark stands complete; remaining work is hardware-gated.
 - 2026-06-29: **SUBMISSION CAPSTONE — docs/SUBMISSION_PAPER2.md captures the path to publication.**
   Crisp, honest submission plan: 1-paragraph elevator pitch; the 8-item contribution list (condensed
   from the paper); target-venue rationale (ASPLOS/PLDI/OOPSLA primary — working in-libtriton pass +
