@@ -64,8 +64,9 @@ closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:
 \emph{automatic} detect-and-lower selector that routes the detected region to the thread cure for
 $3.9\times$, leaving a negative-control kernel on the tile path.
 \item A \textbf{generality law} across six oracle-gated irregular workloads (Sec.~\ref{sec:law},
-Fig.~\ref{fig:law}): regret tracks the tile's issue deficit---created by scalar control, not memory
-irregularity---validated by a graph pointer-chase negative control at exactly $1.00\times$.
+Fig.~\ref{fig:law}): regret is created by scalar control flow---not memory irregularity or dependent
+loads---through two measured channels (issue starvation and masked-lane waste) over a tile-lowering
+baseline, validated by a graph pointer-chase negative control at exactly $1.00\times$.
 \end{enumerate}
 
 \section{Background and Method}
@@ -234,22 +235,26 @@ To test whether the mechanism is automata-specific we built six oracle-gated til
 spanning the irregularity space, each with identical machinery (a Triton tile kernel, the per-lane
 source lowered to a CUDA thread kernel, and a CPU oracle); Fig.~\ref{fig:law} reports the measured
 regret, coloured by dominant mechanism. The result is a law \emph{with a correct negative control}:
-\textbf{regret tracks the tile's issue-activity deficit relative to the thread kernel---created by
-scalar control flow, not by memory irregularity or dependent loads.} A graph pointer-chase (1M random
+\textbf{regret is created by scalar control flow---not by memory irregularity or dependent loads---and
+appears, mechanistically, through one of two measured channels.} A graph pointer-chase (1M random
 walkers, data-dependent gather addresses, scattered \texttt{colidx}, degree CV $3.79$, but a
 \emph{fixed} step count) is the decisive control: tile and thread are bit-for-bit identical in issue
 activity ($5.42\%$ vs.\ $5.43\%$), occupancy ($72.1\%$ vs.\ $72.1\%$), and threads-per-instruction
 ($32$ vs.\ $32$), and the regret is $1.00\times$---irregular memory and dependent loads alone cost
 \emph{nothing}, because a lock-step gather already supplies full intra-warp memory-level parallelism.
-Regret appears only as scalar control starves the tile's issue below the thread's: rejection sampling
-(pure control-flow divergence, no memory) is $4.0\times$; the NFA worklist (active-set \texttt{ffs}
-recurrence) is $2.0\times$ at tile issue $9.9\%$ vs.\ $41\%$. Two effects make the law multi-component
-rather than a single predictor: a \emph{tile-lowering baseline} (uniform-\texttt{nnz} SpMV, zero
-divergence, is still $1.9\times$ from occupancy/masking on a bandwidth-bound gather, honestly falsifying
-our initial ${\approx}1\times$ guess for it) plus a \emph{divergence increment} that grows with tile
-width (power-law SpMV $2.2\times$ at width $32 \to 5.8\times$ at $256$). The no-regret point is therefore
-not dense-regular work alone but \emph{any} irregular workload whose tile issue matches the thread's; the
-cure (Sec.~\ref{sec:implemented}) removes the regret by restoring per-lane issue.
+The two channels: (i) \emph{issue starvation}---a data-dependent scalar recurrence drives the tile's
+issue rate below the thread's: the NFA worklist (active-set \texttt{ffs}) is $2.0\times$ at tile issue
+$9.9\%$ vs.\ $41\%$; (ii) \emph{masked-lane waste}---divergent trip counts make the lock-step tile spend
+full-width $32$-lane work where the thread retires lanes: rejection sampling (pure control-flow
+divergence, no memory) is $4.0\times$ with tile threads-per-instruction $32$ vs.\ the thread's $17$
+(its issue rate is, if anything, \emph{above} the thread's---the waste is in \emph{what} the active
+lanes compute, not the issue rate). A third, divergence-free effect sets the floor: a
+\emph{tile-lowering baseline} (uniform-\texttt{nnz} SpMV, zero divergence, still $1.9\times$ from
+occupancy/masking on a bandwidth-bound gather---honestly falsifying our initial ${\approx}1\times$
+guess), to which a \emph{divergence increment} adds (power-law SpMV $2.2\times$ at tile width
+$32 \to 5.8\times$ at $256$). So the law is genuinely multi-component, not a single scalar predictor; the
+common cause is the lock-step tile, and the cure (Sec.~\ref{sec:implemented}) removes every channel by
+restoring per-lane execution.
 
 \section{Methodological Integrity}
 Our analysis corrected two of its own intermediate hypotheses, which we report rather than hide.
@@ -331,8 +336,11 @@ primitive, with a regime-dependent residual.
 The abstraction regret on irregular automata is not a monolith: a launch artifact, a recoverable
 redundancy, and an irreducible intra-warp-latency-hiding residual whose size is set by the latency
 regime. The cure is a named, bounded IR primitive whose lowering we implement and measure---it closes
-the residual by construction ($4.2\times$ over the tile lowering); integrating it into Triton's MLIR is
-the landmark future step.
+the residual by construction ($4.2\times$ over the tile lowering). We take it into the real compiler: a
+TritonGPU pass that detects the lock-step region in \texttt{libtriton}, a proof that the in-tile-IR
+lowering is structurally impossible (naming the missing per-lane loop/exit primitive), and an automatic
+selector that routes the detected region to the thread cure ($3.9\times$). Adding the per-lane primitive
+to the tile IR itself is the landmark next step.
 
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_decomposition.png}
 \caption{NFA worklist throughput (batch 16384, $\le 64$ states) climbs as each regret component is
@@ -365,9 +373,9 @@ latency hiding component~C was missing.}\label{fig:cure}\end{figure}
 \caption{The regret law across six oracle-gated irregular workloads, by dominant mechanism. A graph
 pointer-chase (green) is the negative control: irregular memory + dependent loads, no control
 divergence $\Rightarrow$ tile and thread are identical (issue $5.42\%$ vs.\ $5.43\%$) and regret is
-$1.00\times$. Regret grows only with scalar-control / divergence (red, orange, blue), peaking at
-$4\times$ for pure control-flow divergence. The predictor is the tile's issue deficit, not memory
-irregularity.}\label{fig:law}\end{figure}
+$1.00\times$. Regret grows only with scalar control / divergence (red, orange, blue), peaking at
+$4\times$ for pure control-flow divergence, via two channels (issue starvation, masked-lane waste) over
+a tile-lowering baseline---scalar control, not memory irregularity.}\label{fig:law}\end{figure}
 
 \bibliographystyle{unsrt}
 \bibliography{refs}

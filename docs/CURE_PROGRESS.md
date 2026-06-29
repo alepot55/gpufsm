@@ -193,6 +193,21 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **REGRET-LAW RIGOR + HONESTY CORRECTION — the issue-deficit is NOT a universal predictor.**
+  Completed the Nsight profiling of the one blank witness (spmv_powerlaw: tile issue 5.79% vs thread
+  5.38%, tipi 32/32 → filled in regret_law.csv). This SURFACED an overstatement in the paper: the headline
+  "regret tracks the tile's issue-activity DEFICIT" is only true for the latency-starvation witness
+  (automata, tile 9.9% ≪ thread 41%). The cross-witness Nsight table shows the law is genuinely
+  **two-channel**, not a single scalar predictor: (i) ISSUE STARVATION (tile issue driven below thread's:
+  automata 9.9 vs 41); (ii) MASKED-LANE WASTE (tile does full-width 32-lane work while thread retires
+  lanes — rejection: tile tipi 32 vs thread 17, and its issue rate is ABOVE the thread's, 53 vs 39, so
+  "issue deficit" would MIS-predict it); over a divergence-free tile-lowering baseline (spmv 1.9× from
+  occupancy/masking) + a divergence increment (powerlaw 2.2×@32→5.8×@256). Pointer-chase control (all
+  equal, regret 1.00) nails that memory/dep-loads alone cost nothing. Corrected the headline + contribution
+  bullet + fig:law caption to the accurate two-channel framing; also un-staled the Conclusion (it claimed
+  MLIR integration was "future" — but the detection pass + selector are DONE this session, now stated).
+  Paper 6pp, 0 undefined/0 overfull. (Skeptical-scientist: caught my own over-general predictor via the
+  measurement I almost skipped — rejection's issue is above thread's, so the deficit framing was wrong.)
 - 2026-06-29: **P2 FOLDED INTO THE PAPER — the landmark narrative is now publishable.** Added
   `\subsection{Implemented in the compiler...}` (sec:compiler) to gpufsm2.tex: the real in-libtriton
   detection pass (tritongpu-thread-region, lock-step scf.while/#blocked/tt.reduce signature) + the
