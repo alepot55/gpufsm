@@ -193,6 +193,19 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **PAPER THREATS/INTEGRITY TIGHTENED — submission-honest on all three fronts.** Surgical
+  additions to gpufsm2.tex: (1) Methodological Integrity now reports THREE self-corrections (was two) —
+  added the two-channel regret-law correction (we falsified our own single "tile issue deficit"
+  predictor: rejection is 4.0× with tile issue ABOVE thread's; and the uniform-SpMV "≈1× negative
+  control" guess was also wrong at 1.9×). (2) Threats/Single-GPU now states the cross-arch re-validation
+  is a turnkey one-command harness checking the falsifiable paradigm-not-arch prediction. (3) New
+  Threats/Compiler-pass-scope: detection runs in libtriton; the lowering is realized BELOW TritonGPU
+  because the structured tile IR cannot express it (scf.condition single-i1 → per-lane loop termination
+  inexpressible, verifier-rejected rewrite) — a property of TODAY's tile IR, falsifiable if a per-lane
+  sub-tile loop/exit op is added. Full grep scan for stale phrasing (future-step/single-predictor/MLIR-
+  is-engineering): none left (the two "single predictor" hits are the correct multi-component framing +
+  the self-correction). Paper 6pp, 0 undefined, 0 overfull; PDF regenerated. The paper is now
+  submission-honest end to end.
 - 2026-06-29: **REPRODUCIBILITY INDEX + NORTH-STAR SYNC (navigability hardening).**
   `experiments/cure/README.md`: a reviewer/AE index mapping every artifact (m0/m2*/m3*/m4/m9 decomposition,
   m10 cure, landmark_{bfs,spmv,rejection,hashprobe} witnesses, p2_{ttgir_probe,pass_verify,lowering_wall,

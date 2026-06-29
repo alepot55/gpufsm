@@ -264,7 +264,7 @@ common cause is the lock-step tile, and the cure (Sec.~\ref{sec:implemented}) re
 restoring per-lane execution.
 
 \section{Methodological Integrity}
-Our analysis corrected two of its own intermediate hypotheses, which we report rather than hide.
+Our analysis corrected three of its own intermediate hypotheses, which we report rather than hide.
 First, an early reading framed the ${\sim}90\times$ warp-instruction redundancy (Sec.~\ref{sec:decomp})
 as the bottleneck; profiling the lane-packed kernel showed the redundancy is removed ${\sim}26\times$
 yet throughput moves only $3.8\times$---it was largely hidden by occupancy, so warp-redundancy is real
@@ -272,14 +272,27 @@ but not load-bearing. Second, we predicted (following the latency-hiding literat
 Triton kernel would sustain \emph{fewer} in-flight memory requests than CUDA; direct measurement
 refuted this---it issues $26$--$84\times$ \emph{more} (masked inactive-lane gathers) and still stalls,
 so the residual is the inability to \emph{hide} dependent-load latency, not a request-count deficit.
-We therefore phrase the mechanism via stall composition and issue activity, not request counts. Both
-corrections sharpened, rather than weakened, the central claim.
+We therefore phrase the mechanism via stall composition and issue activity, not request counts. Third,
+in the generality study (Sec.~\ref{sec:law}) we first stated the law as a single ``tile issue deficit''
+predictor; completing the Nsight profiling falsified it---rejection sampling shows regret $4.0\times$
+while the tile's issue rate is \emph{above} the thread's---so we report the honest two-channel form
+(issue starvation \emph{and} masked-lane waste over a tile-lowering baseline), and a clean
+negative-control prediction for uniform SpMV that was also wrong ($1.9\times$, not ${\approx}1\times$).
+All three corrections sharpened, rather than weakened, the central claim.
 
 \section{Threats to Validity}
 \emph{Single GPU.} Results are on one RTX 4070; the \emph{mechanism} (intra-warp latency hiding, the
 issue-activity differential, the DRAM convergence) is a property of the SIMT execution model and the
 tile-vs-thread lowering, hence architecture-general, but the absolute decomposition factors should be
-re-measured on an A100/H100 (larger L2 shifts the DFA crossover). \emph{Prototype scope.} A multi-word
+re-measured on an A100/H100 (larger L2 shifts the DFA crossover). We make this a turnkey step: a
+one-command harness re-runs every witness, the cure, and the selector on a new GPU, tags the output by
+device, and checks the falsifiable prediction that each regret persists in direction (paradigm, not
+architecture) while throughput rescales. \emph{Compiler-pass scope.} The detection pass runs in
+\texttt{libtriton}; the tile$\to$thread \emph{lowering} is realized below TritonGPU (the thread model)
+because the structured tile IR cannot express it---\texttt{scf.condition} takes a single \texttt{i1},
+so per-lane loop termination is inexpressible (shown by a verifier-rejected rewrite). This is a property
+of \emph{today's} tile IR and is falsifiable: adding a per-lane sub-tile loop/exit op would let the
+lowering live in-IR. \emph{Prototype scope.} A multi-word
 generalization of the lane-packed kernel (NWORDS int64 words/lane) is oracle-validated to 256 states,
 so the prototype is not artificially limited; but the clean ${\sim}2\times$ residual is a
 \emph{register-resident-regime} ($\le 64$-state) result---past 64 states the CUDA register worklist
