@@ -193,6 +193,16 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **§3 DECOMPOSITION / TABLE I cross-checked vs CSVs — one stale number fixed.** Verified Table I
+  against m2e+m3 @batch 16384: Triton nw4=28 ✓, +nw1=104 ✓, +lane-pack=383 ✓, ratios 3.71/3.68/1.93 ✓.
+  The CUDA value was a hair stale: table 735 vs committed CSV median **739** — fixed both occurrences
+  (row + caption "28→739"), so it traces exactly (the paper claims every number does). Also examined an
+  apparent 3.4-vs-3.7 tension and confirmed it is NOT an error: §A's 3.44×@16384 is the DEDICATED
+  num_warps sweep (m2f: nw1/nw4=3.440), while Table I's launch stage 3.71× is the decomposition LADDER's
+  internal ratio (m2e 104/28) — two valid measurements of the same phenomenon, abstract uses "~3.4×" with
+  the approximation tilde; forcing them equal would be dishonest (different runs), so left as-is. The rest
+  of §3 prose (anchor 22 vs 227 = 10.1×; mechanism 4.66M vs 5.07M warp-inst, 9.9% issue) traces to m0 /
+  m3_lite_nsight. Paper 7pp, 0 undefined/0 overfull. Surgical traceability fix, no churn.
 - 2026-06-29: **REPRODUCIBILITY SECTION REFRESHED — now covers the P2/P3 artifacts (was stale).** The
   Reproducibility section predated the compiler work: it had a duplicated "figures regenerate from CSVs"
   sentence and omitted the major new AE artifacts. Rewrote it tightly to: (1) the artifact index (claim →

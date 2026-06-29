@@ -139,7 +139,7 @@ loss is abstraction-imposed.
 
 \begin{table}[t]\centering\small
 \caption{The worklist regret decomposes multiplicatively (batch 16384, $\le 64$ states,
-oracle-gated). Each stage removes one component; $28 \rightarrow 735$ is $3.7\times 3.7 \times
+oracle-gated). Each stage removes one component; $28 \rightarrow 739$ is $3.7\times 3.7 \times
 1.9 = 26\times$.}
 \label{tab:decomp}
 \setlength{\tabcolsep}{4pt}
@@ -150,7 +150,7 @@ Kernel & Gbps & Component removed \\
 Triton worklist (\texttt{nw=4}) & 28 & --- \\
 \quad $+$ \texttt{nw=1} & 104 & launch artifact ($3.7\times$) \\
 \quad $+$ lane-packing & 383 & warp redundancy ($3.7\times$) \\
-CUDA worklist (thread-SIMT) & 735 & irreducible latency ($1.9\times$) \\
+CUDA worklist (thread-SIMT) & 739 & irreducible latency ($1.9\times$) \\
 \bottomrule
 \end{tabular}
 \end{table}
