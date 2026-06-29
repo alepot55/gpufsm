@@ -309,12 +309,16 @@ residual C), with a probe that is falsifiable by construction.
 \section{Reproducibility}
 Correctness gates every measurement: each kernel/config is checked bit-for-bit against the CPU oracle
 (NFA \texttt{reference.py} / \texttt{simulate\_dfa}) before any throughput is reported. Every number in
-this paper traces to a versioned CSV; all figures regenerate from those CSVs by a single script, so the
-plots cannot drift from the measurements. The Gluon expressibility claim is a runnable probe that exits
-$0$ on the expected compile failure and $1$ if a future Gluon ever compiles it---falsifiable by
-construction. The artifact (kernels, oracle, sweeps, profiling commands, CSVs, and the
-\texttt{scalar\_program} lowering) supports one-command regeneration; all figures here are emitted
-from the versioned CSVs by a single script.
+this paper traces to a versioned CSV, and all figures regenerate from those CSVs by a single script, so
+the plots cannot drift from the measurements. An artifact index maps each claim to the command that
+produces it and the CSV it writes. Expressibility and structural claims are \emph{runnable, falsifiable
+probes}: the Gluon probe exits $0$ on the expected compile failure (and $1$ if a future Gluon compiles
+it); the lowering-wall probe asserts the MLIR verifier rejects a per-lane \texttt{scf.condition}; the
+detection-pass check confirms the in-\texttt{libtriton} pass tags the lock-step region with the
+environment flag set and is a no-op without it. The TritonGPU pass is reproduced from a versioned patch
+($+$ source file) against a pinned Triton commit with the documented build recipe, and the
+cross-architecture re-validation is a single non-mutating command that re-runs every witness, the cure,
+and the selector on a new GPU and tags the output by device.
 
 \section{Related Work}
 \textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA: ngAP's

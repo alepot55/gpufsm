@@ -193,6 +193,15 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **REPRODUCIBILITY SECTION REFRESHED — now covers the P2/P3 artifacts (was stale).** The
+  Reproducibility section predated the compiler work: it had a duplicated "figures regenerate from CSVs"
+  sentence and omitted the major new AE artifacts. Rewrote it tightly to: (1) the artifact index (claim →
+  command → CSV); (2) THREE runnable falsifiable probes — Gluon (compile failure), the lowering-wall
+  (MLIR verifier rejects per-lane scf.condition), and the detection-pass check (in-libtriton pass tags
+  the lock-step region with the env flag, no-op without); (3) the TritonGPU pass reproduced from a
+  versioned patch + source against a pinned Triton commit with the build recipe; (4) the non-mutating
+  one-command cross-arch re-validation. Deduped the redundant sentence. A real fix (AE reviewers read
+  Reproducibility closely), not padding. Paper 7pp, 0 undefined/0 overfull.
 - 2026-06-29: **FIGURE for sec:compiler — the automatic detect→route→lower loop visualized (fig:selector).**
   The most novel section (P2: detection pass + structural wall + selector) had no figure. Added
   `fig_selector()` to `paper2/figures.py`: a clean left-to-right SCHEMATIC (not a redundant speedup bar —
