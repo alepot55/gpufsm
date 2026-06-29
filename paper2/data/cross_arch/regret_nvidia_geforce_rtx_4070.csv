@@ -1,0 +1,7 @@
+witness,baseline_regret_rtx4070,this_regret,persists,gpu,selector
+automata_nfa,4.304,2.869,1,NVIDIA GeForce RTX 4070,VERIFIED
+hashprobe,1.4,1.339,1,NVIDIA GeForce RTX 4070,VERIFIED
+pointer_chase,1.005,0.998,1,NVIDIA GeForce RTX 4070,VERIFIED
+rejection,4.0,4.118,1,NVIDIA GeForce RTX 4070,VERIFIED
+spmv_powerlaw,2.173,2.189,1,NVIDIA GeForce RTX 4070,VERIFIED
+spmv_uniform,1.945,1.913,1,NVIDIA GeForce RTX 4070,VERIFIED

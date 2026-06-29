@@ -193,6 +193,21 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P3 CROSS-ARCH HARNESS BUILT + SELF-VALIDATED — one command, ready for cloud A100/H100.**
+  `experiments/cure/p3_cross_arch.py` (+ `scripts/run_cross_arch.sh`): re-runs all regret-law witnesses
+  (spmv uniform/powerlaw, rejection, pointer-chase/bfs, hashprobe) + the M10 cure (automata sp/wp2) + the
+  P2 selector on whatever GPU is present, reads each freshly-measured regret, compares to the committed
+  RTX4070 baseline, and writes paper2/data/cross_arch/regret_<gpu>.csv tagged with
+  torch.cuda.get_device_name. Bakes in the FALSIFIABLE prediction: regret follows the execution PARADIGM
+  not the arch, so each witness's regret persists in direction (divergent >1, pointer-chase ~1) while
+  throughput rescales. SAFE/non-mutating: snapshots each witness CSV (and the selector CSV), runs, reads,
+  RESTORES the committed baseline (verified: after a full run only the new cross_arch CSV is added; all
+  *_rtx4070.csv unchanged). **Self-validated on the RTX4070** (reproduces its own baseline → sanity check
+  the parse/restore/compare logic): all 6 persist=yes (rejection 4.0→4.12, spmv 1.95/2.17→1.91/2.19,
+  hashprobe 1.40→1.34, pointer_chase 1.00→1.00, automata 4.3→2.87 [run-to-run/thermal variance, still
+  >1.1]), selector VERIFIED, verdict CONFIRMED. Ready to run on a cloud pod the moment the user grants
+  access; the A100/H100 numbers drop into cross_arch/ and either confirm or falsify arch-independence at
+  one command. (P3 was the hardware-gated open item in LANDMARK_PLAN.)
 - 2026-06-29: **REGRET-LAW RIGOR + HONESTY CORRECTION — the issue-deficit is NOT a universal predictor.**
   Completed the Nsight profiling of the one blank witness (spmv_powerlaw: tile issue 5.79% vs thread
   5.38%, tipi 32/32 → filled in regret_law.csv). This SURFACED an overstatement in the paper: the headline
