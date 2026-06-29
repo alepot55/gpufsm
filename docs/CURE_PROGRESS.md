@@ -193,6 +193,21 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **P2 FOLDED INTO THE PAPER — the landmark narrative is now publishable.** Added
+  `\subsection{Implemented in the compiler...}` (sec:compiler) to gpufsm2.tex: the real in-libtriton
+  detection pass (tritongpu-thread-region, lock-step scf.while/#blocked/tt.reduce signature) + the
+  STRUCTURAL WALL (carried tensors already sizePerThread=1 → not layout; scf.condition is single-i1 →
+  per-lane tensor<Nxi1> condition rejected by the MLIR verifier, captured via triton-opt) + the NAMED
+  missing IR primitive (per-lane sub-tile loop/exit op) + the automatic selector (detect→route→thread
+  lowering, 3.9× realized, oracle-gated, negative control on tile). New contribution bullet added.
+  Related-work tightened with the SHARP differentiation + 4 new verified bibentries (prism2026 PLDI'26
+  manual perspectives; cutile2025 manual SIMT fallback; tawa2026 CGO dense warp-spec; partialcfg2018
+  PLDI'18 opposite direction = vectorize): none auto-detects+lowers an irregular per-lane region in a
+  tile DSL, and our structural result shows why an in-tile-IR rewrite cannot suffice. Paper compiles
+  CLEAN: 6pp, 0 undefined refs, 0 overfull hbox, 0 bibtex warnings; PDF regenerated. The whole P2 arc
+  (build platform → detection pass → structural wall → missing primitive → automatic selector) is now
+  both BUILT and WRITTEN. Next: P3 multi-GPU prep (cross-arch one-command script) or regret-law Nsight
+  rigor (long_scoreboard stall % per witness).
 - 2026-06-29: **P2 ENDPOINT REACHED — automatic SELECTOR closes the detect→lower loop (realized cure).**
   `experiments/cure/p2_selector.py`: given a per-lane kernel, AUTOMATICALLY detects the lock-step
   signature by running the real in-libtriton pass (subprocess under the from-source Triton with

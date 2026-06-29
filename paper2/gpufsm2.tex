@@ -57,6 +57,12 @@ distinguished from Gluon's per-thread \emph{layout} (Sec.~\ref{sec:cure}).
 \item \textbf{The cure, implemented}: we lower the same idiomatic per-lane source to the thread model
 and measure that it runs $4.2\times$ faster than the tile lowering and matches/exceeds hand-CUDA,
 closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:cure}).
+\item \textbf{In the real compiler} (Sec.~\ref{sec:compiler}): a TritonGPU MLIR pass that compiles into
+\texttt{libtriton} and \emph{detects} the lock-step region; a proof that the in-IR lowering is
+\emph{structurally blocked} (\texttt{scf.condition} is a single \texttt{i1}; the tensors are already
+\texttt{sizePerThread=1}), naming the missing IR primitive (a per-lane sub-tile loop/exit op); and an
+\emph{automatic} detect-and-lower selector that routes the detected region to the thread cure for
+$3.9\times$, leaving a negative-control kernel on the tile path.
 \item A \textbf{generality law} across six oracle-gated irregular workloads (Sec.~\ref{sec:law},
 Fig.~\ref{fig:law}): regret tracks the tile's issue deficit---created by scalar control, not memory
 irregularity---validated by a graph pointer-chase negative control at exactly $1.00\times$.
@@ -191,8 +197,37 @@ and surpasses---thread-model performance from the identical front-end source.
 restores the thread-model signature---issue activity $36\%$ (vs.\ the tile's $9.9\%$, $\approx$ CUDA's
 $41\%$) and the \texttt{long\_scoreboard} dependent-load stall $29\times$ lower than the tile---so
 lowering the same source to independent per-lane streams recovers exactly the intra-warp latency
-hiding component~C was missing. (Integrating this lowering into Triton's MLIR is engineering; the
-lowering's effect, and \emph{why} it works, are what we validate.)
+hiding component~C was missing.
+
+\subsection{Implemented in the compiler: detect, and why the lowering must leave the tile IR}
+\label{sec:compiler}
+We take the cure into the real compiler. On a Triton-from-source build (3.8.0) we add a TritonGPU MLIR
+pass, \texttt{tritongpu-thread-region}, that runs in the NVIDIA \texttt{make\_ttgir} pipeline and
+\emph{detects} the irregular region by its lock-step signature---an \texttt{scf.while} whose iter-args
+are \texttt{\#blocked} tile tensors and whose \texttt{scf.condition} derives from a
+\texttt{tt.reduce}-to-scalar (the whole tile loops to the busiest lane; idle lanes masked). It compiles
+into \texttt{libtriton} and fires on the target kernels (verified: the candidate attribute appears with
+the pass on, is absent with it off, and codegen stays bit-exact).
+
+\textbf{The in-IR lowering is structurally blocked---and that is the sharper result.} Two facts from the
+matched IR. (i) The carried tensors are \emph{already} \texttt{sizePerThread=1} (one element per lane),
+so the lock-step is \emph{not} a layout choice---re-encoding is a no-op, and per-thread layout (Gluon,
+Linear Layouts~\cite{linearlayouts2025}) does not help. (ii) The lock-step is the \emph{loop construct}:
+\texttt{scf.condition} takes a single \texttt{i1}, so the natural rewrite---a per-lane
+\texttt{tensor$\langle$N$\times$i1$\rangle$} condition that lets lanes terminate independently---is
+rejected by the MLIR verifier (\emph{``'i1' vs 'tensor$\langle$8$\times$i1$\rangle$'''}, captured via the
+built \texttt{triton-opt}). Per-lane loop termination is therefore \emph{inexpressible} in TritonGPU's
+structured tile control flow. This names the missing IR primitive precisely: a \textbf{per-lane
+(sub-tile) loop/exit op}. The cure must lower \emph{below} the tile IR to the thread model (independent
+thread scheduling)---which is exactly what \S\ref{sec:implemented} does.
+
+\textbf{Automatic detect-and-lower.} A selector closes the loop: it runs the detection pass, and when the
+lock-step signature is present routes the region to the thread lowering, otherwise keeps the tile path.
+Oracle-gated, the NFA worklist is auto-routed to the thread cure for \textbf{$3.9\times$} over the tile
+(state sweep $16$--$64$, consistent with the $4.2\times$ of \S\ref{sec:implemented}), while a fixed-trip
+negative-control kernel is detected-negative and correctly left on the tile path. So the full loop is
+realized: detect (a real MLIR pass) $\rightarrow$ decide (the signature) $\rightarrow$ lower (the thread
+model, since the tile IR provably cannot) $\rightarrow$ measured, oracle-gated gap-closing.
 
 \subsection{Generality: the regret law}\label{sec:law}
 To test whether the mechanism is automata-specific we built six oracle-gated tile-vs-thread witnesses
@@ -270,6 +305,16 @@ control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025}, give per-
 placement} but not per-lane \emph{control flow} (our probe shows the data-dependent loop cannot
 lower); Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
 drop-to-scalar escape. Warp~\cite{warp2022} is the thread-SIMT existence proof.
+\textbf{Mixing thread- and tile-level execution} is exactly the live frontier, but every approach is
+\emph{manual} or \emph{differently directed}: Prism~\cite{prism2026} lets a programmer hand-annotate
+typed thread/tile ``perspectives''; NVIDIA's cuTile~\cite{cutile2025} concedes the irregular case and
+falls back to a hand-written SIMT path; Tawa~\cite{tawa2026} auto-restructures Triton but for
+\emph{dense} warp specialization; and partial control-flow linearization~\cite{partialcfg2018} goes the
+\emph{opposite} way---\emph{vectorizing} divergent CPU control flow, whereas we \emph{de}-vectorize a
+tile region to recover per-lane MLP. None automatically \emph{detects} an irregular, data-dependent
+per-lane region in a tile DSL and lowers it to the thread model; and our structural result shows
+\emph{why} an in-tile-IR rewrite cannot suffice---the missing primitive is a per-lane sub-tile loop/exit
+op, below the level any of these operate.
 \textbf{Mechanism}: we ground the residual in latency-hiding / MLP-vs-occupancy
 analysis~\cite{volkov2016latency,hongkim2009} and place both kernels on the instruction
 roofline~\cite{instroofline2022}; we distinguish it from divergence~\cite{fung2007} and from the
