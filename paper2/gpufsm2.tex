@@ -87,8 +87,9 @@ are non-Gaussian, so we avoid mean$\pm$std and best-of-$N$), and sweep batch bec
 benefit is occupancy-gated. Every mechanism claim is backed by Nsight Compute, not just wall-clock:
 the issue-stall composition (the \texttt{long\_scoreboard} reason isolates dependent-load waits),
 achieved occupancy, issue activity, warp- and thread-instruction counts, and DRAM/L2 traffic. We report negative and partial results and correct
-two of our own intermediate hypotheses (Secs.~\ref{sec:decomp}, \ref{sec:resid}). Hardware: RTX 4070
-(sm\_89, 46 SMs), Triton 3.5.1, torch 2.9.1+cu128, CUDA 13.3 / driver 580.
+three of our own intermediate hypotheses (Secs.~\ref{sec:decomp}, \ref{sec:resid}, \ref{sec:law}).
+Hardware: RTX 4070 (sm\_89, 46 SMs), Triton 3.5.1, torch 2.9.1+cu128, CUDA 13.3 / driver 580; the
+in-\texttt{libtriton} compiler pass (\S\ref{sec:compiler}) uses a from-source Triton 3.8.
 
 \section{The Decomposition (NFA worklist)}\label{sec:decomp}
 

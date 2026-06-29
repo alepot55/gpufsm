@@ -193,6 +193,15 @@ Niche CONFIRMED empty; novelty holds on two distinctions. Key outcomes folded in
 7. **Write-up paper 2** (CGO/CC framing) + artifact, continuously as results land.
 
 ## Findings log (append-only, newest first)
+- 2026-06-29: **§2 Background/Method read — one real internal inconsistency fixed.** §2 still said we
+  "correct TWO of our own intermediate hypotheses (sec:decomp, sec:resid)" — but Methodological Integrity
+  was updated to THREE this session (the two-channel regret-law self-correction). Fixed §2 to "three" +
+  added the sec:law cross-ref, so the two sections agree. Also tied the stack versions together: the
+  hardware line lists Triton 3.5.1 (measurement stack) while sec:compiler uses 3.8 from source — added a
+  one-clause note "(the in-libtriton compiler pass uses a from-source Triton 3.8)" so a careful reader
+  isn't confused by the two versions. The rest of §2 is sound (oracle gating, median+9-reps non-Gaussian
+  methodology, Nsight metrics, NFA/DFA characterization). Paper 7pp, 0 undefined/0 overfull. §2 was the
+  last un-read section — every section of the paper is now reviewed + every number CSV-cross-checked.
 - 2026-06-29: **§3 DECOMPOSITION / TABLE I cross-checked vs CSVs — one stale number fixed.** Verified Table I
   against m2e+m3 @batch 16384: Triton nw4=28 ✓, +nw1=104 ✓, +lane-pack=383 ✓, ratios 3.71/3.68/1.93 ✓.
   The CUDA value was a hair stale: table 735 vs committed CSV median **739** — fixed both occurrences
