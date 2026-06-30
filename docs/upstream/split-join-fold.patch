@@ -1,0 +1,100 @@
+diff --git a/include/triton/Dialect/Triton/IR/TritonOps.td b/include/triton/Dialect/Triton/IR/TritonOps.td
+index 8bd4d6c..a3cc249 100644
+--- a/include/triton/Dialect/Triton/IR/TritonOps.td
++++ b/include/triton/Dialect/Triton/IR/TritonOps.td
+@@ -545,6 +545,7 @@ def TT_JoinOp : TT_Op<"join", [
+     let results = (outs TT_Tensor:$result);
+     let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type($lhs) `->` type($result)";
+     let hasVerifier = 1;
++    let hasFolder = 1;
+ }
+ 
+ def TT_SplitOp : TT_Op<"split", [
+@@ -565,6 +566,7 @@ def TT_SplitOp : TT_Op<"split", [
+     let arguments = (ins TT_Tensor:$src);
+     let results = (outs TT_Tensor:$outLHS, TT_Tensor:$outRHS);
+     let assemblyFormat = "$src attr-dict `:` type($src) `->` type($outLHS)";
++    let hasFolder = 1;
+ }
+ 
+ def TT_TransOp : TT_Op<"trans", [Pure,
+diff --git a/lib/Dialect/Triton/IR/Ops.cpp b/lib/Dialect/Triton/IR/Ops.cpp
+index be3bc32..a913b4c 100644
+--- a/lib/Dialect/Triton/IR/Ops.cpp
++++ b/lib/Dialect/Triton/IR/Ops.cpp
+@@ -1421,6 +1421,19 @@ LogicalResult JoinOp::verify() {
+   return success();
+ }
+ 
++OpFoldResult JoinOp::fold(FoldAdaptor adaptor) {
++  // join(split(x)[0], split(x)[1]) -> x
++  // Only fold when both operands are exactly the two results of a single split
++  // and the reconstructed type matches, so layout encodings are preserved.
++  auto lhsSplit = getLhs().getDefiningOp<SplitOp>();
++  auto rhsSplit = getRhs().getDefiningOp<SplitOp>();
++  if (lhsSplit && lhsSplit == rhsSplit && getLhs() == lhsSplit.getOutLHS() &&
++      getRhs() == lhsSplit.getOutRHS() &&
++      lhsSplit.getSrc().getType() == getType())
++    return lhsSplit.getSrc();
++  return {};
++}
++
+ // -- SplitOp --
+ LogicalResult SplitOp::inferReturnTypes(
+     MLIRContext *context, std::optional<Location> location,
+@@ -1449,6 +1462,21 @@ LogicalResult SplitOp::inferReturnTypes(
+   return success();
+ }
+ 
++LogicalResult SplitOp::fold(FoldAdaptor adaptor,
++                            SmallVectorImpl<OpFoldResult> &results) {
++  // split(join(a, b)) -> (a, b)
++  // Guard on exact type equality so we never silently drop a layout conversion.
++  if (auto join = getSrc().getDefiningOp<JoinOp>()) {
++    if (join.getLhs().getType() == getOutLHS().getType() &&
++        join.getRhs().getType() == getOutRHS().getType()) {
++      results.push_back(join.getLhs());
++      results.push_back(join.getRhs());
++      return success();
++    }
++  }
++  return failure();
++}
++
+ // -- ElementwiseInlineAsmOp --
+ void ElementwiseInlineAsmOp::getEffects(
+     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+diff --git a/test/Triton/canonicalize.mlir b/test/Triton/canonicalize.mlir
+index b747cc0..c388471 100644
+--- a/test/Triton/canonicalize.mlir
++++ b/test/Triton/canonicalize.mlir
+@@ -260,3 +260,29 @@ tt.func @no_canonicalize_indivisible_offset(%base: tensor<128x!tt.ptr<f32>>) ->
+   %result = tt.int_to_ptr %offset_ptr_int : tensor<128xi64> -> tensor<128x!tt.ptr<f32>>
+   tt.return %result : tensor<128x!tt.ptr<f32>>
+ }
++
++// -----
++
++// CHECK-LABEL: split_join
++tt.func @split_join(%a: tensor<8x4xf32>, %b: tensor<8x4xf32>) -> (tensor<8x4xf32>, tensor<8x4xf32>) {
++  // split(join(a, b)) -> (a, b)
++  // CHECK-NOT: tt.join
++  // CHECK-NOT: tt.split
++  // CHECK: tt.return %arg0, %arg1
++  %j = tt.join %a, %b : tensor<8x4xf32> -> tensor<8x4x2xf32>
++  %o:2 = tt.split %j : tensor<8x4x2xf32> -> tensor<8x4xf32>
++  tt.return %o#0, %o#1 : tensor<8x4xf32>, tensor<8x4xf32>
++}
++
++// -----
++
++// CHECK-LABEL: join_split
++tt.func @join_split(%x: tensor<8x4x2xf32>) -> tensor<8x4x2xf32> {
++  // join(split(x)[0], split(x)[1]) -> x
++  // CHECK-NOT: tt.split
++  // CHECK-NOT: tt.join
++  // CHECK: tt.return %arg0
++  %s:2 = tt.split %x : tensor<8x4x2xf32> -> tensor<8x4xf32>
++  %j = tt.join %s#0, %s#1 : tensor<8x4xf32> -> tensor<8x4x2xf32>
++  tt.return %j : tensor<8x4x2xf32>
++}

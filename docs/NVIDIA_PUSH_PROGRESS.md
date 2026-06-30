@@ -37,6 +37,20 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
+- 2026-06-30 ~16:30: **ARM 1 — FIRST MERGEABLE TRITON PR BUILT + VERIFIED (split/join inverse fold).**
+  Hunted a real upstream gap (subagent trawl → I reproduced/verified every step myself). Found: `tt.join`
+  and `tt.split` are mutual inverses but BOTH fold-less, so `split(join(a,b))` and `join(split(x))` survive
+  `-canonicalize` AND `-triton-combine` (confirmed with triton-opt before believing it). Implemented both
+  folds in the from-source Triton (v3.11.3): `let hasFolder=1` on TT_JoinOp/TT_SplitOp + `JoinOp::fold` /
+  `SplitOp::fold` (multi-result), each **guarded on exact type equality** so a layout-changing pair is never
+  silently dropped (mirrors TransOp::fold; the verifier's inferSplitOpEncoding already makes the inverse
+  layout unique). Built triton-opt (-j2, OOM-safe), VERIFIED: direct repro now folds to `return %a,%b` /
+  `return %x`; FileCheck PASSES on the full test/Triton/canonicalize.mlir (existing + 2 new cases). Isolated
+  to a clean branch `fold-split-join` off upstream c05aa65 (commit b5c33a4, 3 files / 56 insertions, ZERO
+  ThreadRegion leakage). Artifacts in gpufsm: `docs/upstream/pr-split-join-fold.md` (PR description, rev.
+  @lezcano, template #10734/#9971) + `docs/upstream/split-join-fold.patch`. ⚠️ NEEDS USER: push the branch +
+  open the PR (I can't push to triton-lang). This is the arm-1 hire signal (merged PR → maintainer contact).
+  NEXT: while awaiting the PR, hunt a 2nd real gap or respond to review.
 - 2026-06-30 ~15:10: **DIRECTION SET — HIRE-FIRST (user: "più in alto, più grande").** 4-agent strategic
   research (frontier/venue, NVIDIA-signal, cure-feasibility, grand-theory) + a Triton-codebase recon →
   user chose the **hire-first** path (upstream engagement to maximize the NVIDIA signal), hardware RTX4070-
