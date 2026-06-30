@@ -4,6 +4,8 @@
 
 # Fold `split(join(a, b)) -> (a, b)` and `join(split(x)) -> x`
 
+**STATUS: SUBMITTED → https://github.com/triton-lang/triton/pull/10766 (OPEN, mergeable, awaiting maintainer review/CI).**
+
 ## What
 
 `tt.join` and `tt.split` are mutual inverses (join stacks two tensors along a new minor dim of size 2;

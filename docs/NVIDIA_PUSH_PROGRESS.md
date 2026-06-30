@@ -39,6 +39,17 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
+- 2026-06-30 ~23:15: **🎉 FIRST UPSTREAM PR LIVE — triton-lang/triton#10766 (split/join inverse fold).**
+  User chose "open the strongest one first". Installed clang-format 19.1.6 → confirmed the branch is
+  format-clean (no pre-commit churn). Forked triton-lang/triton→alepot55/triton, pushed fold-split-join,
+  opened PR #10766 (OPEN, MERGEABLE, +56/3 files, author alepot55, title "[TRITON] Fold split(join(a,b)) ->
+  (a,b) and join(split(x)) -> x"). CI not yet triggered (Triton gates CI for first-time contributors until a
+  maintainer approves). This DIRECTLY closes weakness #4 (zero upstream contribution) — a real maintainer-
+  reviewable PR in NVIDIA's co-maintained codebase. fold-bitcast@b68445d + fold-ptr-roundtrip@0541b42 HELD
+  in reserve (open after a maintainer engages, per the chosen strategy). Design issue still optional/pending.
+  NEXT (loop): monitor PR #10766 each wake (gh pr view comments + checks); address maintainer feedback /
+  CI failures (fix in branch → rebuild → re-verify FileCheck → push fork); if positively engaged, follow
+  with PR #2/#3.
 - 2026-06-30 ~19:45: **CI regression-safety of the 3 PRs VERIFIED (content grep, no rebuild needed).**
   Checked the whole `test/` tree for the exact round-trip patterns each fold matches: ZERO tests have
   consecutive `tt.bitcast`; NO test has a `split(join)`/`join(split)` round-trip (pipeline tests carry a
