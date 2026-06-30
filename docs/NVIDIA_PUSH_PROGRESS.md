@@ -37,7 +37,15 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
-- 2026-06-30 ~13:10: **Paper consolidation pass — abstract + contributions brought current.** End-to-end
+- 2026-06-30 ~13:40: **Related-work vs NVIDIA cuTile/Tile-IR strengthened (NVIDIA-relevant framing).**
+  Updated paper2 Related Work + the cutile2025 bib entry to engage NVIDIA's current direction precisely:
+  cuTile AND its MLIR Tile IR (now being built as a backend for Triton itself) are tile-level and concede
+  the irregular case to a hand-written SIMT fallback -> the per-lane gap we name persists in BOTH Triton's
+  TritonGPU and NVIDIA's Tile IR, so the proposed primitive is COMPLEMENTARY to NVIDIA's platform bet, not
+  subsumed by it. Strong NVIDIA-interview framing (shows awareness of + alignment with their roadmap).
+  Paper 7pp, 0 undefined/0 overfull. (Sources: NVIDIA dev blog "CUDA Tile IR Backend for OpenAI Triton",
+  CUDA 13.1, 2025; github.com/NVIDIA/cuda-tile.) Non-gated queue now genuinely thin; remaining big levers
+  are user-gated (post RFC, cloud pod, submission) or the multi-week below-TritonGPU C++.- 2026-06-30 ~13:10: **Paper consolidation pass — abstract + contributions brought current.** End-to-end
   re-read found two REAL stale omissions (the newest/strongest results were missing from the front matter):
   (1) the ABSTRACT said "six irregular workloads" with "two channels" and omitted the ML sign-flip and the
   reduce-hoist; updated to eight workloads + the correct sign-flip negative (MoE 2.36x confirms; attention

@@ -372,8 +372,10 @@ lower); Descend~\cite{descend2024} makes the thread hierarchy first-class but of
 drop-to-scalar escape. Warp~\cite{warp2022} is the thread-SIMT existence proof.
 \textbf{Mixing thread- and tile-level execution} is exactly the live frontier, but every approach is
 \emph{manual} or \emph{differently directed}: Prism~\cite{prism2026} lets a programmer hand-annotate
-typed thread/tile ``perspectives''; NVIDIA's cuTile~\cite{cutile2025} concedes the irregular case and
-falls back to a hand-written SIMT path; Tawa~\cite{tawa2026} auto-restructures Triton but for
+typed thread/tile ``perspectives''; NVIDIA's cuTile~\cite{cutile2025}---and its MLIR \emph{Tile IR}, now
+being built as a backend for Triton itself---is tile-level and concedes the irregular case to a
+hand-written SIMT fallback, so the per-lane gap we name persists in \emph{both} Triton's TritonGPU and
+NVIDIA's Tile IR (the proposed primitive is complementary to that platform direction, not subsumed by it); Tawa~\cite{tawa2026} auto-restructures Triton but for
 \emph{dense} warp specialization; and partial control-flow linearization~\cite{partialcfg2018} goes the
 \emph{opposite} way---\emph{vectorizing} divergent CPU control flow, whereas we \emph{de}-vectorize a
 tile region to recover per-lane MLP. None automatically \emph{detects} an irregular, data-dependent
