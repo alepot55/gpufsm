@@ -37,7 +37,18 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
-- 2026-06-30 ~12:35: **F3 FULL-cure SCOPED + BOUNDED + hook-point pinned (design note).** Measured the
+- 2026-06-30 ~13:10: **Paper consolidation pass — abstract + contributions brought current.** End-to-end
+  re-read found two REAL stale omissions (the newest/strongest results were missing from the front matter):
+  (1) the ABSTRACT said "six irregular workloads" with "two channels" and omitted the ML sign-flip and the
+  reduce-hoist; updated to eight workloads + the correct sign-flip negative (MoE 2.36x confirms; attention
+  0.64x, tile WINS -> "why Triton excels at flash-attention yet collapses on automata") + the real
+  in-compiler reduce-hoist (1.55x, in libtriton). (2) the "In the real compiler" CONTRIBUTION bullet listed
+  detect+wall+selector but not the reduce-hoist; added it (honestly partial). Spot-checked numbers trace to
+  CSVs (4.2/3.9/1.55/2.36/0.64). No contradictions; six-core + two-further ML = eight is internally
+  consistent (sec:law text vs abstract/caption "eight"). Paper 7pp, 0 undefined/0 overfull, PDF regen.
+  The paper now tells the full, current story. NEXT: a 3rd distinct improvement (related-work vs the NVIDIA
+  cuTile Tile-IR-for-Triton backend as motivation, OR a Methodological-Integrity note on the F3 0.45x
+  self-correction), or begin the below-TritonGPU op (high-risk).- 2026-06-30 ~12:35: **F3 FULL-cure SCOPED + BOUNDED + hook-point pinned (design note).** Measured the
   full-cure target on the lock-step kernel: CUDA thread (one/element, retiring) = **27.6 us = 5.64x** vs
   tile 155.6us, with threads-per-instruction **11.65** (< 32 = per-lane retirement, Nsight-confirmed). So
   the full cure is worth ~5.6x; the built reduce-hoist captures 1.55x; the residual ~3.6x is EXACTLY the
