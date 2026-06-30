@@ -39,7 +39,17 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
-- 2026-07-01 ~01:25: **🎉🎉 M3 DONE — THE CURE WORKS END-TO-END: oracle-correct + 4.15x measured in the
+- 2026-07-01 ~01:50: **M4(a) — Nsight CONFIRMS the cure mechanism = genuine per-lane retirement (work ∝
+  Σtrip, not 32×max).** ncu (--kernel-name regex:_perlane_while, masked vs retire) on the f3 kernel:
+  masked 137.7us / **36,119,056 inst**; cured 26.0us / **917,504 inst** = **39.4× fewer issued instructions**,
+  5.29× ncu kernel time (4.15× wall-clock). The cured instruction count (~0.92M ≈ Σtrip/32 × body) PROVES
+  total work scales with the SUM of per-lane trips (each lane runs only its own iterations) vs the masked
+  32×warp-max — i.e. real per-lane early exit. Masked also pays a per-iteration cross-lane reduce
+  (redux.sync) × warp-max × 32 lanes, which the cure removes. ⚠️ HONEST NUANCE: ncu reports
+  threads-per-instruction = 32 in BOTH (early iterations near-full dominate the average), so the win is in
+  INSTRUCTION-COUNT/work reduction, NOT an occupancy/divergence-efficiency metric — must frame the paper
+  accordingly (no tpi<32 overclaim). Data: paper2/data/landmark/cure_nsight_rtx4070.csv. NEXT: M4(b) fold
+  the built+measured+profiled cure into paper2 (flagship); M4(c) generalize to a 2nd shape.- 2026-07-01 ~01:25: **🎉🎉 M3 DONE — THE CURE WORKS END-TO-END: oracle-correct + 4.15x measured in the
   REAL Triton compiler.** Wired LowerThreadRegionRetire into make_llir (binding add_lower_thread_region_retire
   in python/src/passes.cc + gated call in compiler.py after add_to_llvmir; rebuilt libtriton.so). Ran the f3
   per-lane-while kernel (num_warps=1, BLOCK=32, pareto trips) through the real compile+run path, 5 samples

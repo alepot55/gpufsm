@@ -1,0 +1,3 @@
+mode,kernel_time_us,inst_executed_sum,threads_per_inst,gpu
+masked_baseline,137.70,36119056,32,RTX4070
+perlane_retire_cure,26.02,917504,32,RTX4070
