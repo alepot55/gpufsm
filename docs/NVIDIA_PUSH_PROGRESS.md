@@ -37,6 +37,15 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
+- 2026-06-30 ~later: **Gap #7 (interview ownership) attacked — derivation/ownership companion.** Wrote
+  `docs/NVIDIA_INTERVIEW_OWNERSHIP.md` (own-every-line): re-derives the regret law + sign-flip from
+  instruction-issue accounting (TIPI), the four whiteboard derivations (neg-control=1.00, rejection
+  max/mean~5, the 5.64x ceiling = 1.55x-in-IR x 3.6x-below split, the equivalence proof), the reduce-hoist
+  pass as a from-memory recipe + the MLIR-API gotchas, the structural wall + exact make_llir hook-point,
+  an ITS/PTX-SASS cheat-sheet (incl. occupancy!=divergence), and likely interview Q&A with crisp answers.
+  Every number traced to regret_law.csv / f3_hoist_rtx4070.csv (verified, no transposition). This is the
+  highest-value remaining NON-gated, NON-multi-week artifact: weakness #7 was explicitly named in the hire
+  goal and nothing addressed it. CPU tests 37 green; tree clean. Commit 0950b58.
 - 2026-06-30 ~13:40: **Related-work vs NVIDIA cuTile/Tile-IR strengthened (NVIDIA-relevant framing).**
   Updated paper2 Related Work + the cutile2025 bib entry to engage NVIDIA's current direction precisely:
   cuTile AND its MLIR Tile IR (now being built as a backend for Triton itself) are tile-level and concede
