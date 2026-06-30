@@ -5,13 +5,33 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
 
 ## Fronts status
 - F1 Triton RFC (draft) — NOT STARTED. Next: research Triton contrib norms + cuTile/Tile-IR state, draft.
-- F2 ML-domain witness — IN PROGRESS. Ragged-attention witness DONE (boundary result, see findings). Next:
-  pair with MoE-routing (scalar-control ML witness) and decide paper framing of the boundary.
+- F2 ML-domain witness — IN PROGRESS. Attention (dense,regret<1) + MoE (scalar,regret>1) witnesses DONE
+  with CORRECT Nsight. Next: fold both into the paper's generality section (unified mechanism).
 - F3 real in-compiler lowering — NOT STARTED (hard; below TritonGPU).
 - F4 multi-GPU A100/H100 — GATED on user cloud pod (`scripts/run_cross_arch.sh` ready).
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
+- 2026-06-30 ~09:35: **F2 MoE witness DONE + Nsight-MEASUREMENT BUG CAUGHT & CORRECTED (rigor).** Built an
+  oracle-gated MoE top-k routing witness (`experiments/cure/landmark_moe.py`, exact int64; one token/lane,
+  ragged variable expert-count, scalar per-step mul-add; uniform vs power-law expert loads). regret =
+  **1.37 (uniform) / 2.36 (power-law) — TILE LOSES, grows with divergence** (confirms the law on a
+  scalar-control ML kernel). `moe_rtx4070.csv`.
+  ⚠️ **CORRECTION (honest):** my prior attention Nsight ("tile≡thread, tipi 32/32", commit 6aae0e8) was
+  WRONG — `ncu --launch-count 1` WITHOUT `--kernel-name` profiled a torch SETUP kernel (the H2D copy from
+  to_dev), not my compute kernel (tell-tale: inst_executed identical + round 131072/45056). Re-profiled
+  with `--kernel-name regex:<fn>` (METHOD NOTE: always filter ncu by kernel name when torch is in the
+  process). CORRECT numbers (power-law) + corrected `attention_nsight_rtx4070.csv` + new `moe_nsight_*`:
+    MoE  tile: issue 43.3%, tipi 30.1, occ 48%, inst 41.8M | thread: issue 35.0%, tipi 7.71, occ 77%, inst 16.3M
+    Attn tile: issue 10.4%, tipi 32.0, occ 28%, inst 123M  | thread: issue 11.7%, tipi 3.45, occ 33%, inst 178M
+  **UNIFIED MECHANISM (correct, NVIDIA-grade):** the THREAD model always gets lane-retirement on divergence
+  (tipi drops: 7.7 MoE / 3.45 attn) while the TILE does masked full-width work (tipi ~30-32). The regret
+  SIGN is then set by per-step INSTRUCTION efficiency: scalar work -> tile issues MORE instructions
+  (while-reduce+masking overhead: 41.8M>16.3M) -> tile loses (MoE). Dense vectorizable work -> tile issues
+  FEWER (vectorized head-dim: 123M<178M) -> tile wins despite no lane-retirement (attention). This UNIFIES
+  with the original regret law (automata/rejection = scalar control = tile loses) and explains the
+  attention boundary precisely. NEXT: fold both ML witnesses + this unified mechanism into the paper's
+  generality section; add rows to regret_law.csv with mechanism labels; keep paper clean.
 - 2026-06-30 ~09:00: **F2 attention witness — BOUNDARY RESULT (honest, sharpens the thesis).** Built an
   oracle-gated ragged/variable-context attention witness (flash online softmax, head_dim D=8, pooled K/V
   with per-query ragged slices; tile Triton vs thread CUDA-nvcc vs numpy oracle; uniform vs power-law

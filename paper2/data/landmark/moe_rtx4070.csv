@@ -1,0 +1,3 @@
+matrix,k_cv,tile_mpair_s,thread_mpair_s,regret,gpu
+uniform,0.0,59362.3,81108.9,1.366,RTX4070
+powerlaw,1.355,29092.5,68597.3,2.358,RTX4070
