@@ -58,3 +58,42 @@ LLVM-dialect pass inserted AFTER `add_to_llvmir`.
   function return inside the loop.
 
 Provenance of this map: deep code recon 2026-06-30 (agent), every claim file:line-cited above.
+
+## M1 REFINED (2026-07-01, after capturing the real lowered IR — much simpler than scoped)
+
+Captured the post-`convert-triton-gpu-to-llvm` IR of p2_lockstep.ttgir (reference:
+`experiments/cure/lockstep_lowered_reference.mlir`). Pipeline to reproduce:
+`GPUFSM_THREAD_REGION=retire triton-opt p2_lockstep.ttgir -tritongpu-thread-region -convert-scf-to-cf
+-allocate-shared-memory-nv -convert-triton-gpu-to-llvm`.
+
+**Key discovery:** at this stage the per-lane predicate ALREADY EXISTS as a scalar. Loop header `^bb1`:
+```
+%89 = llvm.extractvalue %88[0]            ; jLane   (this lane's j)
+%90 = llvm.extractvalue %82[0]            ; tripLane (this lane's trip)
+%91 = llvm.icmp "slt" %89, %90 : i32      ; <-- PER-LANE predicate (i1), already materialized
+... (pack/zext boilerplate) ...
+%100 = nvvm.redux.sync max %98, %99 : i32 ; <-- the cross-lane warp reduction (per-iteration cost)
+%101 = llvm.icmp "sgt" %100, %3 : i32     ; uniform "any lane still active?"
+llvm.cond_br %101, ^bb2(...), ^bb3        ; <-- masked lock-step branch (the regret)
+```
+
+**The entire cure rewrite (≈20 lines):**
+1. Match the loop-latch `llvm.cond_br %c` where `%c = icmp sgt (nvvm.redux.sync max %r, -1), 0` and `%r`
+   traces (through zext + the struct insert/extract boilerplate) back to a per-lane `llvm.icmp` (`%91`).
+2. **Redirect**: set the cond_br condition operand to that per-lane `%91` (each lane now branches on its OWN
+   `j < trip` → lanes retire independently; PTX `@p bra` + hardware ITS).
+3. The `nvvm.redux.sync` + `icmp sgt` + boilerplate become dead → DCE removes the per-iteration cross-lane
+   reduce (the measurable win).
+4. Insert `nvvm.bar.warp.sync` (mask 0xffffffff) at the start of the exit block `^bb3` for reconvergence.
+
+**Plumbing:** new pass (e.g. extend ThreadRegion.cpp with a 2nd pass `LowerThreadRegionRetire`, or a new
+file) operating on `LLVM::LLVMFuncOp` post-conversion; Passes.td entry + GEN_PASS_DEF + CMake (≈50min build).
+Test standalone via triton-opt: append `-lower-thread-region-retire` to the capture pipeline; VERIFY the
+cond_br now uses the per-lane i1 and the redux is gone. Then wire into make_llir (compiler.py:397) + measure.
+
+**Marker:** `ttg.retire_candidate` does NOT currently survive onto `nvvm.redux.sync` — for M1 use STRUCTURAL
+matching (cond_br ← sgt(redux.sync max, 0) ← per-lane icmp), gated by `GPUFSM_THREAD_REGION=retire`. (Optional
+later: copy the attr through the reduce lowering for precise targeting.)
+
+**Guards (M2):** only rewrite if the loop body has no other cross-lane op (shfl/redux/barrier/shared store/
+tt.dot beyond the matched latch reduce) and is not software-pipelined; assert single exit block.
