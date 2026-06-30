@@ -147,6 +147,7 @@ struct ThreadRegionPass : public impl::TritonGPUThreadRegionBase<ThreadRegionPas
   void runOnOperation() override {
     const char *mode = std::getenv("GPUFSM_THREAD_REGION");
     bool doHoist = mode && std::strcmp(mode, "hoist") == 0;
+    bool doRetire = mode && std::strcmp(mode, "retire") == 0;
     ModuleOp mod = getOperation();
     SmallVector<scf::WhileOp> matched;
     mod.walk([&](scf::WhileOp w) {
@@ -168,6 +169,17 @@ struct ThreadRegionPass : public impl::TritonGPUThreadRegionBase<ThreadRegionPas
     if (doHoist)
       for (scf::WhileOp w : matched)
         (void)hoistRewrite(w);
+    // M0 of the per-lane retirement cure: stamp the gating tt.reduce so the
+    // marker survives scf-to-cf into make_llir, where the LLVM-dialect pass
+    // LowerThreadRegion (GPUFSM_THREAD_REGION=retire) recovers the lock-step
+    // loop and rewrites it to per-lane branch + retire. See
+    // docs/cure/LOWERING_PLAN.md.
+    if (doRetire)
+      for (scf::WhileOp w : matched) {
+        auto cond = cast<scf::ConditionOp>(w.getBefore().front().getTerminator());
+        if (auto red = findInBefore<triton::ReduceOp>(cond.getCondition(), w))
+          red->setAttr("ttg.retire_candidate", UnitAttr::get(&getContext()));
+      }
   }
 };
 

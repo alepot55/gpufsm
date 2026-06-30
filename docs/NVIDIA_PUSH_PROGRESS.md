@@ -39,6 +39,15 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
+- 2026-07-01 ~00:15: **CURE BUILD STARTED — M0 DONE+VERIFIED (big-swing pivot).** User: "voglio molto di
+  più, stai sprecando tempo, non accontentarti". Pivoted from hold-and-monitor to BUILDING THE CURE (the
+  below-TritonGPU per-lane retirement lowering, weakness #2). Code-grounded plan: docs/cure/LOWERING_PLAN.md
+  (M0-M4; new LLVM-dialect pass after add_to_llvmir/compiler.py:397, unpackLLElements per-lane scalar,
+  per-lane llvm.cond_br + createSyncWarp, structural guards). **M0**: added GPUFSM_THREAD_REGION=retire mode
+  to ThreadRegion.cpp that stamps the gating tt.reduce with ttg.retire_candidate (survives scf-to-cf into
+  make_llir). Built (fast relink) + VERIFIED on p2_lockstep.ttgir: the reduce carries {ttg.retire_candidate}.
+  NEXT: M1 = the LLVM-dialect LowerThreadRegion pass (capture lowered IR first, then write+build+verify the
+  cond_br rewrite). RunPod NOT blocking (cure is local). PR #10766 passive-monitored.
 - 2026-06-30 ~23:15: **🎉 FIRST UPSTREAM PR LIVE — triton-lang/triton#10766 (split/join inverse fold).**
   User chose "open the strongest one first". Installed clang-format 19.1.6 → confirmed the branch is
   format-clean (no pre-commit churn). Forked triton-lang/triton→alepot55/triton, pushed fold-split-join,
