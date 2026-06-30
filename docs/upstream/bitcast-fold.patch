@@ -1,0 +1,55 @@
+diff --git a/lib/Dialect/Triton/IR/Ops.cpp b/lib/Dialect/Triton/IR/Ops.cpp
+index be3bc32..4489b1a 100644
+--- a/lib/Dialect/Triton/IR/Ops.cpp
++++ b/lib/Dialect/Triton/IR/Ops.cpp
+@@ -1052,8 +1052,18 @@ LogicalResult FpToFpOp::verify() {
+ 
+ //-- BitcastOp --
+ OpFoldResult BitcastOp::fold(FoldAdaptor adaptor) {
++  // bitcast(x : T) : T -> x
+   if (getSrc().getType() == getType())
+     return getSrc();
++  // Collapse nested bitcasts: bitcast(bitcast(x)) -> bitcast(x).  All bitcasts
++  // share bitwidth/shape/encoding, so casting the original source straight to
++  // this type is equivalent; a round-trip to the source type is the identity.
++  if (auto innerCast = getSrc().getDefiningOp<BitcastOp>()) {
++    if (innerCast.getSrc().getType() == getType())
++      return innerCast.getSrc();
++    setOperand(innerCast.getSrc());
++    return getResult();
++  }
+   return {};
+ }
+ 
+diff --git a/test/Triton/canonicalize.mlir b/test/Triton/canonicalize.mlir
+index b747cc0..c503386 100644
+--- a/test/Triton/canonicalize.mlir
++++ b/test/Triton/canonicalize.mlir
+@@ -260,3 +260,27 @@ tt.func @no_canonicalize_indivisible_offset(%base: tensor<128x!tt.ptr<f32>>) ->
+   %result = tt.int_to_ptr %offset_ptr_int : tensor<128xi64> -> tensor<128x!tt.ptr<f32>>
+   tt.return %result : tensor<128x!tt.ptr<f32>>
+ }
++
++// -----
++
++// CHECK-LABEL: bitcast_roundtrip
++tt.func @bitcast_roundtrip(%x: tensor<16xi32>) -> tensor<16xi32> {
++  // bitcast(bitcast(x : i32 -> f32) : f32 -> i32) -> x
++  // CHECK-NOT: tt.bitcast
++  // CHECK: tt.return %arg0
++  %a = tt.bitcast %x : tensor<16xi32> -> tensor<16xf32>
++  %b = tt.bitcast %a : tensor<16xf32> -> tensor<16xi32>
++  tt.return %b : tensor<16xi32>
++}
++
++// -----
++
++// CHECK-LABEL: bitcast_chain
++tt.func @bitcast_chain(%x: tensor<16xi16>) -> tensor<16xbf16> {
++  // bitcast(bitcast(x : i16 -> f16) : f16 -> bf16) -> bitcast(x : i16 -> bf16)
++  // CHECK: %[[B:.*]] = tt.bitcast %arg0 : tensor<16xi16> -> tensor<16xbf16>
++  // CHECK: tt.return %[[B]]
++  %a = tt.bitcast %x : tensor<16xi16> -> tensor<16xf16>
++  %b = tt.bitcast %a : tensor<16xf16> -> tensor<16xbf16>
++  tt.return %b : tensor<16xbf16>
++}

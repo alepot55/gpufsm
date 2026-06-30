@@ -37,6 +37,18 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
+- 2026-06-30 ~17:00: **ARM 1 — 2nd MERGEABLE TRITON PR built+verified (nested-bitcast fold).** Empirical
+  fold-identity sweep with triton-opt (reproduced before believing): found `bitcast(bitcast(x))` survives
+  `-canonicalize` (BitcastOp::fold only handled same-type identity), and `trans(splat(%x))` also survives
+  (kept as a 3rd candidate); `broadcast(broadcast)` already folds (ruled out). Shipped bitcast: extended
+  `BitcastOp::fold` to collapse nested bitcasts (round-trip→x; A->B->C chain→single A->C), safe via
+  SameOperandsAndResultShape/Encoding + equal bitwidth (mirrors trans(trans) in-place idiom). Built (fast
+  relink, Ops.cpp-only), VERIFIED: `bitcast(bitcast(x))`→`return %x`; FileCheck PASSES on full
+  canonicalize.mlir (+2 cases bitcast_roundtrip/bitcast_chain). Isolated to clean branch `fold-bitcast`@
+  b68445d off upstream c05aa65 (2 files/34 ins), INDEPENDENT of fold-split-join. Artifacts:
+  docs/upstream/pr-bitcast-fold.md + bitcast-fold.patch. ⚠️ NEEDS USER: push branch + open PR. Now TWO
+  ready PRs (split/join @b5c33a4, bitcast @b68445d) + the design issue. NEXT: ship trans(splat) as a 3rd, or
+  respond to review once user opens PRs.
 - 2026-06-30 ~16:30: **ARM 1 — FIRST MERGEABLE TRITON PR BUILT + VERIFIED (split/join inverse fold).**
   Hunted a real upstream gap (subagent trawl → I reproduced/verified every step myself). Found: `tt.join`
   and `tt.split` are mutual inverses but BOTH fold-less, so `split(join(a,b))` and `join(split(x))` survive
