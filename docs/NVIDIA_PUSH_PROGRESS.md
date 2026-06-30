@@ -39,6 +39,13 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
+- 2026-06-30 ~19:45: **CI regression-safety of the 3 PRs VERIFIED (content grep, no rebuild needed).**
+  Checked the whole `test/` tree for the exact round-trip patterns each fold matches: ZERO tests have
+  consecutive `tt.bitcast`; NO test has a `split(join)`/`join(split)` round-trip (pipeline tests carry a
+  standalone `tt.join` only, split=0); the only `ptr_to_int(int_to_ptr)` round-trip is our new positive
+  case (`ops.mlir` uses INDEPENDENT casts + no `-canonicalize`). ⇒ none of the 3 folds can fire on any
+  existing test → no CI regression on the touched ops. Added a "Regression safety (verified)" note to each
+  PR doc. This de-risks the #1 PR-bounce cause without the 3 expensive rebuilds. Still awaiting USER push.
 - 2026-06-30 ~18:50: **Log compacted 131→62. Easy fast-relink fold space EXHAUSTED (honest).** Final
   triton-opt sweep: reshape(splat) and convert_layout(same-layout) ALREADY fold; expand_dims(expand_dims)
   survives but is niche AND needs a .td rebuild — not worth it. No new high-value mergeable fold this wake.

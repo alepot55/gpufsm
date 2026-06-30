@@ -34,3 +34,6 @@ returns its input.
 
 Built `triton-opt` from this branch; `ptr_to_int(int_to_ptr(%x))` canonicalizes to `return %x`; FileCheck
 passes on the full `test/Triton/canonicalize.mlir`. (Verified; branch fold-ptr-roundtrip @ 0541b42.)
+
+## Regression safety (verified)
+The only `ptr_to_int(int_to_ptr(...))` round-trip in `test/` is the new positive case here; `test/Triton/ops.mlir` uses independent casts and runs no `-canonicalize`, so this pattern cannot fire there → no CI regression.

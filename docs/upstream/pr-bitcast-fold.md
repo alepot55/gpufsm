@@ -35,3 +35,6 @@ fold idiom.
 
 Built `triton-opt` from this branch; direct repro folds `bitcast(bitcast(x))` to `return %x`; FileCheck
 passes on the full `test/Triton/canonicalize.mlir`.
+
+## Regression safety (verified)
+No existing Triton test contains two consecutive `tt.bitcast` ops (content grep over `test/`), so the nested-bitcast fold cannot fire on any current test → no CI regression.

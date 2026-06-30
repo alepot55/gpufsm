@@ -47,3 +47,6 @@ and the (now-dead, DCE'd) split disappear and the function returns its inputs di
 # before:  %j = tt.join %a, %b ; %o:2 = tt.split %j ; return %o#0, %o#1
 # after:   return %a, %b
 ```
+
+## Regression safety (verified)
+No existing Triton test contains a `split(join(...))` or `join(split(...))` round-trip (content grep over `test/`; pipeline tests use standalone `tt.join` only), so this fold cannot fire on any current test → no CI regression.
