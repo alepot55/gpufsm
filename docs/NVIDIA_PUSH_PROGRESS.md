@@ -37,6 +37,17 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
+- 2026-06-30 ~18:15: **ARM 1 — 3rd MERGEABLE TRITON PR built+verified (ptr/int round-trip mirror).**
+  Empirical sweep found `ptr_to_int(int_to_ptr(x))` survives -canonicalize while its MIRROR
+  `int_to_ptr(ptr_to_int(p))` already folds (CanonicalizeIntToPtrOfPtrToInt) → clean "complete the inverse
+  pair" PR. Added `hasCanonicalizer` to TT_PtrToIntOp + `CanonicalizePtrToIntOfIntToPtr` (direct mirror,
+  replaces with a bitcast that folds away same-type) + lit test. .td change → full ~50min rebuild (280/280
+  OK). VERIFIED: `ptr_to_int(int_to_ptr(x))`→`return %x`; FileCheck PASSES on full canonicalize.mlir. Branch
+  `fold-ptr-roundtrip`@0541b42 off upstream c05aa65 (3 files/39 ins). Artifacts: docs/upstream/
+  pr-ptr-roundtrip-fold.md + ptr-roundtrip-fold.patch. **THREE PRs now ready+verified awaiting USER push**
+  (fold-split-join@b5c33a4, fold-bitcast@b68445d, fold-ptr-roundtrip@0541b42) + design issue. Also picked
+  this over niche trans(splat) (which needs the same .td rebuild for less value). NEXT: respond to review
+  once PRs opened, or 4th .cpp-foldable gap.
 - 2026-06-30 ~17:00: **ARM 1 — 2nd MERGEABLE TRITON PR built+verified (nested-bitcast fold).** Empirical
   fold-identity sweep with triton-opt (reproduced before believing): found `bitcast(bitcast(x))` survives
   `-canonicalize` (BitcastOp::fold only handled same-type identity), and `trans(splat(%x))` also survives
