@@ -37,6 +37,19 @@ PASS built into libtriton (1.55x, oracle-correct, via scf.while iter-arg surgery
 F3 folded into paper+RFC. All committed on dev; details in git log.
 
 ## Findings log (newest first)
+- 2026-06-30 ~15:10: **DIRECTION SET — HIRE-FIRST (user: "più in alto, più grande").** 4-agent strategic
+  research (frontier/venue, NVIDIA-signal, cure-feasibility, grand-theory) + a Triton-codebase recon →
+  user chose the **hire-first** path (upstream engagement to maximize the NVIDIA signal), hardware RTX4070-
+  only for now. Plan: `docs/upstream/STRATEGY.md`. Arms by signal: (1) merged triton-lang/triton PR (must
+  fix a real functional/perf issue; NOT fabricated — hunting a genuine gap), (2) **DONE: reviewer-ready
+  design issue** `docs/upstream/triton-issue-irregular-control.md` (user posts; earns a maintainer thread
+  w/o a niche-merge ask), (3) talk after arm 1. Reframe = "I characterized+partially closed a regret class
+  the CUDA Tile-IR backend exhibits" (real NVIDIA team: Jie Xin/Jonathan Bentz), not "add a primitive".
+  ⚠️ **Verified dead-end:** `-triton-licm` ALREADY hoists a loop-invariant `tt.reduce` (it's `Pure`,
+  TritonOps.td:758; reproduced with triton-opt) → the reduce-hoist generalizes to NO mainstream LICM PR;
+  the automata rewrite stays a paper artifact. Cure-RFC primitive fight DE-PRIORITIZED (slow governance;
+  ecosystem moving toward tile). Commit d55b373. NEXT (autonomous): hunt a REAL mergeable canonicalization/
+  fold or functional/perf bug in TritonGPU (template: merged PR #10734 @lezcano), verified before any ship.
 - 2026-06-30 ~later: **Gap #7 (interview ownership) attacked — derivation/ownership companion.** Wrote
   `docs/NVIDIA_INTERVIEW_OWNERSHIP.md` (own-every-line): re-derives the regret law + sign-flip from
   instruction-issue accounting (TIPI), the four whiteboard derivations (neg-control=1.00, rejection
