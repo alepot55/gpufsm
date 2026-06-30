@@ -1,13 +1,19 @@
 // gpufsm "abstraction regret" research pass — tritongpu-thread-region.
-//   default / GPUFSM_THREAD_REGION=1 : DETECT + mark the lock-step signature (an scf.while over
-//     #blocked tile iter-args whose scf.condition derives from a tt.reduce of a per-lane predicate).
-//   GPUFSM_THREAD_REGION=hoist        : additionally REWRITE the matched while (reduce-hoist): the
-//     per-iteration tt.reduce(cmpi slt %j, %trip) gate is replaced by a scalar counter bounded by a
-//     once-hoisted reduce_max(%trip). Provably equivalent (j is a uniform splat; the body stays masked
-//     by j<trip), removes the per-iteration cross-lane reduce, preserves per-warp termination. (~1.4x;
-//     see experiments/cure/f3_reduce_cost.py). It does NOT give per-lane retirement — that needs a
-//     below-TritonGPU lowering (the structural wall).
+//   default / GPUFSM_THREAD_REGION=1 : DETECT + mark the lock-step signature
+//   (an scf.while over
+//     #blocked tile iter-args whose scf.condition derives from a tt.reduce of a
+//     per-lane predicate).
+//   GPUFSM_THREAD_REGION=hoist        : additionally REWRITE the matched while
+//   (reduce-hoist): the
+//     per-iteration tt.reduce(cmpi slt %j, %trip) gate is replaced by a scalar
+//     counter bounded by a once-hoisted reduce_max(%trip). Provably equivalent
+//     (j is a uniform splat; the body stays masked by j<trip), removes the
+//     per-iteration cross-lane reduce, preserves per-warp termination. (~1.4x;
+//     see experiments/cure/f3_reduce_cost.py). It does NOT give per-lane
+//     retirement — that needs a below-TritonGPU lowering (the structural wall).
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
@@ -26,6 +32,7 @@ namespace triton {
 namespace gpu {
 
 #define GEN_PASS_DEF_TRITONGPUTHREADREGION
+#define GEN_PASS_DEF_TRITONGPULOWERTHREADREGIONRETIRE
 #include "triton/Dialect/TritonGPU/Transforms/Passes.h.inc"
 
 namespace {
@@ -35,9 +42,9 @@ static bool isBlockedTile(Type type) {
   return tensor && isa_and_nonnull<BlockedEncodingAttr>(tensor.getEncoding());
 }
 
-// Backward walk within the before-region; return the first op of type T feeding `root`.
-template <typename T>
-static T findInBefore(Value root, scf::WhileOp w) {
+// Backward walk within the before-region; return the first op of type T feeding
+// `root`.
+template <typename T> static T findInBefore(Value root, scf::WhileOp w) {
   llvm::SmallPtrSet<Operation *, 16> seen;
   SmallVector<Value, 16> wl{root};
   while (!wl.empty()) {
@@ -46,6 +53,24 @@ static T findInBefore(Value root, scf::WhileOp w) {
     if (!d || !seen.insert(d).second)
       continue;
     if (d->getParentRegion() != &w.getBefore())
+      continue;
+    if (auto t = dyn_cast<T>(d))
+      return t;
+    for (Value o : d->getOperands())
+      wl.push_back(o);
+  }
+  return nullptr;
+}
+
+// Global backward walk: first op of type T feeding `root` (no region
+// restriction).
+template <typename T> static T findFeeding(Value root) {
+  llvm::SmallPtrSet<Operation *, 32> seen;
+  SmallVector<Value, 32> wl{root};
+  while (!wl.empty()) {
+    Value v = wl.pop_back_val();
+    Operation *d = v.getDefiningOp();
+    if (!d || !seen.insert(d).second)
       continue;
     if (auto t = dyn_cast<T>(d))
       return t;
@@ -66,7 +91,8 @@ static LogicalResult hoistRewrite(scf::WhileOp w) {
   if (!cmp || cmp.getPredicate() != arith::CmpIPredicate::slt)
     return failure();
 
-  // Identify %j (a before-block arg, the per-lane counter) and %trip (loop-invariant).
+  // Identify %j (a before-block arg, the per-lane counter) and %trip
+  // (loop-invariant).
   auto isBeforeArg = [&](Value v) {
     auto ba = dyn_cast<BlockArgument>(v);
     return ba && ba.getOwner() == &before;
@@ -82,16 +108,19 @@ static LogicalResult hoistRewrite(scf::WhileOp w) {
     if (w->isAncestor(td))
       return failure();
   auto jArg = cast<BlockArgument>(jv);
-  unsigned jIdx = jArg.getArgNumber(); // same index in inits / results / after-args
+  unsigned jIdx =
+      jArg.getArgNumber(); // same index in inits / results / after-args
 
   OpBuilder b(w);
   Location loc = w.getLoc();
-  // Hoist %mt = reduce_max(%trip): clone the matched reduce, feeding it %trip directly.
+  // Hoist %mt = reduce_max(%trip): clone the matched reduce, feeding it %trip
+  // directly.
   IRMapping hm;
   hm.map(red->getOperand(0), tripv);
   Operation *mtOp = b.clone(*red.getOperation(), hm);
   Value mt = mtOp->getResult(0); // scalar i32 = max(trip)
-  Value zero = arith::ConstantOp::create(b, loc, b.getIntegerAttr(mt.getType(), 0));
+  Value zero =
+      arith::ConstantOp::create(b, loc, b.getIntegerAttr(mt.getType(), 0));
 
   // Rebuild the while with one extra i32 iter-arg (the scalar counter js).
   SmallVector<Value> inits(w.getInits());
@@ -110,7 +139,8 @@ static LogicalResult hoistRewrite(scf::WhileOp w) {
   for (Operation &op : before.without_terminator())
     b.clone(op, bm);
   // scalar condition: js < mt ; forward the original condition args + js
-  Value scond = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, jsBefore, mt);
+  Value scond =
+      arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, jsBefore, mt);
   SmallVector<Value> fwd;
   for (Value v : cond.getArgs())
     fwd.push_back(bm.lookupOrDefault(v));
@@ -128,7 +158,8 @@ static LogicalResult hoistRewrite(scf::WhileOp w) {
   b.setInsertionPointToStart(na);
   for (Operation &op : after.without_terminator())
     b.clone(op, am);
-  Value one = arith::ConstantOp::create(b, loc, b.getIntegerAttr(mt.getType(), 1));
+  Value one =
+      arith::ConstantOp::create(b, loc, b.getIntegerAttr(mt.getType(), 1));
   Value jsNext = arith::AddIOp::create(b, loc, jsAfter, one);
   SmallVector<Value> yvals;
   for (Value v : yield.getOperands())
@@ -137,13 +168,15 @@ static LogicalResult hoistRewrite(scf::WhileOp w) {
   scf::YieldOp::create(b, loc, yvals);
 
   // Wire results (drop the extra scalar result) and erase the old while.
-  w.getOperation()->replaceAllUsesWith(nw.getResults().take_front(w.getNumResults()));
+  w.getOperation()->replaceAllUsesWith(
+      nw.getResults().take_front(w.getNumResults()));
   w.erase();
   (void)jIdx;
   return success();
 }
 
-struct ThreadRegionPass : public impl::TritonGPUThreadRegionBase<ThreadRegionPass> {
+struct ThreadRegionPass
+    : public impl::TritonGPUThreadRegionBase<ThreadRegionPass> {
   void runOnOperation() override {
     const char *mode = std::getenv("GPUFSM_THREAD_REGION");
     bool doHoist = mode && std::strcmp(mode, "hoist") == 0;
@@ -163,7 +196,8 @@ struct ThreadRegionPass : public impl::TritonGPUThreadRegionBase<ThreadRegionPas
       if (!findInBefore<triton::ReduceOp>(cond.getCondition(), w))
         return;
       w->setAttr("ttg.thread_region_candidate", UnitAttr::get(&getContext()));
-      w->emitRemark("thread_region candidate: lock-step tile while-loop gated by tt.reduce");
+      w->emitRemark("thread_region candidate: lock-step tile while-loop gated "
+                    "by tt.reduce");
       matched.push_back(w);
     });
     if (doHoist)
@@ -176,10 +210,68 @@ struct ThreadRegionPass : public impl::TritonGPUThreadRegionBase<ThreadRegionPas
     // docs/cure/LOWERING_PLAN.md.
     if (doRetire)
       for (scf::WhileOp w : matched) {
-        auto cond = cast<scf::ConditionOp>(w.getBefore().front().getTerminator());
+        auto cond =
+            cast<scf::ConditionOp>(w.getBefore().front().getTerminator());
         if (auto red = findInBefore<triton::ReduceOp>(cond.getCondition(), w))
           red->setAttr("ttg.retire_candidate", UnitAttr::get(&getContext()));
       }
+  }
+};
+
+// M1 of the cure: per-lane retirement lowering (GPUFSM_THREAD_REGION=retire).
+// Runs after convert-triton-gpu-to-llvm. The masked lock-step latch is
+//   %r   = nvvm.redux.sync max <per-lane predicate as i32>   (cross-lane
+//   reduce) %c   = llvm.icmp sgt %r, 0                                (uniform
+//   "any active") llvm.cond_br %c, ^body, ^exit
+// We redirect the branch to the PER-LANE predicate (the llvm.icmp feeding the
+// redux input) so each lane retires independently (hardware ITS), drop the now
+// dead redux, and reconverge with bar.warp.sync at the exit block.
+struct LowerThreadRegionRetirePass
+    : public impl::TritonGPULowerThreadRegionRetireBase<
+          LowerThreadRegionRetirePass> {
+  void runOnOperation() override {
+    const char *mode = std::getenv("GPUFSM_THREAD_REGION");
+    if (!mode || std::strcmp(mode, "retire") != 0)
+      return;
+    ModuleOp mod = getOperation();
+    struct Match {
+      LLVM::CondBrOp condBr;
+      LLVM::ICmpOp perLane;
+      LLVM::ICmpOp sgt;
+      NVVM::ReduxOp redux;
+    };
+    SmallVector<Match> matches;
+    mod.walk([&](LLVM::CondBrOp condBr) {
+      auto sgt = condBr.getCondition().getDefiningOp<LLVM::ICmpOp>();
+      if (!sgt || sgt.getPredicate() != LLVM::ICmpPredicate::sgt)
+        return;
+      auto redux = sgt.getLhs().getDefiningOp<NVVM::ReduxOp>();
+      if (!redux)
+        redux = sgt.getRhs().getDefiningOp<NVVM::ReduxOp>();
+      if (!redux)
+        return;
+      auto perLane = findFeeding<LLVM::ICmpOp>(redux.getVal());
+      if (!perLane || perLane == sgt)
+        return;
+      matches.push_back({condBr, perLane, sgt, redux});
+    });
+    for (Match &m : matches) {
+      // Redirect the latch to the per-lane predicate.
+      m.condBr.getConditionMutable().assign(m.perLane.getResult());
+      // Reconverge all lanes at the exit (false) block.
+      Block *exit = m.condBr.getFalseDest();
+      OpBuilder b(exit, exit->begin());
+      Location loc = m.condBr.getLoc();
+      Value mask = LLVM::ConstantOp::create(
+          b, loc, b.getI32Type(),
+          b.getIntegerAttr(b.getI32Type(), static_cast<int32_t>(0xffffffff)));
+      NVVM::SyncWarpOp::create(b, loc, mask);
+      // Drop the now-dead cross-lane reduce chain (best-effort).
+      if (m.sgt.use_empty())
+        m.sgt.erase();
+      if (m.redux.use_empty())
+        m.redux.erase();
+    }
   }
 };
 

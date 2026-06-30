@@ -39,6 +39,18 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
+- 2026-07-01 ~00:50: **🎉 M1 DONE+VERIFIED — the per-lane retirement CURE works in the real Triton stack.**
+  Wrote the LLVM-dialect pass `LowerThreadRegionRetire` (flag -tritongpu-lower-thread-region-retire, gate
+  GPUFSM_THREAD_REGION=retire) in ThreadRegion.cpp + Passes.td entry + CMake NVVM/LLVM deps. Built (wide
+  rebuild OK). VERIFIED on p2_lockstep.ttgir through the full lowering: the masked lock-step latch
+  `llvm.cond_br (icmp sgt (nvvm.redux.sync max),0)` is now `llvm.cond_br %91` where %91=`llvm.icmp slt
+  jLane,tripLane` (the PER-LANE predicate) → each lane retires independently (hardware ITS); the
+  `nvvm.redux.sync` is GONE (0 occurrences — the per-iteration cross-lane reduce eliminated, the measurable
+  win); `nvvm.bar.warp.sync` inserted at the exit block (reconvergence). This turns weakness #2 from
+  "diagnosed/unbuilt" → "BUILT in-compiler". Reference: experiments/cure/lockstep_retired_reference.mlir.
+  clang-format clean. NEXT: M2 (safety guards: bail if body has other cross-lane ops / pipelined / not
+  single-exit), M3 (wire into make_llir compiler.py:397 + end-to-end oracle-correctness + measure speedup vs
+  masked baseline, target → 5.64x; reduce-hoist was 1.55x), M4 (fold into paper2 = flagship "built cure").
 - 2026-07-01 ~00:15: **CURE BUILD STARTED — M0 DONE+VERIFIED (big-swing pivot).** User: "voglio molto di
   più, stai sprecando tempo, non accontentarti". Pivoted from hold-and-monitor to BUILDING THE CURE (the
   below-TritonGPU per-lane retirement lowering, weakness #2). Code-grounded plan: docs/cure/LOWERING_PLAN.md
