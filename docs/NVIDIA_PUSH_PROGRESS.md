@@ -15,7 +15,13 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
-- 2026-06-30 ~11:55: **F3 — REAL IN-COMPILER REDUCE-HOIST PASS DONE (1.55x, oracle-correct, in libtriton).**
+- 2026-06-30 ~12:10: **F3 real-pass folded into paper2 + RFC.** sec:compiler now reports the real
+  in-compiler reduce-hoist rewrite (built into libtriton, oracle-correct, 1.55x), positioned honestly as
+  a PARTIAL win (trims the lock-step reduce; does NOT give per-lane sub-warp retirement -> still needs the
+  below-TritonGPU lowering). Conclusion reframed ("a real in-compiler rewrite is built; the full per-lane
+  primitive is the remaining step"). RFC Evidence updated with the 1.55x. Paper 7pp, 0 undefined/0 overfull.
+  NEXT hardest sub-front: the below-TritonGPU per-lane lowering (the FULL cure) — attempt the narrowest
+  sound step; if it walls, document the exact blocker (strengthens the RFC).- 2026-06-30 ~11:55: **F3 — REAL IN-COMPILER REDUCE-HOIST PASS DONE (1.55x, oracle-correct, in libtriton).**
   Extended ThreadRegion.cpp from tag-only to a REWRITE (env `GPUFSM_THREAD_REGION=hoist`): match the
   lock-step scf.while, recover %trip (loop-invariant) + %j (uniform before-arg), HOIST `reduce_max(trip)`
   once (by cloning the matched tt.reduce onto %trip), rebuild the while with a scalar counter iter-arg
