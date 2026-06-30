@@ -4,7 +4,8 @@ Campaign north-star: `docs/NVIDIA_PUSH_PLAN.md`. Branch `dev`. Goal = NVIDIA-hir
 the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest "verified") per iteration.
 
 ## Fronts status
-- F1 Triton RFC (draft) — NOT STARTED. Next: research Triton contrib norms + cuTile/Tile-IR state, draft.
+- F1 Triton RFC — DRAFT DONE (docs/rfc/triton-per-lane-region.md, reviewer-ready) + research notes. Ready
+  for the USER to post as a [RFC] issue on triton-lang/triton. Next: F3 (real in-compiler lowering).
 - F2 ML-domain witness — DONE. Attention + MoE witnesses folded into paper2 (regret_law.csv 8 rows,
   fig_regret_law sign-flip, sec:law unified-mechanism paragraph + contribution bullet). NEXT front: F1 RFC or F3.
 - F3 real in-compiler lowering — NOT STARTED (hard; below TritonGPU).
@@ -12,7 +13,20 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
-- 2026-06-30 ~10:10: **F2 FOLDED INTO THE PAPER — ML generality with the sign-flip, done.** Added the two
+- 2026-06-30 ~10:40: **F1 Triton RFC — reviewer-ready draft DONE (web-researched).** Did targeted web
+  research (sources in docs/rfc/_research_notes.md): Triton governance/RFC norms (hierarchical; RFCs as
+  [RFC] GitHub issues; IR/Pass changes case-by-case/rare); cuTile/CUDA Tile IR (CUDA 13.1, MLIR; NVIDIA
+  building a Tile IR backend FOR Triton — but it does NOT address per-lane/data-dependent control / SIMT
+  fallback, so the gap exists in BOTH paths); Gluon/TLX/warp-spec (layout + warp-task specialization, NOT
+  per-lane scalar control); existing Triton issues on data-dependent loops (#2672/#9122/#9175/#7125 =
+  known pain, but NO per-lane-region proposal exists -> the RFC is novel). Wrote
+  `docs/rfc/triton-per-lane-region.md`: Summary, Motivation (the 4.2x + regret law incl. ML sign-flip),
+  the IR diagnosis (scf.while/#blocked/tt.reduce; structural wall scf.condition=i1), the PROPOSAL
+  (`tt.scalar_region`/`serial_range` — semantics, example, lowering sketch via ITS + reconverge, cost-model
+  selection), Alternatives (Gluon/TLX/cuTile/Tawa/partial-CFG-linearization), Compatibility, Evaluation
+  plan, and an honest Evidence/Status section (detection+wall+selector built; in-compiler lowering NOT yet
+  upstreamed = what the RFC is for). This is the highest NVIDIA-signal artifact (front #4: upstream
+  contribution) — ready for the USER to post. NEXT: F3 (real in-compiler lowering, narrowest sound case).- 2026-06-30 ~10:10: **F2 FOLDED INTO THE PAPER — ML generality with the sign-flip, done.** Added the two
   ML rows to `regret_law.csv` (moe_powerlaw 2.36 scalar_control_ml_moe; attention_powerlaw 0.64
   dense_vector_tile_wins) -> 8 witnesses. Extended `fig_regret_law` to show the SIGN FLIP (attention dips
   below the no-regret line, teal, "tile WINS" annotation; MoE red >1). Rewrote sec:law with the unified
