@@ -5,14 +5,25 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
 
 ## Fronts status
 - F1 Triton RFC (draft) — NOT STARTED. Next: research Triton contrib norms + cuTile/Tile-IR state, draft.
-- F2 ML-domain witness — IN PROGRESS. Attention (dense,regret<1) + MoE (scalar,regret>1) witnesses DONE
-  with CORRECT Nsight. Next: fold both into the paper's generality section (unified mechanism).
+- F2 ML-domain witness — DONE. Attention + MoE witnesses folded into paper2 (regret_law.csv 8 rows,
+  fig_regret_law sign-flip, sec:law unified-mechanism paragraph + contribution bullet). NEXT front: F1 RFC or F3.
 - F3 real in-compiler lowering — NOT STARTED (hard; below TritonGPU).
 - F4 multi-GPU A100/H100 — GATED on user cloud pod (`scripts/run_cross_arch.sh` ready).
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
-- 2026-06-30 ~09:35: **F2 MoE witness DONE + Nsight-MEASUREMENT BUG CAUGHT & CORRECTED (rigor).** Built an
+- 2026-06-30 ~10:10: **F2 FOLDED INTO THE PAPER — ML generality with the sign-flip, done.** Added the two
+  ML rows to `regret_law.csv` (moe_powerlaw 2.36 scalar_control_ml_moe; attention_powerlaw 0.64
+  dense_vector_tile_wins) -> 8 witnesses. Extended `fig_regret_law` to show the SIGN FLIP (attention dips
+  below the no-regret line, teal, "tile WINS" annotation; MoE red >1). Rewrote sec:law with the unified
+  CORRECTED mechanism (thread always retires lanes on divergence; the regret SIGN is per-step instruction
+  efficiency — scalar->tile issues more->loses, dense vectorizable->tile issues fewer->wins) + the
+  "generalizes to ML with a correct sign-flip prediction" framing (explains why Triton wins flash-attention
+  but loses automata; honest re one-element-per-lane mapping). Updated the generality contribution bullet
+  (six->eight workloads) + fig caption. Paper compiles clean: **7pp, 0 undefined, 0 overfull**, PDF regen.
+  F2 (the "narrow domain" gap) is now CLOSED: the regret law is demonstrated + predictive on the ML kernels
+  NVIDIA cares about, including a correct negative. NEXT: F1 (Triton RFC, with web research) or F3 (real
+  in-compiler lowering).- 2026-06-30 ~09:35: **F2 MoE witness DONE + Nsight-MEASUREMENT BUG CAUGHT & CORRECTED (rigor).** Built an
   oracle-gated MoE top-k routing witness (`experiments/cure/landmark_moe.py`, exact int64; one token/lane,
   ragged variable expert-count, scalar per-step mul-add; uniform vs power-law expert loads). regret =
   **1.37 (uniform) / 2.36 (power-law) — TILE LOSES, grows with divergence** (confirms the law on a

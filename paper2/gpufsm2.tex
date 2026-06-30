@@ -70,10 +70,11 @@ closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:
 \texttt{sizePerThread=1}), naming the missing IR primitive (a per-lane sub-tile loop/exit op); and an
 \emph{automatic} detect-and-lower selector that routes the detected region to the thread cure for
 $3.9\times$, leaving a negative-control kernel on the tile path.
-\item A \textbf{generality law} across six oracle-gated irregular workloads (Sec.~\ref{sec:law},
-Fig.~\ref{fig:law}): regret is created by scalar control flow---not memory irregularity or dependent
-loads---through two measured channels (issue starvation and masked-lane waste) over a tile-lowering
-baseline, validated by a graph pointer-chase negative control at exactly $1.00\times$.
+\item A \textbf{generality law} across eight oracle-gated irregular workloads (Sec.~\ref{sec:law},
+Fig.~\ref{fig:law}), including the ML kernels tile DSLs target: regret is created by per-step
+\emph{scalar control}---not memory irregularity---validated by a pointer-chase negative control
+($1.00\times$), confirmed on MoE top-$k$ routing ($2.36\times$), and with the correct \emph{sign flip}
+predicted on dense ragged attention ($0.64\times$, the tile wins).
 \end{enumerate}
 
 \section{Background and Method}
@@ -265,6 +266,22 @@ $32 \to 5.8\times$ at $256$). So the law is genuinely multi-component, not a sin
 common cause is the lock-step tile, and the cure (Sec.~\ref{sec:implemented}) removes every channel by
 restoring per-lane execution.
 
+\textbf{The law generalizes to ML---with a correct sign-flip prediction.} Two further oracle-gated
+witnesses, on the irregular kernels NVIDIA's tile DSLs actually target. \emph{MoE top-$k$ routing}
+(ragged, data-dependent expert counts; a scalar per-token accumulate) is the ML face of scalar control:
+regret $2.36\times$ at power-law expert loads---the tile issues $2.6\times$ more instructions ($41.8$M
+vs.\ $16.3$M) and does masked full-width work (threads-per-instruction $30.1$ vs.\ the thread's $7.7$).
+\emph{Ragged variable-context attention} has the \emph{identical} ragged structure but a \emph{dense}
+head-dim payload per step, and here the law predicts the \textbf{negative}, correctly: regret
+$0.64\times$---the tile is \emph{faster}. The mechanism unifies: the thread model always retires lanes
+on divergence (threads-per-instruction $3.45$ on attention, $7.7$ on MoE), but the regret \emph{sign} is
+set by per-step instruction efficiency---scalar work makes the tile issue \emph{more} (lock-step reduce
+plus masking) so it loses, while a dense vectorizable head-dim makes it issue \emph{fewer} ($123$M vs.\
+the thread's $178$M) so it wins \emph{despite} no lane retirement. This sharpens the thesis: the tile
+pays for \emph{per-step scalar control}, not irregularity per se---exactly why Triton is the tool of
+choice for flash-attention yet collapses on automata. (The witnesses use the framework's
+one-element-per-lane mapping; production attention is warp-cooperative, a different design point.)
+
 \section{Methodological Integrity}
 Our analysis corrected three of its own intermediate hypotheses, which we report rather than hide.
 First, an early reading framed the ${\sim}90\times$ warp-instruction redundancy (Sec.~\ref{sec:decomp})
@@ -396,12 +413,13 @@ and matches/exceeds hand-CUDA. \emph{Right:} it does so \emph{through the diagno
 activity jumps from the tile's $10\%$ to $36\%$ ($\approx$ CUDA's $41\%$), restoring the intra-warp
 latency hiding component~C was missing.}\label{fig:cure}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_regret_law.png}
-\caption{The regret law across six oracle-gated irregular workloads, by dominant mechanism. A graph
-pointer-chase (green) is the negative control: irregular memory + dependent loads, no control
-divergence $\Rightarrow$ tile and thread are identical (issue $5.42\%$ vs.\ $5.43\%$) and regret is
-$1.00\times$. Regret grows only with scalar control / divergence (red, orange, blue), peaking at
-$4\times$ for pure control-flow divergence, via two channels (issue starvation, masked-lane waste) over
-a tile-lowering baseline---scalar control, not memory irregularity.}\label{fig:law}\end{figure}
+\caption{The regret law across eight oracle-gated irregular workloads, by dominant mechanism. A graph
+pointer-chase (green) is the negative control (irregular memory + dependent loads, no control
+divergence $\Rightarrow$ regret $1.00\times$). Regret grows with scalar control / divergence (grey, red,
+blue, orange), peaking at $4\times$. The two ML witnesses (right) test the \emph{sign}: MoE routing
+(scalar per step) confirms the law ($2.36\times$), while ragged attention (dense head-dim) \emph{inverts}
+it ($0.64\times$, teal, below the no-regret line---the tile wins), because per-step instruction
+efficiency, not irregularity, sets the sign.}\label{fig:law}\end{figure}
 \begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_selector.png}
 \caption{The automatic detect$\to$route$\to$lower loop (P2). The detection pass (in \texttt{libtriton})
 matches the lock-step signature; the lock-step NFA worklist is routed to the thread lowering

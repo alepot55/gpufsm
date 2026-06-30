@@ -252,6 +252,8 @@ def fig_regret_law() -> None:
         "automata_nfa",
         "spmv_powerlaw",
         "rejection",
+        "moe_powerlaw",
+        "attention_powerlaw",
     ]
     nice = {
         "pointer_chase": "graph\npointer-chase",
@@ -260,6 +262,8 @@ def fig_regret_law() -> None:
         "automata_nfa": "automata\n(NFA)",
         "spmv_powerlaw": "SpMV\npower-law",
         "rejection": "rejection\nsampling",
+        "moe_powerlaw": "MoE routing\n(ML, scalar)",
+        "attention_powerlaw": "attention\n(ML, dense)",
     }
     mech_color = {
         "negative_control_latency_equal": "#27ae60",
@@ -268,6 +272,8 @@ def fig_regret_law() -> None:
         "latency_starvation": "#c0392b",
         "baseline_plus_divergence": "#8e44ad",
         "masked_waste_pure_compute": "#e67e22",
+        "scalar_control_ml_moe": "#c0392b",
+        "dense_vector_tile_wins": "#16a085",
     }
     by = {r["workload"]: r for r in rows}
     labels = [nice[w] for w in order]
@@ -277,13 +283,24 @@ def fig_regret_law() -> None:
     for b, v in zip(ax.bar(labels, vals, color=colors), vals, strict=True):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.05, f"{v:.2f}×", ha="center", fontsize=9)
     ax.axhline(1.0, color="green", ls="--", lw=1)
-    ax.text(0, 1.06, "no-regret line (tile issue ≈ thread issue)", fontsize=8, color="green")
+    ax.text(0, 1.06, "no-regret line", fontsize=8, color="green")
+    # mark the sign flip: attention (dense ML) dips below 1 -> tile WINS
+    ai = order.index("attention_powerlaw")
+    ax.annotate(
+        "tile WINS\n(dense head-dim)",
+        (ai, vals[ai]),
+        (ai, 1.35),
+        ha="center",
+        fontsize=7,
+        color="#16a085",
+        arrowprops=dict(arrowstyle="->", color="#16a085"),
+    )
     ax.set_ylabel("tile-vs-thread regret (×)")
     ax.set_ylim(0, max(vals) * 1.15)
+    ax.tick_params(axis="x", labelsize=7.5)
     ax.set_title(
-        "Regret tracks the tile's issue deficit, not memory irregularity: 1.0–4×, by mechanism\n"
-        "(green=irregular negative control, grey=occupancy, red=latency-starvation, "
-        "orange/blue=masked-waste)",
+        "Regret SIGN set by per-step work, not irregularity: scalar control -> tile loses\n"
+        "(grey/red/blue/orange); a dense ML head-dim (attention) inverts it -> tile wins (teal)",
         fontsize=8,
     )
     fig.tight_layout()
