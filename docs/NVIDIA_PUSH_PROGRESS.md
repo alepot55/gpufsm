@@ -8,14 +8,30 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
   for the USER to post as a [RFC] issue on triton-lang/triton. Next: F3 (real in-compiler lowering).
 - F2 ML-domain witness — DONE. Attention + MoE witnesses folded into paper2 (regret_law.csv 8 rows,
   fig_regret_law sign-flip, sec:law unified-mechanism paragraph + contribution bullet). NEXT front: F1 RFC or F3.
-- F3 real in-compiler lowering — IN PROGRESS. Gating measurement DONE: a sound reduce-hoist transform
-  on the lock-step while is VALIDATED at 1.41x (source-level, oracle-correct). NEXT: build it as a
-  TritonGPU pass. (Full per-lane retirement still needs below-TritonGPU lowering = the wall.)
+- F3 real in-compiler lowering — REDUCE-HOIST PASS DONE (real TritonGPU MLIR rewrite in libtriton,
+  1.55x, oracle-correct). Remaining: the FULL cure (per-lane sub-warp retirement) still needs the
+  below-TritonGPU lowering (the structural wall) — that is the next, hardest sub-front.
 - F4 multi-GPU A100/H100 — GATED on user cloud pod (`scripts/run_cross_arch.sh` ready).
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
-- 2026-06-30 ~11:15: **F3 gating measurement — reduce-hoist transform VALIDATED (1.41x), worth building
+- 2026-06-30 ~11:55: **F3 — REAL IN-COMPILER REDUCE-HOIST PASS DONE (1.55x, oracle-correct, in libtriton).**
+  Extended ThreadRegion.cpp from tag-only to a REWRITE (env `GPUFSM_THREAD_REGION=hoist`): match the
+  lock-step scf.while, recover %trip (loop-invariant) + %j (uniform before-arg), HOIST `reduce_max(trip)`
+  once (by cloning the matched tt.reduce onto %trip), rebuild the while with a scalar counter iter-arg
+  (js: init 0, +1/iter), rewrite the condition to a scalar `js < mt` (no per-iteration cross-lane reduce;
+  the old reduce goes dead/DCE'd), body preserved/masked. MLIR API gotchas (this LLVM treats deprecation
+  as error): use `OpTy::create(b, ...)` not `b.create<OpTy>`; `ConstantIntOp` signature changed -> use
+  `arith::ConstantOp` + `getIntegerAttr`. Rebuilt libtriton (exit 0). VERIFIED via triton-opt (text IR:
+  scalar condition, hoisted reduce_max, js increment in after-region) AND end-to-end JIT
+  (`experiments/cure/f3_hoist_verify.py`): oracle bit-exact, baseline 155.6us -> hoist **100.4us = 1.55x**
+  (detection-only 152.6us = perf no-op, confirming it's the rewrite). `p2_pass_verify` still VERIFIED
+  (detection unbroken). This is the genuine "built" artifact for F3 -- a working in-compiler optimization
+  pass that compiles into libtriton and is oracle-correct + faster. HONEST scope: it trims the lock-step
+  loop's per-iteration reduce; it does NOT give per-lane (sub-warp) retirement -- the FULL cure still needs
+  the below-TritonGPU lowering (the structural wall), the next hardest sub-front. Sources:
+  experiments/cure/triton_thread_region_pass/ThreadRegion.cpp (preserved), f3_hoist_verify.py,
+  paper2/data/landmark/f3_hoist_rtx4070.csv.- 2026-06-30 ~11:15: **F3 gating measurement — reduce-hoist transform VALIDATED (1.41x), worth building
   (with an honest mid-course correction).** Before writing an MLIR pass, measured the candidate at the
   source level (`experiments/cure/f3_reduce_cost.py`, oracle-identical, scalar payload power-law trips).
   FALSIFIED first: a naive `while -> global-max bounded-for` is **0.45x (SLOWER)** because the `tl.max`

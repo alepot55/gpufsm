@@ -1,0 +1,4 @@
+mode,oracle,time_us,speedup_vs_baseline,gpu
+off,OK,155.6,1.00,RTX4070
+detect_only,OK,152.6,1.02,RTX4070
+hoist,OK,100.4,1.55,RTX4070
