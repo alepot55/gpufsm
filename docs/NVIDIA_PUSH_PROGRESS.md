@@ -8,12 +8,29 @@ the 7 gaps into strengths via fronts F1–F5. One committed artifact (or honest 
   for the USER to post as a [RFC] issue on triton-lang/triton. Next: F3 (real in-compiler lowering).
 - F2 ML-domain witness — DONE. Attention + MoE witnesses folded into paper2 (regret_law.csv 8 rows,
   fig_regret_law sign-flip, sec:law unified-mechanism paragraph + contribution bullet). NEXT front: F1 RFC or F3.
-- F3 real in-compiler lowering — NOT STARTED (hard; below TritonGPU).
+- F3 real in-compiler lowering — IN PROGRESS. Gating measurement DONE: a sound reduce-hoist transform
+  on the lock-step while is VALIDATED at 1.41x (source-level, oracle-correct). NEXT: build it as a
+  TritonGPU pass. (Full per-lane retirement still needs below-TritonGPU lowering = the wall.)
 - F4 multi-GPU A100/H100 — GATED on user cloud pod (`scripts/run_cross_arch.sh` ready).
 - F5 submission — GATED on user accounts; ⚠️ also paper-1 num_warps disclosure before HPEC (7 Jul).
 
 ## Findings log (newest first)
-- 2026-06-30 ~10:40: **F1 Triton RFC — reviewer-ready draft DONE (web-researched).** Did targeted web
+- 2026-06-30 ~11:15: **F3 gating measurement — reduce-hoist transform VALIDATED (1.41x), worth building
+  (with an honest mid-course correction).** Before writing an MLIR pass, measured the candidate at the
+  source level (`experiments/cure/f3_reduce_cost.py`, oracle-identical, scalar payload power-law trips).
+  FALSIFIED first: a naive `while -> global-max bounded-for` is **0.45x (SLOWER)** because the `tl.max`
+  gate is a per-WARP reduce (each warp stops at its local busiest lane); a global bound forces every warp
+  to the global max -> far more wasted work. CORRECTED to the REAL transform: hoist the per-warp max ONCE
+  (`mt = tl.max(trip)`) + a SCALAR loop counter (`while j < mt`) -> no per-iteration cross-lane reduce,
+  per-warp termination preserved, provably equivalent (body already masked by j<trip). That is **1.41x
+  faster** (108 vs 153 us), oracle-correct. ⇒ a genuine sound in-compiler optimization for the lock-step
+  region: reduce-hoist / while-condition strength reduction (per-iter tt.reduce -> hoisted scalar bound;
+  also re-enables the pipeliner). HONEST scope: this trims the lock-step loop's overhead but does NOT give
+  per-lane (sub-warp) retirement -- the full cure still needs the below-TritonGPU per-lane lowering (the
+  structural wall). This is a real "built" step for F3 + it sharpens the thesis (the residual is sub-warp,
+  not reduce overhead). NEXT: implement as a TritonGPU pass (extend tritongpu-thread-region: match the
+  reduce-gated while, hoist tl.max(trip), rewrite to a scalar-counter while), rebuild libtriton, verify
+  oracle + measure end-to-end.- 2026-06-30 ~10:40: **F1 Triton RFC — reviewer-ready draft DONE (web-researched).** Did targeted web
   research (sources in docs/rfc/_research_notes.md): Triton governance/RFC norms (hierarchical; RFCs as
   [RFC] GitHub issues; IR/Pass changes case-by-case/rare); cuTile/CUDA Tile IR (CUDA 13.1, MLIR; NVIDIA
   building a Tile IR backend FOR Triton — but it does NOT address per-lane/data-dependent control / SIMT
