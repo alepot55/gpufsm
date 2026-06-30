@@ -39,7 +39,15 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
-- 2026-07-01 ~00:50: **🎉 M1 DONE+VERIFIED — the per-lane retirement CURE works in the real Triton stack.**
+- 2026-07-01 ~00:55: **M2 DONE+VERIFIED — safety guard (cure now correct-in-general).** Added a body-
+  safety guard to LowerThreadRegionRetire: walks the loop body subgraph (true-dest→header, excluding exit)
+  and BAILS if any cross-lane op (NVVM Shfl/Redux/SyncWarp/Barrier) is present — a retired lane must not be
+  needed by a shuffle/reduce/barrier still run by active lanes. Fast relink (.cpp-only). VERIFIED: the safe
+  p2_lockstep kernel still rewrites (latch=per-lane %91, redux gone, bar.warp.sync present); unsafe bodies
+  are now skipped. M0+M1+M2 all built+verified tonight. NEXT: M3 = wire the pass into the real make_llir
+  pipeline (expose to Python bindings / compiler.py:397) → compile+run the f3 kernel for end-to-end
+  ORACLE-CORRECTNESS + measure speedup vs masked baseline (target → 5.64x bound; reduce-hoist was 1.55x);
+  then M4 fold the BUILT cure into paper2 (flagship: "diagnosed"→"built").- 2026-07-01 ~00:50: **🎉 M1 DONE+VERIFIED — the per-lane retirement CURE works in the real Triton stack.**
   Wrote the LLVM-dialect pass `LowerThreadRegionRetire` (flag -tritongpu-lower-thread-region-retire, gate
   GPUFSM_THREAD_REGION=retire) in ThreadRegion.cpp + Passes.td entry + CMake NVVM/LLVM deps. Built (wide
   rebuild OK). VERIFIED on p2_lockstep.ttgir through the full lowering: the masked lock-step latch

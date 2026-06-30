@@ -253,6 +253,34 @@ struct LowerThreadRegionRetirePass
       auto perLane = findFeeding<LLVM::ICmpOp>(redux.getVal());
       if (!perLane || perLane == sgt)
         return;
+      // M2 safety guard: per-lane retirement is only correct if the loop body
+      // has NO other cross-lane op (a retired lane must not be needed by a
+      // shuffle/reduce/barrier/warp-sync still executed by active lanes). Walk
+      // the body subgraph (true-dest back to header, excluding the exit) and
+      // bail if any cross-lane op is present.
+      {
+        Block *header = condBr->getBlock();
+        Block *exit = condBr.getFalseDest();
+        llvm::SmallPtrSet<Block *, 8> visited;
+        SmallVector<Block *, 8> wl{condBr.getTrueDest()};
+        bool unsafe = false;
+        while (!wl.empty() && !unsafe) {
+          Block *blk = wl.pop_back_val();
+          if (blk == header || blk == exit || !visited.insert(blk).second)
+            continue;
+          for (Operation &op : *blk) {
+            if (isa<NVVM::ShflOp, NVVM::ReduxOp, NVVM::SyncWarpOp,
+                    NVVM::BarrierOp>(op)) {
+              unsafe = true;
+              break;
+            }
+          }
+          for (Block *succ : blk->getSuccessors())
+            wl.push_back(succ);
+        }
+        if (unsafe)
+          return;
+      }
       matches.push_back({condBr, perLane, sgt, redux});
     });
     for (Match &m : matches) {
