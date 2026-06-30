@@ -39,7 +39,17 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
 `tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
 
 ## Findings log (newest first)
-- 2026-07-01 ~00:55: **M2 DONE+VERIFIED — safety guard (cure now correct-in-general).** Added a body-
+- 2026-07-01 ~01:25: **🎉🎉 M3 DONE — THE CURE WORKS END-TO-END: oracle-correct + 4.15x measured in the
+  REAL Triton compiler.** Wired LowerThreadRegionRetire into make_llir (binding add_lower_thread_region_retire
+  in python/src/passes.cc + gated call in compiler.py after add_to_llvmir; rebuilt libtriton.so). Ran the f3
+  per-lane-while kernel (num_warps=1, BLOCK=32, pareto trips) through the real compile+run path, 5 samples
+  each, cache-busted: **baseline (masked) median 166.7us vs cured (per-lane retirement) 40.2us = 4.15x
+  speedup (range 4.09-4.25x), oracle=OK on EVERY run** (bit-exact acc[i]=trip[i]*(trip[i]-1)/2). This sits
+  between the in-IR reduce-hoist (1.55x) and the thread bound (5.64x) — exactly the residual per-lane
+  retirement recovers. **WEAKNESS #2 FULLY FLIPPED: the cure is no longer "diagnosed/unbuilt" — it is BUILT
+  in-compiler, oracle-correct, 4.15x.** Data: paper2/data/landmark/cure_speedup_rtx4070.csv; wiring patch
+  experiments/cure/triton_thread_region_pass/pipeline_wiring.patch. NEXT: M4 — rewrite paper2's contribution
+  around the BUILT+MEASURED cure (flagship upgrade), then generalize to a 2nd witness.- 2026-07-01 ~00:55: **M2 DONE+VERIFIED — safety guard (cure now correct-in-general).** Added a body-
   safety guard to LowerThreadRegionRetire: walks the loop body subgraph (true-dest→header, excluding exit)
   and BAILS if any cross-lane op (NVVM Shfl/Redux/SyncWarp/Barrier) is present — a retired lane must not be
   needed by a shuffle/reduce/barrier still run by active lanes. Fast relink (.cpp-only). VERIFIED: the safe

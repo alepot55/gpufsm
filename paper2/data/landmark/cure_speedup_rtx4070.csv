@@ -1,0 +1,4 @@
+mode,median_us,min_us,max_us,oracle,gpu
+masked_baseline,166.7,153.6,167.9,OK,RTX4070
+perlane_retire_cure,40.2,39.2,40.8,OK,RTX4070
+speedup_x,4.15,,,,
