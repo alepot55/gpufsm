@@ -131,6 +131,11 @@ stall, occupancy) per witness, on ≥2 architectures (consumer + datacenter). Su
 - A TritonGPU detection pass (`tritongpu-thread-region`) that compiles into `libtriton`, matches the
   lock-step signature, and tags candidate regions; a falsifiable probe that the per-lane-condition
   rewrite is rejected by the MLIR verifier (the structural wall).
+- A REAL in-compiler rewrite in the same pass (opt-in): it hoists `reduce_max(trip)` once and replaces
+  the per-iteration cross-lane reduce with a scalar counter (provably equivalent; preserves per-warp
+  termination). Built into `libtriton`, oracle-correct end-to-end, **1.55x** on the lock-step kernel
+  (155.6->100.4 us). This is a partial in-compiler win -- it trims the lock-step loop's reduce overhead
+  but does NOT grant per-lane sub-warp retirement; that is exactly what the proposed primitive adds.
 - Honest status: the *detection* + the structural-impossibility result + an *automatic selector* over an
   out-of-band thread lowering are built; the **in-compiler per-lane lowering proposed here is not yet
   upstreamed** — that is what this RFC is for.
