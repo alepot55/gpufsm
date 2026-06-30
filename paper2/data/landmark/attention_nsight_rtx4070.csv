@@ -1,0 +1,3 @@
+matrix,kernel,issue_active_pct,thread_inst_per_inst,occupancy_pct,gpu
+powerlaw,tile,5.22,32.0,54.92,RTX4070
+powerlaw,thread,5.45,32.0,53.89,RTX4070
