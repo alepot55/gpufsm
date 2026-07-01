@@ -37,7 +37,15 @@ Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWIN
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~02:20: **M4b DONE — the BUILT cure folded into paper2 (flagship upgrade).** Rewrote the
+- 2026-07-01 ~02:45: **Cure HARDENED on a REAL workload (SpMV CSR) — de-risks "narrow/synthetic".** The
+  LowerThreadRegionRetire pass FIRES + stays oracle-correct on the real power-law SpMV lock-step kernel
+  (_spmv_tile, same latch): masked ~1793us vs cured ~1575us = **1.14x** (stable 3/3). Verified the pass
+  fired: dumped _spmv_tile.ptx has bar.warp.sync + redux.sync removed. Modest speedup is HONEST + thesis-
+  confirming: SpMV is memory-gather-bound (x[colidx] DRAM), so little of its cost is the control reduce —
+  the SAME cure gives 4.15x on control-bound work and 1.14x on memory-bound SpMV, showing the recoverable
+  regret is per-step CONTROL, not memory. Folded one honest sentence into paper2 (7pp, clean). CSV
+  cure_realworkload_rtx4070.csv. The cure now validated on synthetic control-bound + real sparse. NEXT:
+  optionally MoE (more control-bound, expect higher); push paper submission-readiness; PR #10766 monitor.- 2026-07-01 ~02:20: **M4b DONE — the BUILT cure folded into paper2 (flagship upgrade).** Rewrote the
   abstract + the "In the real compiler" contribution + \S sec:implemented: from "diagnosed / structurally-
   impossible / reduce-hoist 1.55x / out-of-band selector" to "the in-tile-IR lowering is structurally
   impossible SO we BUILD the cure below it (TritonGPU->LLVM pass wired into make_llir: redirect lock-step

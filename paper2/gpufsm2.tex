@@ -266,7 +266,12 @@ distributions. Nsight attributes the gain to work reduction: issued instructions
 ($36.1\mathrm{M}\rightarrow0.92\mathrm{M}$) because total work scales with $\sum_i \mathit{trip}_i$---each
 lane runs only its own iterations---rather than $32\times$ the busiest lane; threads-per-instruction is
 unchanged, so this is an instruction-issue win, not an occupancy one. This closes the residual the
-reduce-hoist left open: the cure is \emph{built}, oracle-correct, and measured, not merely diagnosed.
+reduce-hoist left open: the cure is \emph{built}, oracle-correct, and measured, not merely diagnosed. The pass also fires, oracle-correct, on a \emph{real} sparse workload---power-law
+CSR SpMV, the same lock-step latch---where it is a smaller $1.14\times$ (its \texttt{redux.sync} removed and
+\texttt{bar.warp.sync} present in the emitted PTX, confirming it fired): SpMV is memory-gather-bound, so
+little of its cost is the control reduce. That the same cure yields $4.15\times$ on control-bound work and
+$1.14\times$ on memory-bound SpMV is itself a confirmation of the thesis---the recoverable regret is the
+per-step \emph{control}, not the memory.
 
 \textbf{Automatic detect-and-lower.} A selector closes the loop (Fig.~\ref{fig:selector}): it runs the
 detection pass, and when the lock-step signature is present routes the region to the thread lowering,
