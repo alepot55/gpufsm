@@ -37,7 +37,14 @@ Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWIN
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~02:45: **Cure HARDENED on a REAL workload (SpMV CSR) — de-risks "narrow/synthetic".** The
+- 2026-07-01 ~03:12: **MoE datapoint — cure spectrum now complete + thesis-confirming.** cure_moe.py
+  (MoE top-k routing, power-law, int64-exact oracle): masked ~233us vs cured ~186us = **1.25x**, oracle-OK,
+  pass FIRED (PTX bar.warp.sync=1, redux.sync=0). Full real-workload spectrum: synthetic pure-control 4.15x
+  > MoE mixed-gather 1.25x > SpMV memory-gather 1.14x. Both SpMV+MoE carry per-iteration gathers so are
+  gather-bound; the SAME cure's benefit scales with control-boundedness → confirms the regret is per-step
+  CONTROL not memory. Paper sentence refined to the SpMV+MoE spectrum (7pp clean). CSV
+  cure_realworkload_rtx4070.csv (3 rows). Cure now validated on: synthetic (3 distributions) + 2 real
+  workloads (SpMV, MoE). NEXT: paper submission-readiness pass; PR #10766 monitor.- 2026-07-01 ~02:45: **Cure HARDENED on a REAL workload (SpMV CSR) — de-risks "narrow/synthetic".** The
   LowerThreadRegionRetire pass FIRES + stays oracle-correct on the real power-law SpMV lock-step kernel
   (_spmv_tile, same latch): masked ~1793us vs cured ~1575us = **1.14x** (stable 3/3). Verified the pass
   fired: dumped _spmv_tile.ptx has bar.warp.sync + redux.sync removed. Modest speedup is HONEST + thesis-

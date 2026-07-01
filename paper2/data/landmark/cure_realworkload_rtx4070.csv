@@ -1,3 +1,4 @@
 workload,masked_us,cured_us,speedup_x,oracle,pass_fired,bound,gpu
 synthetic_perlane_while,166.7,40.2,4.15,OK,yes,control,RTX4070
+moe_routing_powerlaw,233.4,186.3,1.25,OK,yes,mixed_gather,RTX4070
 spmv_csr_powerlaw,1793.0,1575.0,1.14,OK,yes,memory_gather,RTX4070
