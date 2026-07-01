@@ -30,22 +30,34 @@ Env: `.venv/bin/python` (gpufsm+CUDA RTX4070; ruff+mypy in .venv). From-source T
   = per-lane retirement (below-TritonGPU); the reduce-hoist is the in-IR slice (removes the reduce only).
 
 ## DONE (compacted, 2026-07-01)
-UPSTREAM: 3 verified fold PRs off upstream c05aa65; **PR #10766 (split/join) LIVE** — MAINTAINER
-ThomasRaoux (Triton core/NVIDIA) asked "practical use cases?", I replied honestly (inverse-fold-family
-completion; offered to close if niche) + HELD PRs #2/#3 (don't spam a skeptic). fold-bitcast@b68445d,
-fold-ptr-roundtrip@0541b42 ready. Design issue draft pending.
-CURE (the flagship, weakness #2 flipped): built the below-TritonGPU per-lane retirement lowering as a real
-MLIR pass (LowerThreadRegionRetire) wired into make_llir — masked lock-step latch → per-lane cond_br,
-cross-lane redux removed, bar.warp.sync reconverge; M2 body-safety guard. Oracle-correct + measured:
-synthetic 4.15x (Nsight 39x fewer instructions, work ∝ Σtrip), 2.5-7.3x across uniform/geometric/pareto,
-real workloads MoE 1.25x + SpMV 1.14x (all pass-fired-confirmed via PTX bar.warp.sync). Spectrum confirms
-regret=per-step-control not memory. Folded into paper2 (8pp, consolidated results table, Threats reconciled,
-0 overfull/undefined). CSVs cure_{speedup,nsight,generalize,realworkload}_rtx4070.csv. Plan docs/cure/
-LOWERING_PLAN.md. Pattern for a cure runner: copy tile kernel+data+oracle, masked vs GPUFSM_THREAD_REGION=
-retire, oracle-gate THEN measure; confirm firing via TRITON_KERNEL_DUMP grep .ptx for bar.warp.sync.
-STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
+**PUBLICATION PATH = ACM TACO** (journal, rolling, revise-and-resubmit → certain; user wants "pubblicazione
+certa"). Paper `paper2/gpufsm_taco.tex` (acmsmall, clean 15pp, anonymous, CCS concepts + keywords, built-cure
+complete). Backups gpufsm_ppopp.tex/gpufsm2.tex. Plan docs/TACO_PLAN.md. Submit via ScholarOne when strong
+(no deadline). Biggest lever = A100 datacenter validation (user RunPod ~$5-10; scripts/a100_validate.sh
+turnkey) to pre-empt the "add architectures" revision. arXiv OUT (no endorsement); optional fast-visibility
+preprint = TechRxiv/Zenodo (no endorsement) — awaiting user decision.
+
+**THE FLAGSHIP (weakness #2 flipped): the cure is BUILT** — LowerThreadRegionRetire pass in real Triton
+(make_llir): masked lock-step latch → per-lane cond_br, cross-lane redux removed, bar.warp.sync. Oracle-
+correct + measured: synthetic 4.15x (Nsight 39x fewer inst, work ∝ Σtrip), 2.5-7.3x across distributions,
+real workloads MoE 1.25x + SpMV 1.14x (control-boundedness spectrum confirms regret=control-not-memory).
+CSVs cure_{speedup,nsight,generalize,realworkload}. Cure sources version-controlled at experiments/cure/
+triton_thread_region_pass/ + pipeline_wiring.patch (reproducible on a fresh pod).
+
+**UPSTREAM (weakness #4): PR #10766** (split/join fold) LIVE on triton-lang/triton — MAINTAINER ThomasRaoux
+(Triton core/NVIDIA) engaged ("practical use cases?"); replied honestly. Then CI caught a REAL regression
+(broke ws_data_partition warp-spec test) — FIXED (folds bail on discardable attrs so they don't drop
+async_task_id), verified across all join/split lit tests + negative case, force-pushed a7ebe90, replied.
+fold-bitcast@b68445d + fold-ptr-roundtrip@0541b42 held in reserve. STANDING AUTH: act autonomously on
+Triton PRs/issues/maintainer replies until hired. LESSON: run the FULL lit suite, not one file.
 
 ## Findings log (newest first)
+- 2026-07-01 ~09:30: **TACO version + CCS concepts.** Converted to journal format (acmsmall) after the
+  "pubblicazione certa" decision; added ACM CCS concepts (Compilers 500 / Parallel-programming-languages /
+  SIMD) + keywords (TACO requirement). Clean: 15pp, 0 overfull/undefined/missing-number/fatal, figs render.
+  PR #10766 still awaiting Raoux. Sent the user the current PDF; explained TACO timeline (~2mo first
+  response, ~6mo to accept, online in Just-Accepted weeks after). NEXT: journal-depth (related work, deepen
+  a section) + tomorrow's A100.
 - 2026-07-01 ~08:45: **PIVOT to CONFERENCE: PPoPP 2027 (user: no arXiv, submit fast, all by early Aug;
   RunPod tomorrow).** Web-researched venues: PACT scaded, PPoPP 2027 ~3 Aug (co-loc HPCA/CGO/CC, Salt Lake,
   Mar 2027; official CFP not yet posted — MONITOR), ASPLOS 9 Sep, CGO ~Sep. Chose PPoPP (parallel-execution
