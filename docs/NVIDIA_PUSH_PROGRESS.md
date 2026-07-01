@@ -37,7 +37,16 @@ Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWIN
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~03:12: **MoE datapoint — cure spectrum now complete + thesis-confirming.** cure_moe.py
+- 2026-07-01 ~03:40: **🔥 MAINTAINER ENGAGED on PR #10766 — ThomasRaoux (Triton core maintainer, now at
+  NVIDIA) asked "are there practical use cases?"** Exactly the maintainer-contact the hire-first strategy
+  targeted. Replied (standing auth) honestly + technically: the fold completes the in-tree inverse-fold
+  family (trans/trans, bitcast/bitcast, int_to_ptr/ptr_to_int); round-trips arise from composition/inlining
+  (interleaved/complex/microscaling paths) + unblock downstream folds; guarded on type equality; and
+  honestly noted no in-tree test hits it today + offered to close if too niche (respecting maintainer
+  bandwidth). Comment: pull/10766#issuecomment-4849477051. HELD PR #2/#3 (his question is mildly skeptical →
+  piling on more folds would read as spam; quality>quantity). CI: pre-commit/formatting PASS; integration-
+  tests fail identically across ALL amd+nvidia backends (h100/a100/gb200/gfx942/950/90a) = infra/base-branch,
+  not my 3-line IR fold. NEXT: watch for his reply; if positive, engage; the cure/paper remain the flagship.- 2026-07-01 ~03:12: **MoE datapoint — cure spectrum now complete + thesis-confirming.** cure_moe.py
   (MoE top-k routing, power-law, int64-exact oracle): masked ~233us vs cured ~186us = **1.25x**, oracle-OK,
   pass FIRED (PTX bar.warp.sync=1, redux.sync=0). Full real-workload spectrum: synthetic pure-control 4.15x
   > MoE mixed-gather 1.25x > SpMV memory-gather 1.14x. Both SpMV+MoE carry per-iteration gathers so are
