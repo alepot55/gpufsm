@@ -1,0 +1,3 @@
+mode,redux_sync,bar_warp_sync,branches,latch_predicate
+off,1,0,2,uniform (redux.sync.max -> setp.lt %r10<1 -> whole-warp bra)
+retire,0,1,1,per-lane (setp.lt %r11<%r1 -> bar.warp.sync)
