@@ -1,0 +1,504 @@
+\documentclass[sigconf,review,anonymous]{acmart}
+\settopmatter{printacmref=false}
+\setcopyright{none}
+\acmConference[PPoPP '27]{ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming}{March 2027}{Salt Lake City, UT, USA}
+\usepackage{lmodern}
+\usepackage{amssymb}
+\microtypesetup{expansion=false}
+
+\begin{document}
+\title{From Diagnosis to Cure: Decomposing the Tile-SPMD Abstraction Regret on Irregular Automata}
+\author{Anonymous}
+\affiliation{\institution{Anonymous}\city{}\country{}}
+\email{anon@example.org}
+\renewcommand{\shortauthors}{Anonymous}
+
+\begin{abstract}
+Tile-based GPU DSLs (Triton) trail hand-written CUDA by ${\sim}10\times$ on irregular
+finite-automata workloads. Prior work attributed this ``abstraction regret'' to the execution
+\emph{paradigm} (tile/SPMD vs.\ thread-SIMT) rather than abstraction height. We turn that diagnosis
+into an anatomy and a cure: we decompose the regret into three independently measured components and
+identify, to the instruction level, the single missing primitive. On a work-efficient NFA worklist
+the $10\times$ anchor decomposes as \textbf{(A)} a launch-configuration artifact (${\sim}3.4\times$,
+default \texttt{num\_warps}), \textbf{(B)} a lane-packing-recoverable component (warp-redundant scalar
+execution), and \textbf{(C)} an irreducible ${\sim}2\times$ residual. Component C is \emph{not}
+instruction count, occupancy, or memory bandwidth: at matched occupancy and \emph{fewer}
+warp-instructions than CUDA, and sitting below both the issue and bandwidth roofline ceilings, a
+per-lane Triton worklist still spends $15.3\times$ more cycles in the dependent-load stall and issues
+at $9.9\%$ vs.\ $41\%$ of peak---it is latency-bound. The root cause is abstraction-denied
+intra-warp memory-level parallelism: a CUDA warp's lanes issue independent in-flight loads that
+overlap, whereas a lock-step tile serializes the dependent next-state load. We show the residual is
+\emph{regime-dependent}: for the memory-bound DFA it closes (lane-packed Triton matches CUDA,
+$1.05\times$, once the table spills to DRAM). We specify the missing IR primitive---a
+\texttt{scalar\_program} region that lowers each lane to an independent instruction stream---and
+\emph{implement its lowering}: the same idiomatic per-lane source, lowered to the thread model, runs
+$4.2\times$ faster than the tile lowering and matches or exceeds hand-written CUDA, closing the
+residual by construction. The phenomenon \emph{generalizes}, including to the ML kernels tile DSLs target: across eight
+oracle-gated irregular workloads the tile-vs-thread regret is created by per-step \emph{scalar
+control}---not memory irregularity or dependent loads---validated by a graph pointer-chase negative
+control ($1.00\times$), confirmed on MoE top-$k$ routing ($2.36\times$), and with a correct
+\emph{sign-flip} negative on dense ragged attention ($0.64\times$, the tile \emph{wins})---which is why
+Triton excels at flash-attention yet collapses on automata. Finally we take the cure
+into the real compiler. A TritonGPU pass detects the lock-step region in \texttt{libtriton}, and a proof
+shows the in-tile-IR lowering is \emph{structurally impossible} (naming the missing per-lane loop/exit
+primitive)---so, since the tile IR cannot express it, we \textbf{build the cure below it}: a
+\mbox{TritonGPU$\rightarrow$LLVM} pass that redirects the lock-step latch to the per-lane predicate, drops the
+per-iteration cross-lane reduce, and reconverges with a warp barrier. It is oracle-correct and
+\textbf{$4.15\times$} ($39\times$ fewer issued instructions; $2.5$--$7.3\times$ across trip distributions),
+recovering the residual between the in-IR reduce-hoist ($1.55\times$) and the thread bound ($5.64\times$).
+Every kernel is correctness-gated against a CPU oracle; every number traces to a versioned CSV.
+\end{abstract}
+
+\keywords{GPU compilers, tile DSLs, Triton, SIMT, warp-level parallelism, irregular parallelism, per-lane control flow}
+
+\maketitle
+
+\section{Introduction and Contributions}
+A companion study~\cite{paper1} shows that on irregular automata the Triton$\rightarrow$CUDA gap
+follows the execution paradigm, not the abstraction height. It leaves open \emph{why}, mechanistically,
+and \emph{what} would close it. This paper answers both. Our contributions:
+\begin{enumerate}
+\item A \textbf{falsifiable decomposition} of the tile-SPMD automata regret into artifact, recoverable,
+and irreducible, each measured and Nsight-attributed (Sec.~\ref{sec:decomp}, Fig.~\ref{fig:decomp}).
+\item Identification of the irreducible residual as \textbf{abstraction-denied intra-warp latency
+hiding}---not redundancy, occupancy, instruction count, or bandwidth---\emph{measured}: fewer
+warp-instructions than CUDA, same occupancy, below both roofline ceilings, yet $15.3\times$ the
+dependent-load stall and $9.9\%$ vs.\ $41\%$ issue activity (Sec.~\ref{sec:resid}).
+\item A demonstration that the residual is \textbf{regime-dependent} (latency-bound NFA vs.\
+memory-bound DFA), unifying both faces through one latency mechanism (Sec.~\ref{sec:regime}).
+\item A \textbf{launch-configuration finding} (default \texttt{num\_warps=4} inflates the worklist
+regret ${\sim}3.4\times$), a methodological caution for DSL benchmarking (Sec.~\ref{sec:artifact}).
+\item The \textbf{missing-primitive design} + a bound on its payoff + the thread-model existence proof,
+distinguished from Gluon's per-thread \emph{layout} (Sec.~\ref{sec:cure}).
+\item \textbf{The cure, implemented}: we lower the same idiomatic per-lane source to the thread model
+and measure that it runs $4.2\times$ faster than the tile lowering and matches/exceeds hand-CUDA,
+closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:cure}).
+\item \textbf{In the real compiler} (Sec.~\ref{sec:compiler}): a TritonGPU MLIR pass that compiles into
+\texttt{libtriton} and \emph{detects} the lock-step region; a proof that the in-IR lowering is
+\emph{structurally blocked} (\texttt{scf.condition} is a single \texttt{i1}; the tensors are already
+\texttt{sizePerThread=1}), naming the missing IR primitive (a per-lane sub-tile loop/exit op); and an
+\emph{automatic} detect-and-lower selector that routes the detected region to the thread cure for
+$3.9\times$ (negative-control kernels stay on the tile path); a real in-compiler rewrite built into
+\texttt{libtriton} (reduce-hoist, $1.55\times$, oracle-correct); \textbf{and the full per-lane retirement
+cure, built below the tile IR}---a \mbox{TritonGPU$\rightarrow$LLVM} pass wired into \texttt{make\_llir},
+oracle-correct and \textbf{$4.15\times$} ($39\times$ fewer issued instructions, $2.5$--$7.3\times$ across
+trip distributions), closing the residual by construction.
+\item A \textbf{generality law} across eight oracle-gated irregular workloads (Sec.~\ref{sec:law},
+Fig.~\ref{fig:law}), including the ML kernels tile DSLs target: regret is created by per-step
+\emph{scalar control}---not memory irregularity---validated by a pointer-chase negative control
+($1.00\times$), confirmed on MoE top-$k$ routing ($2.36\times$), and with the correct \emph{sign flip}
+predicted on dense ragged attention ($0.64\times$, the tile wins).
+\end{enumerate}
+
+\section{Background and Method}
+NFA simulation (a work-efficient worklist iterating the active set via \texttt{ffs} over a bitmask) is
+control-flow/latency-bound; DFA simulation (one dependent table gather \texttt{trans[cur*256+sym]} per
+symbol) is memory-bound. CUDA and NVIDIA Warp~\cite{warp2022} are thread-SIMT (one thread per string);
+Triton~\cite{triton2019} is tile/SPMD (a program operates on tiles). Correctness gates speed: every
+kernel/config is validated bit-for-bit against a CPU oracle before any throughput is reported. We
+report medians over warmup${+}9$ reps at a GPU-saturating batch~\cite{hoefler2015} (timings on GPUs
+are non-Gaussian, so we avoid mean$\pm$std and best-of-$N$), and sweep batch because the lane-packing
+benefit is occupancy-gated. Every mechanism claim is backed by Nsight Compute, not just wall-clock:
+the issue-stall composition (the \texttt{long\_scoreboard} reason isolates dependent-load waits),
+achieved occupancy, issue activity, warp- and thread-instruction counts, and DRAM/L2 traffic. We report negative and partial results and correct
+three of our own intermediate hypotheses (Secs.~\ref{sec:decomp}, \ref{sec:resid}, \ref{sec:law}).
+Hardware: RTX 4070 (sm\_89, 46 SMs), Triton 3.5.1, torch 2.9.1+cu128, CUDA 13.3 / driver 580; the
+in-\texttt{libtriton} compiler pass (\S\ref{sec:compiler}) uses a from-source Triton 3.8.
+
+\section{The Decomposition (NFA worklist)}\label{sec:decomp}
+
+\subsection{The anchor}
+A work-efficient register-resident worklist ($\le 64$ states, batch 4096, 12 configs): Triton
+$22$\,Gbps vs.\ CUDA $227$\,Gbps $=$ \textbf{$10.1\times$ median} ($9.4$--$12.3\times$).
+
+\subsection{Component A: launch-configuration artifact}\label{sec:artifact}
+The Triton worklist defaults to \texttt{num\_warps=4}: four warps per program redundantly process the
+\emph{same} string. Sweeping \texttt{num\_warps}$\in\{1,2,4,8\}$: \texttt{nw=1} vs.\ \texttt{nw=4} $=$
+$2.77\times$@4096 $\rightarrow 3.44\times$@16384 $\rightarrow 3.69\times$@65536 (each doubling
+${\sim}$halves throughput). This inflates prior worklist regret numbers and must be disclosed.
+
+\subsection{Component B: warp redundancy, recoverable by lane-packing}
+The scalar Triton program executes warp-uniformly: \texttt{thread\_inst\_per\_inst} $=32.00$ (Triton)
+vs.\ $30.34$ (CUDA), the same number with opposite meaning---CUDA's 32 lanes run 32 \emph{different}
+strings, Triton's run the \emph{same} one---yielding ${\sim}90\times$ more warp-instructions. Lane-packing
+(32 strings into the 32 lanes, exploiting the shared CSR so inner-loop bounds stay scalar) removes it.
+On the dense scan, pure lane-packing recovers $3.2\times \rightarrow 9.8\times \rightarrow 19.4\times$
+(batch 4096/16384/65536) toward the ideal $32\times$; it is \textbf{occupancy-gated}
+(Fig.~\ref{fig:occ}). \emph{Correction:} we first framed the $90\times$ warp-redundancy as the
+bottleneck; Nsight shows it is removed ${\sim}26\times$ yet throughput moves only $3.8\times$---it was
+largely hidden by occupancy.
+
+\subsection{Component C: the irreducible residual}\label{sec:resid}
+A per-lane Triton worklist (each lane its own \texttt{ffs} + per-lane CSR gather, no cross-lane reduce,
+no active-set union) beats the union variant $1.27\times$ but is still $0.51\times$ of CUDA
+($\approx 2\times$ slower). Nsight is decisive (Fig.~\ref{fig:mech}): it has \emph{fewer}
+warp-instructions than CUDA ($4.66$M vs.\ $5.07$M) and the same occupancy ($22.5\%$), yet is $3.3\times$
+slower because issue activity is $9.9\%$. Raising occupancy does not help---a \texttt{BLOCK} sweep
+$\{32,64,128,256\}$ only \emph{worsens} it ($0.49\times \rightarrow 0.31\times$): bigger lock-step
+tiles add divergence. \textbf{Direct measurement} confirms the mechanism: at matched occupancy the
+per-lane Triton kernel spends $15.3\times$ more cycles in the \texttt{long\_scoreboard} stall (waiting
+on a dependent memory load) than CUDA, and the issue-rate ratio ($4.1\times$) tracks the throughput
+ratio ($3.5\times$), consistent with Little's law~\cite{volkov2016latency,hongkim2009}. The
+instruction roofline (Fig.~\ref{fig:roof})~\cite{instroofline2022} settles ``did you write a worse
+kernel?'': both kernels sit far below the issue \emph{and} bandwidth ceilings ($8.3\%/27\%$ vs.\
+$32\%/3.4\%$ of peak), and Triton issues fewer warp-instructions yet runs $3.5\times$ slower---it is
+structurally latency-bound. \emph{Honest refinement:} the per-lane kernel does not issue \emph{fewer}
+memory requests---it issues $26$--$84\times$ \emph{more} (masked inactive-lane gathers)---so the tile
+model pays twice: excess masked traffic \emph{and} no dependent-load hiding. Root cause: a CUDA warp's
+lanes are independent in-flight-load generators (memory-level parallelism); a lock-step tile serializes
+the dependent next-state load, so latency hides only across warps (occupancy-bound). This is distinct
+from branch/memory divergence~\cite{fung2007}: the lanes can be perfectly coalesced and still stall on
+a dependent load. We distinguish it from the \emph{hardware} fix of intra-warp stalls~\cite{subwarp2022}:
+the same SM is fast under CUDA and slow under Triton at equal occupancy and fewer instructions, so the
+loss is abstraction-imposed.
+
+\begin{table}[t]\centering\small
+\caption{The worklist regret decomposes multiplicatively (batch 16384, $\le 64$ states,
+oracle-gated). Each stage removes one component; $28 \rightarrow 739$ is $3.7\times 3.7 \times
+1.9 = 26\times$.}
+\label{tab:decomp}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Kernel & Gbps & Component removed \\
+\midrule
+Triton worklist (\texttt{nw=4}) & 28 & --- \\
+\quad $+$ \texttt{nw=1} & 104 & launch artifact ($3.7\times$) \\
+\quad $+$ lane-packing & 383 & warp redundancy ($3.7\times$) \\
+CUDA worklist (thread-SIMT) & 739 & irreducible latency ($1.9\times$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:decomp} summarizes the multiplicative decomposition: removing the launch artifact
+and the warp redundancy each recovers $3.7\times$, leaving the irreducible $1.9\times$ latency
+residual. By Little's law (concurrency $=$ throughput $\times$ latency), the latency-bound kernel's
+throughput is set by the in-flight-request concurrency it can sustain; the per-lane Triton kernel's
+$9.9\%$ issue activity and $15.3\times$ dependent-load stall mean it sustains far less effective
+concurrency than CUDA at the same occupancy, and the issue-rate ratio ($4.1\times$) tracking the
+throughput ratio ($3.5\times$) is exactly the relation Little's law predicts when latency is fixed.
+
+\section{Regime-Dependence (DFA): the unification}\label{sec:regime}
+The DFA (memory-bound) decomposes the same way but the residual \emph{closes in the DRAM regime}
+(Fig.~\ref{fig:dfa}). Across table sizes (cache$\rightarrow$L2$\rightarrow$DRAM): scalar Triton DFA is
+flat ${\sim}29$\,Gbps (independent confirmation of the scalar-gather ceiling); lane-packing gives
+${\sim}12\times$ over it; and the lane-packed/CUDA ratio is $0.55$--$0.62\times$ in cache but
+$1.05\times$ at a $16$\,MB ($>$L2) table---lane-packed Triton \emph{matches} CUDA. Mechanism (DRAM
+utilization only $14.6\%$, so memory-\emph{latency} not saturated bandwidth): at moderate (cache)
+latency CUDA's intra-warp hiding wins ${\sim}1.7\times$; at DRAM latency both must hide latency via
+cross-warp parallelism and \emph{converge}. So the NFA's fundamental ${\sim}2\times$ residual and the
+DFA's closeable gap are one mechanism at different latency scales.
+
+\section{The Cure: the missing primitive}\label{sec:cure}
+\textbf{Design.} A \texttt{scalar\_program} region (or per-lane \texttt{serial\_range}) in the tile DSL
+that lowers the marked code to a per-thread independent instruction stream, giving each lane independent
+control flow and intra-warp latency hiding. The diagnosis names what it must provide: independent
+per-lane \texttt{ffs}/\texttt{while}, per-lane data-dependent loop bounds, register-resident per-lane
+bitset, scalar gather. \textbf{Bound.} It closes the latency-bound residual (up to ${\sim}2\times$ on the
+NFA) and nothing extra in the already-converged DRAM-DFA regime---a regime-dependent, falsifiable
+prediction. \textbf{Existence proof.} The thread model realizes it: CUDA achieves $1.0\times$ and the
+high-level Warp DSL~\cite{warp2022} reaches $0.9\times$. \textbf{Not already in Gluon.} A runnable probe
+shows Triton's low-level Gluon frontend exposes per-thread \emph{layout}~\cite{linearlayouts2025}, not
+per-lane \emph{control flow}: \texttt{gl.load} returns a layout-typed block, never a scalar, so the
+data-dependent CSR loop cannot even be lowered (compile error captured verbatim). Layout control $\ne$
+control-flow divergence.
+
+\subsection{The cure, implemented}\label{sec:implemented}
+We do not stop at proposing the primitive: we implement its lowering and measure that it closes the
+residual. A function \texttt{lower\_scalar\_program\_to\_cuda} takes the \emph{same} idiomatic per-lane
+body the Triton tile kernel expresses (active-set \texttt{ffs} worklist, data-dependent CSR loop,
+scalar gather, register bitset) and lowers it to a per-thread CUDA kernel (one thread $=$ one string),
+compiled with \texttt{nvcc}. Oracle-validated bit-for-bit; throughput on no-accept automata (sustained
+full-length scan, removing the early-exit confound), $\le 64$ states, batch 16384. The same per-lane
+program lowered to \emph{threads} (SP) vs.\ \emph{tiles} (Triton WP2) differs by \textbf{$4.2\times$}
+(median; SP ${\approx}1555$ vs.\ WP2 ${\approx}378$\,Gbps), robust across batch, and SP \emph{matches
+or exceeds} hand-written CUDA (SP/CU $= 2.15\times$, since the generated kernel is a minimal thread
+worklist). So the residual
+is not merely diagnosed but \emph{closed by construction}: supplying the per-lane lowering recovers---
+and surpasses---thread-model performance from the identical front-end source.
+\textbf{The cure acts through the diagnosed mechanism}, not by accident: profiling SP shows it
+restores the thread-model signature---issue activity $36\%$ (vs.\ the tile's $9.9\%$, $\approx$ CUDA's
+$41\%$) and the \texttt{long\_scoreboard} dependent-load stall $29\times$ lower than the tile---so
+lowering the same source to independent per-lane streams recovers exactly the intra-warp latency
+hiding component~C was missing.
+
+\subsection{Implemented in the compiler: detect, and why the lowering must leave the tile IR}
+\label{sec:compiler}
+We take the cure into the real compiler. On a Triton-from-source build (3.8.0) we add a TritonGPU MLIR
+pass, \texttt{tritongpu-thread-region}, that runs in the NVIDIA \texttt{make\_ttgir} pipeline and
+\emph{detects} the irregular region by its lock-step signature---an \texttt{scf.while} whose iter-args
+are \texttt{\#blocked} tile tensors and whose \texttt{scf.condition} derives from a
+\texttt{tt.reduce}-to-scalar (the whole tile loops to the busiest lane; idle lanes masked). It compiles
+into \texttt{libtriton} and fires on the target kernels (verified: the candidate attribute appears with
+the pass on, is absent with it off, and codegen stays bit-exact).
+
+\textbf{The in-IR lowering is structurally blocked---and that is the sharper result.} Two facts from the
+matched IR. (i) The carried tensors are \emph{already} \texttt{sizePerThread=1} (one element per lane),
+so the lock-step is \emph{not} a layout choice---re-encoding is a no-op, and per-thread layout (Gluon,
+Linear Layouts~\cite{linearlayouts2025}) does not help. (ii) The lock-step is the \emph{loop construct}:
+\texttt{scf.condition} takes a single \texttt{i1}, so the natural rewrite---a per-lane
+\texttt{tensor$\langle$N$\times$i1$\rangle$} condition that lets lanes terminate independently---is
+rejected by the MLIR verifier (\emph{``'i1' vs 'tensor$\langle$8$\times$i1$\rangle$'''}, captured via the
+built \texttt{triton-opt}). Per-lane loop termination is therefore \emph{inexpressible} in TritonGPU's
+structured tile control flow. This names the missing IR primitive precisely: a \textbf{per-lane
+(sub-tile) loop/exit op}. The cure must lower \emph{below} the tile IR to the thread model (independent
+thread scheduling)---which is exactly what \S\ref{sec:implemented} does.
+
+\textbf{A real in-compiler rewrite, built (partial).} Even though the full per-lane lowering is
+blocked in the tile IR, a sound rewrite recovers part of the cost \emph{inside} the compiler. The
+per-iteration \texttt{tt.reduce} that gates the lock-step \texttt{while} is loop-invariant in disguise:
+the lane counter is a uniform splat, so \texttt{any}$(j<\mathit{trip})$ equals $j<\max(\mathit{trip})$.
+We extend the pass (opt-in flag) to \emph{hoist} \texttt{reduce\_max(trip)} once before the loop and
+replace the per-iteration cross-lane reduce with a scalar counter, leaving the masked body unchanged---a
+provably-equivalent transformation that preserves per-warp termination. Built into \texttt{libtriton} and
+verified bit-exact end-to-end and via \texttt{triton-opt} on the rewritten IR, it is \textbf{$1.55\times$}
+faster on the lock-step kernel ($155.6\rightarrow100.4\,\mu$s; detection-only mode is a perf no-op,
+confirming the gain is the rewrite). This is an honest \emph{partial}---it removes the lock-step loop's
+reduce overhead but does \emph{not} grant per-lane (sub-warp) retirement---which we build next, below the tile IR.
+
+\textbf{The full cure, built below the tile IR.} The tile IR cannot express per-lane retirement, but the
+lowering \emph{below} it can. After \texttt{convert-triton-gpu-to-llvm} the per-lane predicate already
+exists as a scalar $j_{\mathrm{lane}}<\mathit{trip}_{\mathrm{lane}}$; the lock-step latch merely
+warp-reduces it (\texttt{nvvm.redux.sync}) to a uniform \texttt{i1} that gates \texttt{llvm.cond\_br}. Our
+pass---a real MLIR pass in \texttt{libtriton}, wired into \texttt{make\_llir}---redirects the branch to the
+\emph{per-lane} predicate (each lane then retires independently under hardware Independent Thread
+Scheduling), deletes the now-dead cross-lane reduce, and inserts a \texttt{bar.warp.sync} at the
+reconvergence block; a body-safety guard bails when the loop carries any cross-lane op. Compiled and run
+end-to-end, it is oracle-correct (bit-exact) and \textbf{$4.15\times$} on the lock-step kernel
+($166.7\rightarrow40.2\,\mu$s), and \textbf{$2.5$--$7.3\times$} across uniform/geometric/pareto trip
+distributions. Nsight attributes the gain to work reduction: issued instructions fall \textbf{$39\times$}
+($36.1\mathrm{M}\rightarrow0.92\mathrm{M}$) because total work scales with $\sum_i \mathit{trip}_i$---each
+lane runs only its own iterations---rather than $32\times$ the busiest lane; threads-per-instruction is
+unchanged, so this is an instruction-issue win, not an occupancy one. This closes the residual the
+reduce-hoist left open: the cure is \emph{built}, oracle-correct, and measured, not merely diagnosed. The pass also fires, oracle-correct, on \emph{real} workloads with the same lock-step
+latch---power-law CSR SpMV ($1.14\times$) and MoE top-$k$ routing ($1.25\times$)---with its
+\texttt{redux.sync} removed and \texttt{bar.warp.sync} present in the emitted PTX (confirming it fired).
+Both carry per-iteration memory gathers, so little of their cost is the control reduce. That the \emph{same}
+cure yields $4.15\times$ on control-bound work but $1.14$--$1.25\times$ on gather-bound SpMV/MoE is itself a
+confirmation of the thesis: the recoverable regret scales with the per-step \emph{control}, not the memory.
+Table~\ref{tab:builtcure} consolidates the built-cure measurements.
+
+\begin{table}[t]\centering\small
+\caption{The built per-lane retirement cure (a real MLIR pass wired into \texttt{make\_llir}):
+oracle-correct on every workload, speedup vs.\ the masked tile baseline. The benefit scales with
+control-boundedness. Every row traces to a versioned CSV.}
+\label{tab:builtcure}
+\begin{tabular}{@{}llr@{}}
+\toprule
+Workload & Dominant cost & Speedup \\
+\midrule
+Synthetic per-lane \texttt{while} & control & $\mathbf{4.15\times}$ \\
+\quad (uniform / geometric / pareto) & control & $2.5$--$7.3\times$ \\
+MoE top-$k$ routing (power-law) & mixed gather & $1.25\times$ \\
+SpMV CSR (power-law) & memory gather & $1.14\times$ \\
+\midrule
+\multicolumn{2}{@{}l}{Nsight: issued instructions (synthetic)} & $39\times$ fewer \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Automatic detect-and-lower.} A selector closes the loop (Fig.~\ref{fig:selector}): it runs the
+detection pass, and when the lock-step signature is present routes the region to the thread lowering,
+otherwise keeps the tile path.
+Oracle-gated, the NFA worklist is auto-routed to the thread cure for \textbf{$3.9\times$} over the tile
+(state sweep $16$--$64$, consistent with the $4.2\times$ of \S\ref{sec:implemented}), while a fixed-trip
+negative-control kernel is detected-negative and correctly left on the tile path. So the full loop is
+realized: detect (a real MLIR pass) $\rightarrow$ decide (the signature) $\rightarrow$ lower (the thread
+model, since the tile IR provably cannot) $\rightarrow$ measured, oracle-gated gap-closing.
+
+\subsection{Generality: the regret law}\label{sec:law}
+To test whether the mechanism is automata-specific we built six oracle-gated tile-vs-thread witnesses
+spanning the irregularity space, each with identical machinery (a Triton tile kernel, the per-lane
+source lowered to a CUDA thread kernel, and a CPU oracle); Fig.~\ref{fig:law} reports the measured
+regret, coloured by dominant mechanism. The result is a law \emph{with a correct negative control}:
+\textbf{regret is created by scalar control flow---not by memory irregularity or dependent loads---and
+appears, mechanistically, through one of two measured channels.} A graph pointer-chase (1M random
+walkers, data-dependent gather addresses, scattered \texttt{colidx}, degree CV $3.79$, but a
+\emph{fixed} step count) is the decisive control: tile and thread are bit-for-bit identical in issue
+activity ($5.42\%$ vs.\ $5.43\%$), occupancy ($72.1\%$ vs.\ $72.1\%$), and threads-per-instruction
+($32$ vs.\ $32$), and the regret is $1.00\times$---irregular memory and dependent loads alone cost
+\emph{nothing}, because a lock-step gather already supplies full intra-warp memory-level parallelism.
+The two channels: (i) \emph{issue starvation}---a data-dependent scalar recurrence drives the tile's
+issue rate below the thread's: the NFA worklist (active-set \texttt{ffs}) is $2.0\times$ at tile issue
+$9.9\%$ vs.\ $41\%$; (ii) \emph{masked-lane waste}---divergent trip counts make the lock-step tile spend
+full-width $32$-lane work where the thread retires lanes: rejection sampling (pure control-flow
+divergence, no memory) is $4.0\times$ with tile threads-per-instruction $32$ vs.\ the thread's $17$
+(its issue rate is, if anything, \emph{above} the thread's---the waste is in \emph{what} the active
+lanes compute, not the issue rate). A third, divergence-free effect sets the floor: a
+\emph{tile-lowering baseline} (uniform-\texttt{nnz} SpMV, zero divergence, still $1.9\times$ from
+occupancy/masking on a bandwidth-bound gather---honestly falsifying our initial ${\approx}1\times$
+guess), to which a \emph{divergence increment} adds (power-law SpMV $2.2\times$ at tile width
+$32 \to 5.8\times$ at $256$). So the law is genuinely multi-component, not a single scalar predictor; the
+common cause is the lock-step tile, and the cure (Sec.~\ref{sec:implemented}) removes every channel by
+restoring per-lane execution.
+
+\textbf{The law generalizes to ML---with a correct sign-flip prediction.} Two further oracle-gated
+witnesses, on the irregular kernels NVIDIA's tile DSLs actually target. \emph{MoE top-$k$ routing}
+(ragged, data-dependent expert counts; a scalar per-token accumulate) is the ML face of scalar control:
+regret $2.36\times$ at power-law expert loads---the tile issues $2.6\times$ more instructions ($41.8$M
+vs.\ $16.3$M) and does masked full-width work (threads-per-instruction $30.1$ vs.\ the thread's $7.7$).
+\emph{Ragged variable-context attention} has the \emph{identical} ragged structure but a \emph{dense}
+head-dim payload per step, and here the law predicts the \textbf{negative}, correctly: regret
+$0.64\times$---the tile is \emph{faster}. The mechanism unifies: the thread model always retires lanes
+on divergence (threads-per-instruction $3.45$ on attention, $7.7$ on MoE), but the regret \emph{sign} is
+set by per-step instruction efficiency---scalar work makes the tile issue \emph{more} (lock-step reduce
+plus masking) so it loses, while a dense vectorizable head-dim makes it issue \emph{fewer} ($123$M vs.\
+the thread's $178$M) so it wins \emph{despite} no lane retirement. This sharpens the thesis: the tile
+pays for \emph{per-step scalar control}, not irregularity per se---exactly why Triton is the tool of
+choice for flash-attention yet collapses on automata. (The witnesses use the framework's
+one-element-per-lane mapping; production attention is warp-cooperative, a different design point.)
+
+\section{Methodological Integrity}
+Our analysis corrected three of its own intermediate hypotheses, which we report rather than hide.
+First, an early reading framed the ${\sim}90\times$ warp-instruction redundancy (Sec.~\ref{sec:decomp})
+as the bottleneck; profiling the lane-packed kernel showed the redundancy is removed ${\sim}26\times$
+yet throughput moves only $3.8\times$---it was largely hidden by occupancy, so warp-redundancy is real
+but not load-bearing. Second, we predicted (following the latency-hiding literature) that the per-lane
+Triton kernel would sustain \emph{fewer} in-flight memory requests than CUDA; direct measurement
+refuted this---it issues $26$--$84\times$ \emph{more} (masked inactive-lane gathers) and still stalls,
+so the residual is the inability to \emph{hide} dependent-load latency, not a request-count deficit.
+We therefore phrase the mechanism via stall composition and issue activity, not request counts. Third,
+in the generality study (Sec.~\ref{sec:law}) we first stated the law as a single ``tile issue deficit''
+predictor; completing the Nsight profiling falsified it---rejection sampling shows regret $4.0\times$
+while the tile's issue rate is \emph{above} the thread's---so we report the honest two-channel form
+(issue starvation \emph{and} masked-lane waste over a tile-lowering baseline), and a clean
+negative-control prediction for uniform SpMV that was also wrong ($1.9\times$, not ${\approx}1\times$).
+All three corrections sharpened, rather than weakened, the central claim.
+
+\section{Threats to Validity}
+\emph{Single GPU.} Results are on one RTX 4070; the \emph{mechanism} (intra-warp latency hiding, the
+issue-activity differential, the DRAM convergence) is a property of the SIMT execution model and the
+tile-vs-thread lowering, hence architecture-general, but the absolute decomposition factors should be
+re-measured on an A100/H100 (larger L2 shifts the DFA crossover). We make this a turnkey step: a
+one-command harness re-runs every witness, the cure, and the selector on a new GPU, tags the output by
+device, and checks the falsifiable prediction that each regret persists in direction (paradigm, not
+architecture) while throughput rescales. \emph{Compiler-pass scope.} Both the detection pass and the per-lane
+retirement \emph{lowering} are real MLIR passes in \texttt{libtriton} (the latter wired into
+\texttt{make\_llir}); the lowering realizes the cure \emph{below} TritonGPU---in the LLVM lowering, not
+out-of-band (\S\ref{sec:implemented})---because the structured \emph{tile} IR cannot express it:
+\texttt{scf.condition} takes a single \texttt{i1}, so per-lane loop termination is inexpressible in
+TritonGPU (shown by a verifier-rejected rewrite). That the cure lives below the tile IR is a property of
+\emph{today's} tile IR and is falsifiable: a per-lane sub-tile loop/exit op would let it live in-IR. The
+pass fires only on the \texttt{tl.max} lock-step latch and a body-safety guard bails when the loop carries
+a cross-lane op, so its scope is explicit. \emph{Prototype scope.} A multi-word
+generalization of the lane-packed kernel (NWORDS int64 words/lane) is oracle-validated to 256 states,
+so the prototype is not artificially limited; but the clean ${\sim}2\times$ residual is a
+\emph{register-resident-regime} ($\le 64$-state) result---past 64 states the CUDA register worklist
+itself degrades (register pressure), so the head-to-head is confounded by both baselines losing the
+register-resident advantage, and ANMLZoo-scale automata (Brill 42661 $=$ 667 words) make the per-lane
+multi-word scatter explode---itself a manifestation of the tile limitation we study. Real automata run
+oracle-valid but sub-Gbps (an \emph{algorithmic} cost, orthogonal to the regret). \emph{Tuning.} \texttt{num\_warps} is a knob; we
+disclose the full sweep rather than a single config, rebutting the autotuning
+counter-thesis~\cite{ringlein2025}: the Triton/Gluon same-MLIR control plus the disclosed sweep
+separate \emph{tuning} (which closes component A and part of B) from \emph{expressibility} (the
+residual C), with a probe that is falsifiable by construction.
+
+\section{Reproducibility}
+Correctness gates every measurement: each kernel/config is checked bit-for-bit against the CPU oracle
+(NFA \texttt{reference.py} / \texttt{simulate\_dfa}) before any throughput is reported. Every number in
+this paper traces to a versioned CSV, and all figures regenerate from those CSVs by a single script, so
+the plots cannot drift from the measurements. An artifact index maps each claim to the command that
+produces it and the CSV it writes. Expressibility and structural claims are \emph{runnable, falsifiable
+probes}: the Gluon probe exits $0$ on the expected compile failure (and $1$ if a future Gluon compiles
+it); the lowering-wall probe asserts the MLIR verifier rejects a per-lane \texttt{scf.condition}; the
+detection-pass check confirms the in-\texttt{libtriton} pass tags the lock-step region with the
+environment flag set and is a no-op without it. The TritonGPU pass is reproduced from a versioned patch
+($+$ source file) against a pinned Triton commit with the documented build recipe, and the
+cross-architecture re-validation is a single non-mutating command that re-runs every witness, the cure,
+and the selector on a new GPU and tags the output by device.
+
+\section{Related Work}
+\textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA: ngAP's
+non-blocking multi-symbol processing~\cite{ngap2024}, HybridSA's bit-parallel
+shift-and~\cite{hybridsa2024}, BitGen's Parabix bitstreams~\cite{bitgen2025}, AsyncAP's
+input-symbol asynchrony~\cite{asyncap2023}, AutomataBLAS's AP-as-SpMV~\cite{automatablas2025}, and
+the Hopps sparsity ASIC~\cite{hopps2025}. Each \emph{varies the algorithm} on one CUDA
+implementation; none compares GPU programming models or holds the algorithm fixed across DSLs. The
+sole IR-for-automata work~\cite{mlirregex2025} lowers regex to one fixed domain-specific accelerator
+---a hardware target, not a GPU-paradigm/expressibility study, and with no tile-vs-thread cost. Our
+axis is orthogonal: fixed algorithm, varied programming model.
+\textbf{Tile GPU DSLs}: Triton~\cite{triton2019} and the 2024--26 wave exposing more thread/warp
+control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025}, give per-thread \emph{data
+placement} but not per-lane \emph{control flow} (our probe shows the data-dependent loop cannot
+lower); Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
+drop-to-scalar escape. Warp~\cite{warp2022} is the thread-SIMT existence proof.
+\textbf{Mixing thread- and tile-level execution} is exactly the live frontier, but every approach is
+\emph{manual} or \emph{differently directed}: Prism~\cite{prism2026} lets a programmer hand-annotate
+typed thread/tile ``perspectives''; NVIDIA's cuTile~\cite{cutile2025}---and its MLIR \emph{Tile IR}, now
+being built as a backend for Triton itself---is tile-level and concedes the irregular case to a
+hand-written SIMT fallback, so the per-lane gap we name persists in \emph{both} Triton's TritonGPU and
+NVIDIA's Tile IR (the proposed primitive is complementary to that platform direction, not subsumed by it); Tawa~\cite{tawa2026} auto-restructures Triton but for
+\emph{dense} warp specialization; and partial control-flow linearization~\cite{partialcfg2018} goes the
+\emph{opposite} way---\emph{vectorizing} divergent CPU control flow, whereas we \emph{de}-vectorize a
+tile region to recover per-lane MLP. None automatically \emph{detects} an irregular, data-dependent
+per-lane region in a tile DSL and lowers it to the thread model; and our structural result shows
+\emph{why} an in-tile-IR rewrite cannot suffice---the missing primitive is a per-lane sub-tile loop/exit
+op, below the level any of these operate.
+\textbf{Mechanism}: we ground the residual in latency-hiding / MLP-vs-occupancy
+analysis~\cite{volkov2016latency,hongkim2009} and place both kernels on the instruction
+roofline~\cite{instroofline2022}; we distinguish it from divergence~\cite{fung2007} and from the
+\emph{hardware} intra-warp-stall fix of Subwarp Interleaving~\cite{subwarp2022} (we attribute the
+same stall to the DSL, at equal occupancy and fewer instructions).
+\textbf{Methodology and lineage}: rigorous benchmarking~\cite{hoefler2015}, roofline~\cite{roofline2009},
+and the performance-portability metric~\cite{pennycook2016} (per-hardware; we measure per-\emph{capability}
+regret); we rebut the autotuning counter-thesis~\cite{ringlein2025} via the Triton/Gluon same-MLIR
+control and the disclosed \texttt{num\_warps} sweep. The gap we fill: no constructive,
+instruction-level account of \emph{why} a tile DSL pays on irregular control flow, naming the missing
+primitive, with a regime-dependent residual.
+
+\section{Conclusion}
+The abstraction regret on irregular automata is not a monolith: a launch artifact, a recoverable
+redundancy, and an irreducible intra-warp-latency-hiding residual whose size is set by the latency
+regime. The cure is a named, bounded IR primitive whose lowering we implement and measure---it closes
+the residual by construction ($4.2\times$ over the tile lowering). We take it into the real compiler: a
+TritonGPU pass that detects the lock-step region in \texttt{libtriton}, a proof that the in-tile-IR
+lowering is structurally impossible (naming the missing per-lane loop/exit primitive), and an automatic
+selector that routes the detected region to the thread cure ($3.9\times$); and a real in-compiler
+rewrite (reduce-hoist) that is built into \texttt{libtriton} and oracle-correct ($1.55\times$). Adding the
+full per-lane primitive to the tile IR itself---the remaining step---is the landmark future work.
+
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_decomposition.png}
+\caption{NFA worklist throughput (batch 16384, $\le 64$ states) climbs as each regret component is
+removed: \texttt{nw=4}$\rightarrow$\texttt{nw=1} (launch artifact), $\rightarrow$lane-packing (warp
+redundancy), $\rightarrow$CUDA (irreducible latency). All oracle-gated.}
+\label{fig:decomp}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_occupancy_gating.png}
+\caption{Lane-packing's benefit is occupancy-gated: the pure-packing speedup grows
+$3.2\times\rightarrow19.4\times$ with batch (toward the ideal $32\times$) as more warps fill the GPU.}
+\label{fig:occ}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_mechanism.png}
+\caption{Per-lane Triton vs.\ CUDA (16384 strings, 32 states): same occupancy, \emph{fewer}
+warp-instructions, yet $3.3\times$ slower at $9.9\%$ vs.\ $41\%$ issue activity---latency-bound.}
+\label{fig:mech}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_roofline.png}
+\caption{Instruction roofline (16384 strings, 32 states): both kernels sit far below the issue
+\emph{and} DRAM-bandwidth ceilings ($8.3\%/27\%$ for Triton, $32\%/3.4\%$ for CUDA), so neither is
+instruction- nor bandwidth-bound---the residual is latency.}\label{fig:roof}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_dfa_crossover.png}
+\caption{DFA: lane-packed Triton trails CUDA $\sim$1.7$\times$ while the table is cache-resident but
+\emph{matches} it ($1.05\times$) once the $16$\,MB table spills past L2---both then rely on cross-warp
+parallelism. The residual is regime-dependent.}\label{fig:dfa}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_cure.png}
+\caption{The cure, implemented (batch 16384, $\le 64$ states). \emph{Left:} the \emph{same} per-lane
+source lowered to threads (\texttt{scalar\_program}) runs $4.2\times$ the tile lowering (Triton WP2)
+and matches/exceeds hand-CUDA. \emph{Right:} it does so \emph{through the diagnosed mechanism}---issue
+activity jumps from the tile's $10\%$ to $36\%$ ($\approx$ CUDA's $41\%$), restoring the intra-warp
+latency hiding component~C was missing.}\label{fig:cure}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_regret_law.png}
+\caption{The regret law across eight oracle-gated irregular workloads, by dominant mechanism. A graph
+pointer-chase (green) is the negative control (irregular memory + dependent loads, no control
+divergence $\Rightarrow$ regret $1.00\times$). Regret grows with scalar control / divergence (grey, red,
+blue, orange), peaking at $4\times$. The two ML witnesses (right) test the \emph{sign}: MoE routing
+(scalar per step) confirms the law ($2.36\times$), while ragged attention (dense head-dim) \emph{inverts}
+it ($0.64\times$, teal, below the no-regret line---the tile wins), because per-step instruction
+efficiency, not irregularity, sets the sign.}\label{fig:law}\end{figure}
+\begin{figure}[t]\centering\includegraphics[width=\columnwidth]{figures/fig_selector.png}
+\caption{The automatic detect$\to$route$\to$lower loop (P2). The detection pass (in \texttt{libtriton})
+matches the lock-step signature; the lock-step NFA worklist is routed to the thread lowering
+($378{\to}1555$\,Gbps $=3.9\times$, exceeding hand-CUDA), while a no-signature kernel (pointer-chase)
+stays on the tile path. All routing oracle-gated; numbers from the versioned CSVs.}\label{fig:selector}
+\end{figure}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+\end{document}
