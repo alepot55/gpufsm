@@ -1,0 +1,13 @@
+dist,mode,warpmax_mean,trip_mean,D,oracle,time_us
+constant,off,64.00,64.00,1.000,OK,116.9
+lowvar,off,71.84,64.01,1.122,OK,127.0
+uniform,off,248.80,128.54,1.936,OK,317.7
+geometric,off,63.30,15.99,3.958,OK,114.5
+pareto2,off,72.80,15.78,4.613,OK,135.2
+pareto1.2,off,120.13,14.21,8.454,OK,181.2
+constant,retire,64.00,64.00,1.000,OK,45.1
+lowvar,retire,71.84,64.01,1.122,OK,39.9
+uniform,retire,248.80,128.54,1.936,OK,46.0
+geometric,retire,63.30,15.99,3.958,OK,44.0
+pareto2,retire,72.80,15.78,4.613,OK,41.0
+pareto1.2,retire,120.13,14.21,8.454,OK,40.6
