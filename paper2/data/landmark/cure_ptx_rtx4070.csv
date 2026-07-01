@@ -1,3 +1,5 @@
-mode,redux_sync,bar_warp_sync,branches,latch_predicate
-off,1,0,2,uniform (redux.sync.max -> setp.lt %r10<1 -> whole-warp bra)
-retire,0,1,1,per-lane (setp.lt %r11<%r1 -> bar.warp.sync)
+level,mode,warp_reduce,warp_sync,branches,static_instr,latch_predicate
+ptx,off,1,0,2,,uniform (redux.sync.max.s32 -> setp.lt %r10<1 -> whole-warp bra)
+ptx,retire,0,1,1,,per-lane (setp.lt %r11<%r1 -> bar.warp.sync)
+sass,off,1,0,3,48,uniform (REDUX.MAX.S32 UR6 -> ISETP.GE R6>=1 -> @P0 BRA whole-warp)
+sass,retire,0,0,2,40,per-lane (ISETP.GE per-lane; reconv via BSSY/BSYNC)
