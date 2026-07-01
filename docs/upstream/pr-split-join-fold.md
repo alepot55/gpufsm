@@ -50,5 +50,11 @@ and the (now-dead, DCE'd) split disappear and the function returns its inputs di
 # after:   return %a, %b
 ```
 
-## Regression safety (verified)
-No existing Triton test contains a `split(join(...))` or `join(split(...))` round-trip (content grep over `test/`; pipeline tests use standalone `tt.join` only), so this fold cannot fire on any current test → no CI regression.
+## Regression safety (corrected 2026-07-01)
+⚠️ My initial grep-based claim was WRONG: `test/Hopper/WarpSpecialization/ws_data_partition.mlir`
+(`@test_split_join_reshape_trans_partition`) DOES construct `split(join(x,x))` round-trips as an
+intentional data-partition vehicle, carrying `async_task_id`. CI caught it (lit tests, nvidia-h100 +
+amd-gfx942). Fixed: both folds now BAIL when the op carries discardable attributes (an erasing fold must
+not silently drop e.g. warp-specialization task ids). Re-ran every lit test touching join/split (13 simple-
+RUN files) — all green; added a negative FileCheck case. Lesson: run the full lit suite, not just
+canonicalize.mlir.

@@ -46,7 +46,18 @@ retire, oracle-gate THEN measure; confirm firing via TRITON_KERNEL_DUMP grep .pt
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~03:40: **🔥 MAINTAINER ENGAGED on PR #10766 — ThomasRaoux (Triton core maintainer, now at
+- 2026-07-01 ~08:15: **PR #10766 CI regression FOUND + FIXED (user flagged the red checks).** The integration
+  checks weren't infra: nvidia-h100 + amd-gfx942 genuinely FAILED at lit tests — my split/join fold broke
+  `ws_data_partition.mlir` (@test_split_join_reshape_trans_partition), which uses split(join(x,x)) round-trips
+  as an intentional warp-specialization data-partition vehicle (ops carry async_task_id). My fold removed them,
+  dropping the task attr. My earlier grep-based "no test triggers it" was WRONG (I only ran canonicalize.mlir).
+  FIX (principled, layering-clean): both folds now bail when the op has discardable attrs — an erasing fold
+  must not silently drop e.g. WS task ids (async_task_id is nvidia-only so can't be named in a core fold; the
+  generic guard avoids the layering issue). VERIFIED: WS test now PASS + my canonicalize tests still fold +
+  ALL 13 simple-RUN join/split lit tests green + added a negative FileCheck case. Amended PR commit a7ebe90,
+  force-pushed to fork (CI re-running), replied to Raoux explaining the WS interaction + fix (good signal:
+  found+fixed a real interaction). LESSON: run the full lit suite, not one file. User: "prova a sistemarla,
+  non mollare, ragionaci bene" → done.- 2026-07-01 ~03:40: **🔥 MAINTAINER ENGAGED on PR #10766 — ThomasRaoux (Triton core maintainer, now at
   NVIDIA) asked "are there practical use cases?"** Exactly the maintainer-contact the hire-first strategy
   targeted. Replied (standing auth) honestly + technically: the fold completes the in-tree inverse-fold
   family (trans/trans, bitcast/bitcast, int_to_ptr/ptr_to_int); round-trips arise from composition/inlining
