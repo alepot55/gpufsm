@@ -52,7 +52,13 @@ fold-bitcast@b68445d + fold-ptr-roundtrip@0541b42 held in reserve. STANDING AUTH
 Triton PRs/issues/maintainer replies until hired. LESSON: run the FULL lit suite, not one file.
 
 ## Findings log (newest first)
-- 2026-07-01 ~09:30: **TACO version + CCS concepts.** Converted to journal format (acmsmall) after the
+- 2026-07-01 ~10:20: **TACO anonymity pass DONE + VERIFIED (avoids auto-reject).** Confirmed via TACO
+  author guidelines: papers revealing author identity are subject to IMMEDIATE REJECTION (effectively
+  double-blind). Made the paper double-blind-safe: 'A companion study'->'Prior work' (line 79); paper1 bib
+  note 'Companion diagnosis paper'->'Manuscript under review'; verified author=Anonymous + refs.bib has NO
+  name leaks (grep potenza/alepot55/alessandro = 0). Fixed 2 residual overfulls (emergencystretch). Clean:
+  15pp, 0 overfull/undefined/missing-number. NEXT: journal-depth related work; tomorrow A100. Awaiting user:
+  preprint (TechRxiv/Zenodo) y/n + candidacy timeline.- 2026-07-01 ~09:30: **TACO version + CCS concepts.** Converted to journal format (acmsmall) after the
   "pubblicazione certa" decision; added ACM CCS concepts (Compilers 500 / Parallel-programming-languages /
   SIMD) + keywords (TACO requirement). Clean: 15pp, 0 overfull/undefined/missing-number/fatal, figs render.
   PR #10766 still awaiting Raoux. Sent the user the current PDF; explained TACO timeline (~2mo first
