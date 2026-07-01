@@ -285,8 +285,7 @@ lowering \emph{below} it can. After \texttt{convert-triton-gpu-to-llvm} the per-
 exists as a scalar $j_{\mathrm{lane}}<\mathit{trip}_{\mathrm{lane}}$; the lock-step latch merely
 warp-reduces it (\texttt{nvvm.redux.sync}) to a uniform \texttt{i1} that gates \texttt{llvm.cond\_br}. Our
 pass---a real MLIR pass in \texttt{libtriton}, wired into \texttt{make\_llir}---redirects the branch to the
-\emph{per-lane} predicate (each lane then retires independently under hardware Independent Thread
-Scheduling), deletes the now-dead cross-lane reduce, and inserts a \texttt{bar.warp.sync} at the
+\emph{per-lane} predicate (each lane then retires independently under hardware Independent Thread Scheduling~\cite{its2017}), deletes the now-dead cross-lane reduce, and inserts a \texttt{bar.warp.sync} at the
 reconvergence block; a body-safety guard bails when the loop carries any cross-lane op. Compiled and run
 end-to-end, it is oracle-correct (bit-exact) and \textbf{$4.15\times$} on the lock-step kernel
 ($166.7\rightarrow40.2\,\mu$s), and \textbf{$2.5$--$7.3\times$} across uniform/geometric/pareto trip

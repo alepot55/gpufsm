@@ -30,29 +30,33 @@ Env: `.venv/bin/python` (gpufsm+CUDA RTX4070; ruff+mypy in .venv). From-source T
   = per-lane retirement (below-TritonGPU); the reduce-hoist is the in-IR slice (removes the reduce only).
 
 ## DONE (compacted, 2026-07-01)
-**PUBLICATION PATH = ACM TACO** (journal, rolling, revise-and-resubmit → certain; user wants "pubblicazione
-certa"). Paper `paper2/gpufsm_taco.tex` (acmsmall, clean 15pp, anonymous, CCS concepts + keywords, built-cure
-complete). Backups gpufsm_ppopp.tex/gpufsm2.tex. Plan docs/TACO_PLAN.md. Submit via ScholarOne when strong
-(no deadline). Biggest lever = A100 datacenter validation (user RunPod ~$5-10; scripts/a100_validate.sh
-turnkey) to pre-empt the "add architectures" revision. arXiv OUT (no endorsement); optional fast-visibility
-preprint = TechRxiv/Zenodo (no endorsement) — awaiting user decision.
+**PUBLICATION = ACM TACO** (journal, rolling, revise-and-resubmit → certain; user: "pubblicazione certa").
+Paper `paper2/gpufsm_taco.tex` (acmsmall, clean 15pp, ANONYMIZED+double-blind-safe [TACO auto-rejects
+non-anon], CCS concepts+keywords, built-cure complete, 26 refs). Backups gpufsm_ppopp.tex/gpufsm2.tex.
+Plan docs/TACO_PLAN.md. Submit via ScholarOne when strong (no deadline). Biggest lever = A100 datacenter
+validation (user RunPod ~$5-10; scripts/a100_validate.sh turnkey) to pre-empt "add architectures" revision.
+arXiv OUT (no endorsement); optional fast preprint = TechRxiv/Zenodo — AWAITING user y/n + candidacy timeline.
+Build gotchas: lmodern+\emergencystretch=2em; ACM metadata minimal (\acmJournal{TACO} only, empty numeric
+fields → 'Missing number'); font expansion needs lmodern.
 
-**THE FLAGSHIP (weakness #2 flipped): the cure is BUILT** — LowerThreadRegionRetire pass in real Triton
-(make_llir): masked lock-step latch → per-lane cond_br, cross-lane redux removed, bar.warp.sync. Oracle-
-correct + measured: synthetic 4.15x (Nsight 39x fewer inst, work ∝ Σtrip), 2.5-7.3x across distributions,
-real workloads MoE 1.25x + SpMV 1.14x (control-boundedness spectrum confirms regret=control-not-memory).
-CSVs cure_{speedup,nsight,generalize,realworkload}. Cure sources version-controlled at experiments/cure/
-triton_thread_region_pass/ + pipeline_wiring.patch (reproducible on a fresh pod).
+**FLAGSHIP (weakness #2 flipped): cure BUILT** — LowerThreadRegionRetire pass in real Triton (make_llir):
+masked lock-step latch→per-lane cond_br, cross-lane redux removed, bar.warp.sync. Oracle-correct: synthetic
+4.15x (Nsight 39x fewer inst, work ∝ Σtrip), 2.5-7.3x across distributions, MoE 1.25x + SpMV 1.14x
+(control-boundedness spectrum). CSVs cure_{speedup,nsight,generalize,realworkload}. Sources version-controlled
+experiments/cure/triton_thread_region_pass/ + pipeline_wiring.patch (reproducible on a fresh pod).
 
-**UPSTREAM (weakness #4): PR #10766** (split/join fold) LIVE on triton-lang/triton — MAINTAINER ThomasRaoux
-(Triton core/NVIDIA) engaged ("practical use cases?"); replied honestly. Then CI caught a REAL regression
-(broke ws_data_partition warp-spec test) — FIXED (folds bail on discardable attrs so they don't drop
-async_task_id), verified across all join/split lit tests + negative case, force-pushed a7ebe90, replied.
-fold-bitcast@b68445d + fold-ptr-roundtrip@0541b42 held in reserve. STANDING AUTH: act autonomously on
-Triton PRs/issues/maintainer replies until hired. LESSON: run the FULL lit suite, not one file.
+**UPSTREAM (weakness #4): PR #10766** (split/join fold) LIVE — maintainer ThomasRaoux engaged; CI caught a
+real WS-partition regression, FIXED (folds bail on discardable attrs), verified all join/split lit tests +
+negative case, force-pushed a7ebe90, replied. fold-bitcast/fold-ptr-roundtrip held. STANDING AUTH: act on
+Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suite.
 
 ## Findings log (newest first)
-- 2026-07-01 ~10:20: **TACO anonymity pass DONE + VERIFIED (avoids auto-reject).** Confirmed via TACO
+- 2026-07-01 ~10:52: **Related-work already journal-depth (26 refs); added the ONE genuine gap = ITS.**
+  The cure's per-lane retirement mechanically relies on Independent Thread Scheduling but was uncited — added
+  the accurate NVIDIA Volta whitepaper ref (its2017) + cited it at the mechanism (line 288). (Skipped Hexcute:
+  won't fabricate its author list unverified.) Compacted the log (168→127). Clean 15pp, 0 overfull/undefined.
+  The paper is now genuinely SUBMISSION-READY modulo the A100 (tomorrow) + user decisions (preprint y/n,
+  candidacy timeline). Further micro-polish = diminishing returns; next real levers are A100 + user.- 2026-07-01 ~10:20: **TACO anonymity pass DONE + VERIFIED (avoids auto-reject).** Confirmed via TACO
   author guidelines: papers revealing author identity are subject to IMMEDIATE REJECTION (effectively
   double-blind). Made the paper double-blind-safe: 'A companion study'->'Prior work' (line 79); paper1 bib
   note 'Companion diagnosis paper'->'Manuscript under review'; verified author=Anonymous + refs.bib has NO
@@ -126,43 +130,3 @@ Triton PRs/issues/maintainer replies until hired. LESSON: run the FULL lit suite
   much the masked baseline over-works (32×warp-max vs Σtrip) — biggest for uniform (warp-max≈256). Cured
   hits a ~40us floor (work now small → memory/launch bound). CSV cure_generalize_rtx4070.csv. NEXT: M4b fold
   the built+measured+profiled+generalized cure into paper2 (flagship: diagnosed→built, 2.5-7.3x).
-- 2026-07-01 ~01:50: **M4(a) — Nsight CONFIRMS the cure mechanism = genuine per-lane retirement (work ∝
-  Σtrip, not 32×max).** ncu (--kernel-name regex:_perlane_while, masked vs retire) on the f3 kernel:
-  masked 137.7us / **36,119,056 inst**; cured 26.0us / **917,504 inst** = **39.4× fewer issued instructions**,
-  5.29× ncu kernel time (4.15× wall-clock). The cured instruction count (~0.92M ≈ Σtrip/32 × body) PROVES
-  total work scales with the SUM of per-lane trips (each lane runs only its own iterations) vs the masked
-  32×warp-max — i.e. real per-lane early exit. Masked also pays a per-iteration cross-lane reduce
-  (redux.sync) × warp-max × 32 lanes, which the cure removes. ⚠️ HONEST NUANCE: ncu reports
-  threads-per-instruction = 32 in BOTH (early iterations near-full dominate the average), so the win is in
-  INSTRUCTION-COUNT/work reduction, NOT an occupancy/divergence-efficiency metric — must frame the paper
-  accordingly (no tpi<32 overclaim). Data: paper2/data/landmark/cure_nsight_rtx4070.csv. NEXT: M4(b) fold
-  the built+measured+profiled cure into paper2 (flagship); M4(c) generalize to a 2nd shape.- 2026-07-01 ~01:25: **🎉🎉 M3 DONE — THE CURE WORKS END-TO-END: oracle-correct + 4.15x measured in the
-  REAL Triton compiler.** Wired LowerThreadRegionRetire into make_llir (binding add_lower_thread_region_retire
-  in python/src/passes.cc + gated call in compiler.py after add_to_llvmir; rebuilt libtriton.so). Ran the f3
-  per-lane-while kernel (num_warps=1, BLOCK=32, pareto trips) through the real compile+run path, 5 samples
-  each, cache-busted: **baseline (masked) median 166.7us vs cured (per-lane retirement) 40.2us = 4.15x
-  speedup (range 4.09-4.25x), oracle=OK on EVERY run** (bit-exact acc[i]=trip[i]*(trip[i]-1)/2). This sits
-  between the in-IR reduce-hoist (1.55x) and the thread bound (5.64x) — exactly the residual per-lane
-  retirement recovers. **WEAKNESS #2 FULLY FLIPPED: the cure is no longer "diagnosed/unbuilt" — it is BUILT
-  in-compiler, oracle-correct, 4.15x.** Data: paper2/data/landmark/cure_speedup_rtx4070.csv; wiring patch
-  experiments/cure/triton_thread_region_pass/pipeline_wiring.patch. NEXT: M4 — rewrite paper2's contribution
-  around the BUILT+MEASURED cure (flagship upgrade), then generalize to a 2nd witness.- 2026-07-01 ~00:55: **M2 DONE+VERIFIED — safety guard (cure now correct-in-general).** Added a body-
-  safety guard to LowerThreadRegionRetire: walks the loop body subgraph (true-dest→header, excluding exit)
-  and BAILS if any cross-lane op (NVVM Shfl/Redux/SyncWarp/Barrier) is present — a retired lane must not be
-  needed by a shuffle/reduce/barrier still run by active lanes. Fast relink (.cpp-only). VERIFIED: the safe
-  p2_lockstep kernel still rewrites (latch=per-lane %91, redux gone, bar.warp.sync present); unsafe bodies
-  are now skipped. M0+M1+M2 all built+verified tonight. NEXT: M3 = wire the pass into the real make_llir
-  pipeline (expose to Python bindings / compiler.py:397) → compile+run the f3 kernel for end-to-end
-  ORACLE-CORRECTNESS + measure speedup vs masked baseline (target → 5.64x bound; reduce-hoist was 1.55x);
-  then M4 fold the BUILT cure into paper2 (flagship: "diagnosed"→"built").- 2026-07-01 ~00:50: **🎉 M1 DONE+VERIFIED — the per-lane retirement CURE works in the real Triton stack.**
-  Wrote the LLVM-dialect pass `LowerThreadRegionRetire` (flag -tritongpu-lower-thread-region-retire, gate
-  GPUFSM_THREAD_REGION=retire) in ThreadRegion.cpp + Passes.td entry + CMake NVVM/LLVM deps. Built (wide
-  rebuild OK). VERIFIED on p2_lockstep.ttgir through the full lowering: the masked lock-step latch
-  `llvm.cond_br (icmp sgt (nvvm.redux.sync max),0)` is now `llvm.cond_br %91` where %91=`llvm.icmp slt
-  jLane,tripLane` (the PER-LANE predicate) → each lane retires independently (hardware ITS); the
-  `nvvm.redux.sync` is GONE (0 occurrences — the per-iteration cross-lane reduce eliminated, the measurable
-  win); `nvvm.bar.warp.sync` inserted at the exit block (reconvergence). This turns weakness #2 from
-  "diagnosed/unbuilt" → "BUILT in-compiler". Reference: experiments/cure/lockstep_retired_reference.mlir.
-  clang-format clean. NEXT: M2 (safety guards: bail if body has other cross-lane ops / pipelined / not
-  single-exit), M3 (wire into make_llir compiler.py:397 + end-to-end oracle-correctness + measure speedup vs
-  masked baseline, target → 5.64x; reduce-hoist was 1.55x), M4 (fold into paper2 = flagship "built cure").
