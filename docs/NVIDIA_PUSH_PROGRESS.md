@@ -29,16 +29,20 @@ Env: `.venv/bin/python` (gpufsm+CUDA RTX4070; ruff+mypy in .venv). From-source T
   rejection, MoE); a dense vectorizable head-dim -> tile issues fewer -> tile wins (attention). The cure
   = per-lane retirement (below-TritonGPU); the reduce-hoist is the in-IR slice (removes the reduce only).
 
-## DONE (compacted, 2026-06-30)
-Git consolidated to main+dev. Campaign plan + env set up. F2 (2 ML witnesses + sign-flip in paper),
-F1 (RFC + research notes), F3 reduce-hoist measurement + PASS in libtriton (1.55x). Earlier 2026-06-30
-(pre-pivot): gap#7 ownership doc `docs/NVIDIA_INTERVIEW_OWNERSHIP.md`; paper2 related-work engages cuTile/
-Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cure SCOPED+BOUNDED = 5.64x
-(=1.55x in-IR reduce-hoist + ~3.6x below-TritonGPU per-lane retirement; hook-point make_llir pinned,
-`docs/rfc/below-tritongpu-lowering.md`). ⚠️ LICM dead-end: -triton-licm already hoists loop-invariant
-`tt.reduce` (Pure) → reduce-hoist is NOT a mainstream PR (paper artifact only). All committed on dev.
+## DONE (compacted, 2026-07-01)
+HIRE-FIRST upstream arm: 3 verified fold PRs off upstream c05aa65 (split/join, bitcast, ptr-roundtrip);
+**PR #10766 (split/join) LIVE** on triton-lang/triton (OPEN, awaiting review); other 2 held in reserve;
+design issue draft pending; all CI-regression-safe. Gap#7 ownership doc. paper2 related-work vs cuTile.
+Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWING = build the cure.
+STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
+- 2026-07-01 ~02:15: **M4c — the cure GENERALIZES (oracle-correct across 3 trip distributions).**
+  cure_generalize.py, masked vs retire on the per-lane-while kernel: uniform 300→41us (7.3x), geometric
+  99.3→39.8us (2.5x), pareto 142→41us (3.5x) — all oracle=OK. Not a one-kernel trick; speedup tracks how
+  much the masked baseline over-works (32×warp-max vs Σtrip) — biggest for uniform (warp-max≈256). Cured
+  hits a ~40us floor (work now small → memory/launch bound). CSV cure_generalize_rtx4070.csv. NEXT: M4b fold
+  the built+measured+profiled+generalized cure into paper2 (flagship: diagnosed→built, 2.5-7.3x).
 - 2026-07-01 ~01:50: **M4(a) — Nsight CONFIRMS the cure mechanism = genuine per-lane retirement (work ∝
   Σtrip, not 32×max).** ncu (--kernel-name regex:_perlane_while, masked vs retire) on the f3 kernel:
   masked 137.7us / **36,119,056 inst**; cured 26.0us / **917,504 inst** = **39.4× fewer issued instructions**,
@@ -88,47 +92,3 @@ Tile-IR (complementary framing); abstract→8 workloads + sign-flip; F3 full-cur
   make_llir). Built (fast relink) + VERIFIED on p2_lockstep.ttgir: the reduce carries {ttg.retire_candidate}.
   NEXT: M1 = the LLVM-dialect LowerThreadRegion pass (capture lowered IR first, then write+build+verify the
   cond_br rewrite). RunPod NOT blocking (cure is local). PR #10766 passive-monitored.
-- 2026-06-30 ~23:15: **🎉 FIRST UPSTREAM PR LIVE — triton-lang/triton#10766 (split/join inverse fold).**
-  User chose "open the strongest one first". Installed clang-format 19.1.6 → confirmed the branch is
-  format-clean (no pre-commit churn). Forked triton-lang/triton→alepot55/triton, pushed fold-split-join,
-  opened PR #10766 (OPEN, MERGEABLE, +56/3 files, author alepot55, title "[TRITON] Fold split(join(a,b)) ->
-  (a,b) and join(split(x)) -> x"). CI not yet triggered (Triton gates CI for first-time contributors until a
-  maintainer approves). This DIRECTLY closes weakness #4 (zero upstream contribution) — a real maintainer-
-  reviewable PR in NVIDIA's co-maintained codebase. fold-bitcast@b68445d + fold-ptr-roundtrip@0541b42 HELD
-  in reserve (open after a maintainer engages, per the chosen strategy). Design issue still optional/pending.
-  NEXT (loop): monitor PR #10766 each wake (gh pr view comments + checks); address maintainer feedback /
-  CI failures (fix in branch → rebuild → re-verify FileCheck → push fork); if positively engaged, follow
-  with PR #2/#3.
-- 2026-06-30 ~19:45: **CI regression-safety of the 3 PRs VERIFIED (content grep, no rebuild needed).**
-  Checked the whole `test/` tree for the exact round-trip patterns each fold matches: ZERO tests have
-  consecutive `tt.bitcast`; NO test has a `split(join)`/`join(split)` round-trip (pipeline tests carry a
-  standalone `tt.join` only, split=0); the only `ptr_to_int(int_to_ptr)` round-trip is our new positive
-  case (`ops.mlir` uses INDEPENDENT casts + no `-canonicalize`). ⇒ none of the 3 folds can fire on any
-  existing test → no CI regression on the touched ops. Added a "Regression safety (verified)" note to each
-  PR doc. This de-risks the #1 PR-bounce cause without the 3 expensive rebuilds. Still awaiting USER push.
-- 2026-06-30 ~18:50: **Log compacted 131→62. Easy fast-relink fold space EXHAUSTED (honest).** Final
-  triton-opt sweep: reshape(splat) and convert_layout(same-layout) ALREADY fold; expand_dims(expand_dims)
-  survives but is niche AND needs a .td rebuild — not worth it. No new high-value mergeable fold this wake.
-  3 clean verified PRs + the design issue is a stronger signal than a pile of trivial folds; deliberately
-  NOT manufacturing marginal PRs. Real bottleneck = USER pushing the 3 ready branches / posting the issue.
-- 2026-06-30: **ARM 1 — THREE mergeable Triton PRs built+verified, awaiting USER push.** Method each: real
-  gap reproduced with triton-opt FIRST → implemented → FileCheck green on full test/Triton/canonicalize.mlir
-  → isolated to a clean branch off upstream c05aa65 + patch/PR-doc in docs/upstream/. Reviewer @lezcano
-  (template merged #10734/#9971):
-  (1) `fold-split-join`@b5c33a4 — tt.join/tt.split mutual inverses but fold-less; added JoinOp/SplitOp folds
-      guarded on exact type equality. split(join(a,b))->(a,b), join(split(x))->x. (3 files/56 ins)
-  (2) `fold-bitcast`@b68445d — extended BitcastOp::fold to collapse nested bitcasts (round-trip->x,
-      A->B->C chain->single A->C). (2 files/34 ins)
-  (3) `fold-ptr-roundtrip`@0541b42 — hasCanonicalizer on TT_PtrToIntOp + mirror of existing
-      CanonicalizeIntToPtrOfPtrToInt, completing the inverse pair: ptr_to_int(int_to_ptr(x))->x. (3 files/39 ins)
-  ⚠️ I CANNOT push to triton-lang — USER pushes the 3 branches + opens PRs + shares links → I handle review.
-- 2026-06-30 ~15:10: **DIRECTION = HIRE-FIRST** (user "più in alto, più grande"): 4-agent research + Triton
-  recon → maximize NVIDIA signal via upstream PRs (plan docs/upstream/STRATEGY.md). Design issue draft
-  docs/upstream/triton-issue-irregular-control.md ALSO pending user post (earns a maintainer thread w/o a
-  niche-merge ask). Reframe = "characterized+partially closed a regret class the CUDA Tile-IR backend
-  exhibits" (NVIDIA team Jie Xin/Jonathan Bentz), not "add a primitive". Cure-RFC primitive de-prioritized.
-
-## Verified fold dead-ends (do NOT re-investigate)
-reduce-hoist→no LICM PR; broadcast(broadcast/splat), expand_dims(splat), reshape(reshape/same),
-trans(trans), addptr(addptr/zero), int_to_ptr(ptr_to_int), bitcast(bitcast) [now shipped], reshape(splat), convert_layout(same) ALREADY fold.
-trans(splat)->splat is a REAL gap but needs a canonicalizer + .td rebuild (niche, low ROI).
