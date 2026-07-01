@@ -30,10 +30,19 @@ Env: `.venv/bin/python` (gpufsm+CUDA RTX4070; ruff+mypy in .venv). From-source T
   = per-lane retirement (below-TritonGPU); the reduce-hoist is the in-IR slice (removes the reduce only).
 
 ## DONE (compacted, 2026-07-01)
-HIRE-FIRST upstream arm: 3 verified fold PRs off upstream c05aa65 (split/join, bitcast, ptr-roundtrip);
-**PR #10766 (split/join) LIVE** on triton-lang/triton (OPEN, awaiting review); other 2 held in reserve;
-design issue draft pending; all CI-regression-safe. Gap#7 ownership doc. paper2 related-work vs cuTile.
-Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWING = build the cure.
+UPSTREAM: 3 verified fold PRs off upstream c05aa65; **PR #10766 (split/join) LIVE** — MAINTAINER
+ThomasRaoux (Triton core/NVIDIA) asked "practical use cases?", I replied honestly (inverse-fold-family
+completion; offered to close if niche) + HELD PRs #2/#3 (don't spam a skeptic). fold-bitcast@b68445d,
+fold-ptr-roundtrip@0541b42 ready. Design issue draft pending.
+CURE (the flagship, weakness #2 flipped): built the below-TritonGPU per-lane retirement lowering as a real
+MLIR pass (LowerThreadRegionRetire) wired into make_llir — masked lock-step latch → per-lane cond_br,
+cross-lane redux removed, bar.warp.sync reconverge; M2 body-safety guard. Oracle-correct + measured:
+synthetic 4.15x (Nsight 39x fewer instructions, work ∝ Σtrip), 2.5-7.3x across uniform/geometric/pareto,
+real workloads MoE 1.25x + SpMV 1.14x (all pass-fired-confirmed via PTX bar.warp.sync). Spectrum confirms
+regret=per-step-control not memory. Folded into paper2 (8pp, consolidated results table, Threats reconciled,
+0 overfull/undefined). CSVs cure_{speedup,nsight,generalize,realworkload}_rtx4070.csv. Plan docs/cure/
+LOWERING_PLAN.md. Pattern for a cure runner: copy tile kernel+data+oracle, masked vs GPUFSM_THREAD_REGION=
+retire, oracle-gate THEN measure; confirm firing via TRITON_KERNEL_DUMP grep .ptx for bar.warp.sync.
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
@@ -118,12 +127,3 @@ STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hi
   clang-format clean. NEXT: M2 (safety guards: bail if body has other cross-lane ops / pipelined / not
   single-exit), M3 (wire into make_llir compiler.py:397 + end-to-end oracle-correctness + measure speedup vs
   masked baseline, target → 5.64x; reduce-hoist was 1.55x), M4 (fold into paper2 = flagship "built cure").
-- 2026-07-01 ~00:15: **CURE BUILD STARTED — M0 DONE+VERIFIED (big-swing pivot).** User: "voglio molto di
-  più, stai sprecando tempo, non accontentarti". Pivoted from hold-and-monitor to BUILDING THE CURE (the
-  below-TritonGPU per-lane retirement lowering, weakness #2). Code-grounded plan: docs/cure/LOWERING_PLAN.md
-  (M0-M4; new LLVM-dialect pass after add_to_llvmir/compiler.py:397, unpackLLElements per-lane scalar,
-  per-lane llvm.cond_br + createSyncWarp, structural guards). **M0**: added GPUFSM_THREAD_REGION=retire mode
-  to ThreadRegion.cpp that stamps the gating tt.reduce with ttg.retire_candidate (survives scf-to-cf into
-  make_llir). Built (fast relink) + VERIFIED on p2_lockstep.ttgir: the reduce carries {ttg.retire_candidate}.
-  NEXT: M1 = the LLVM-dialect LowerThreadRegion pass (capture lowered IR first, then write+build+verify the
-  cond_br rewrite). RunPod NOT blocking (cure is local). PR #10766 passive-monitored.

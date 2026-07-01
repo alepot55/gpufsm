@@ -368,12 +368,15 @@ tile-vs-thread lowering, hence architecture-general, but the absolute decomposit
 re-measured on an A100/H100 (larger L2 shifts the DFA crossover). We make this a turnkey step: a
 one-command harness re-runs every witness, the cure, and the selector on a new GPU, tags the output by
 device, and checks the falsifiable prediction that each regret persists in direction (paradigm, not
-architecture) while throughput rescales. \emph{Compiler-pass scope.} The detection pass runs in
-\texttt{libtriton}; the tile$\to$thread \emph{lowering} is realized below TritonGPU (the thread model)
-because the structured tile IR cannot express it---\texttt{scf.condition} takes a single \texttt{i1},
-so per-lane loop termination is inexpressible (shown by a verifier-rejected rewrite). This is a property
-of \emph{today's} tile IR and is falsifiable: adding a per-lane sub-tile loop/exit op would let the
-lowering live in-IR. \emph{Prototype scope.} A multi-word
+architecture) while throughput rescales. \emph{Compiler-pass scope.} Both the detection pass and the per-lane
+retirement \emph{lowering} are real MLIR passes in \texttt{libtriton} (the latter wired into
+\texttt{make\_llir}); the lowering realizes the cure \emph{below} TritonGPU---in the LLVM lowering, not
+out-of-band (\S\ref{sec:implemented})---because the structured \emph{tile} IR cannot express it:
+\texttt{scf.condition} takes a single \texttt{i1}, so per-lane loop termination is inexpressible in
+TritonGPU (shown by a verifier-rejected rewrite). That the cure lives below the tile IR is a property of
+\emph{today's} tile IR and is falsifiable: a per-lane sub-tile loop/exit op would let it live in-IR. The
+pass fires only on the \texttt{tl.max} lock-step latch and a body-safety guard bails when the loop carries
+a cross-lane op, so its scope is explicit. \emph{Prototype scope.} A multi-word
 generalization of the lane-packed kernel (NWORDS int64 words/lane) is oracle-validated to 256 states,
 so the prototype is not artificially limited; but the clean ${\sim}2\times$ residual is a
 \emph{register-resident-regime} ($\le 64$-state) result---past 64 states the CUDA register worklist
