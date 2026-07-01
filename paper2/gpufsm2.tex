@@ -272,6 +272,26 @@ latch---power-law CSR SpMV ($1.14\times$) and MoE top-$k$ routing ($1.25\times$)
 Both carry per-iteration memory gathers, so little of their cost is the control reduce. That the \emph{same}
 cure yields $4.15\times$ on control-bound work but $1.14$--$1.25\times$ on gather-bound SpMV/MoE is itself a
 confirmation of the thesis: the recoverable regret scales with the per-step \emph{control}, not the memory.
+Table~\ref{tab:builtcure} consolidates the built-cure measurements.
+
+\begin{table}[t]\centering\small
+\caption{The built per-lane retirement cure (a real MLIR pass wired into \texttt{make\_llir}):
+oracle-correct on every workload, speedup vs.\ the masked tile baseline. The benefit scales with
+control-boundedness. Every row traces to a versioned CSV.}
+\label{tab:builtcure}
+\begin{tabular}{@{}llr@{}}
+\toprule
+Workload & Dominant cost & Speedup \\
+\midrule
+Synthetic per-lane \texttt{while} & control & $\mathbf{4.15\times}$ \\
+\quad (uniform / geometric / pareto) & control & $2.5$--$7.3\times$ \\
+MoE top-$k$ routing (power-law) & mixed gather & $1.25\times$ \\
+SpMV CSR (power-law) & memory gather & $1.14\times$ \\
+\midrule
+\multicolumn{2}{@{}l}{Nsight: issued instructions (synthetic)} & $39\times$ fewer \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \textbf{Automatic detect-and-lower.} A selector closes the loop (Fig.~\ref{fig:selector}): it runs the
 detection pass, and when the lock-step signature is present routes the region to the thread lowering,
