@@ -51,6 +51,8 @@ negative case, force-pushed a7ebe90, replied. fold-bitcast/fold-ptr-roundtrip he
 Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suite.
 
 ## Findings log (newest first)
+
+- **2026-07-01 predictive straggler law (paper2).** Built-cure sweep over 6 controlled trip distributions (oracle-gated both modes): `masked = 50.3 + 1.08·E[warp-max]` µs (R²=0.998); cured = flat 42.8µs floor. Speedup tracks the **absolute straggler** E[warp-max] (corr 0.99), **not** the divergence ratio D (corr 0.08) — geometric D=3.96→2.6× vs uniform D=1.94→6.9×. Falsifiable, <9% pred error. Folded into `gpufsm_taco.tex` §implemented (15pp, clean, anon). CSV `cure_predictive_rtx4070.csv`, `experiments/cure/cure_predictive.py`. Upgrades channel-(ii) from qualitative→predictive.
 - 2026-07-01 ~10:52: **Related-work already journal-depth (26 refs); added the ONE genuine gap = ITS.**
   The cure's per-lane retirement mechanically relies on Independent Thread Scheduling but was uncited — added
   the accurate NVIDIA Volta whitepaper ref (its2017) + cited it at the mechanism (line 288). (Skipped Hexcute:
