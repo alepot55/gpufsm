@@ -1,0 +1,9 @@
+dist,mode,warpmax_mean,trip_mean,D,oracle,time_us
+bimodal,off,217.99,104.04,2.095,OK,271.4
+lognormal,off,86.91,18.26,4.761,OK,133.9
+single_straggler,off,256.00,9.94,25.761,OK,311.4
+spike,off,201.84,16.25,12.423,OK,260.1
+bimodal,retire,217.99,104.04,2.095,OK,48.0
+lognormal,retire,86.91,18.26,4.761,OK,49.1
+single_straggler,retire,256.00,9.94,25.761,OK,47.0
+spike,retire,201.84,16.25,12.423,OK,45.1
