@@ -46,7 +46,17 @@ retire, oracle-gate THEN measure; confirm firing via TRITON_KERNEL_DUMP grep .pt
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~08:15: **PR #10766 CI regression FOUND + FIXED (user flagged the red checks).** The integration
+- 2026-07-01 ~08:45: **PIVOT to CONFERENCE: PPoPP 2027 (user: no arXiv, submit fast, all by early Aug;
+  RunPod tomorrow).** Web-researched venues: PACT scaded, PPoPP 2027 ~3 Aug (co-loc HPCA/CGO/CC, Salt Lake,
+  Mar 2027; official CFP not yet posted — MONITOR), ASPLOS 9 Sep, CGO ~Sep. Chose PPoPP (parallel-execution
+  model = tile-SPMD vs thread-SIMT is home turf). DONE TODAY: (1) generated acmart.cls (CTAN), converted
+  paper2 IEEEtran→ACM (paper2/gpufsm_ppopp.tex); font expansion via lmodern + emergencystretch killed
+  35→0 overfull; **clean 8pp, 0 overfull/undefined/fatal, all 8 figs render, under 10pp limit**. (2) paper
+  already ANONYMOUS (double-blind-ready, zero name/repo/github leaks). (3) built-cure story fully present
+  (4.15x/39x/table/SpMV1.14x/MoE1.25x). (4) turnkey scripts/a100_validate.sh for TOMORROW (phase1 regret-law
+  cross-arch fast+reliable; phase2 build Triton+cure, validate 4.15x on A100). Plan docs/PPOPP_PLAN.md.
+  NEEDS USER: tomorrow spin up RunPod A100 2-3h (~$5-10) → run a100_validate.sh; later HotCRP submit.
+  NEXT: PPoPP-audience framing polish; monitor PR #10766 (Raoux) + official PPoPP CFP.- 2026-07-01 ~08:15: **PR #10766 CI regression FOUND + FIXED (user flagged the red checks).** The integration
   checks weren't infra: nvidia-h100 + amd-gfx942 genuinely FAILED at lit tests — my split/join fold broke
   `ws_data_partition.mlir` (@test_split_join_reshape_trans_partition), which uses split(join(x,x)) round-trips
   as an intentional warp-specialization data-partition vehicle (ops carry async_task_id). My fold removed them,
