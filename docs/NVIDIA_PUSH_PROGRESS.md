@@ -37,7 +37,18 @@ Easy-fold space exhausted. Then PIVOT (user "voglio molto di più") → BIG SWIN
 STANDING AUTH: act autonomously on Triton PRs/issues/maintainer replies until hired.
 
 ## Findings log (newest first)
-- 2026-07-01 ~02:15: **M4c — the cure GENERALIZES (oracle-correct across 3 trip distributions).**
+- 2026-07-01 ~02:20: **M4b DONE — the BUILT cure folded into paper2 (flagship upgrade).** Rewrote the
+  abstract + the "In the real compiler" contribution + \S sec:implemented: from "diagnosed / structurally-
+  impossible / reduce-hoist 1.55x / out-of-band selector" to "the in-tile-IR lowering is structurally
+  impossible SO we BUILD the cure below it (TritonGPU->LLVM pass wired into make_llir: redirect lock-step
+  latch to per-lane predicate, drop cross-lane redux, bar.warp.sync reconverge) — oracle-correct, 4.15x, 39x
+  fewer instructions, 2.5-7.3x across distributions, recovering the residual between reduce-hoist (1.55x) and
+  the 5.64x thread bound". Mechanism framed HONESTLY (work ∝ Σtrip, instruction-issue win; tpi unchanged, no
+  occupancy overclaim). Kept the structural-impossibility argument (it now MOTIVATES the below-IR build).
+  LaTeX clean: 7pp, 0 overfull, 0 undefined. Numbers CSV-traced (cure_speedup/nsight/generalize_rtx4070.csv).
+  **FLAGSHIP COMPLETE: the cure is BUILT + MEASURED + PROFILED + GENERALIZED + WRITTEN UP.** Weakness #2
+  fully flipped. NEXT: harden on a REAL automata kernel (not just synthetic per-lane-while); push paper
+  toward submission-ready; monitor PR #10766.- 2026-07-01 ~02:15: **M4c — the cure GENERALIZES (oracle-correct across 3 trip distributions).**
   cure_generalize.py, masked vs retire on the per-lane-while kernel: uniform 300→41us (7.3x), geometric
   99.3→39.8us (2.5x), pareto 142→41us (3.5x) — all oracle=OK. Not a one-kernel trick; speedup tracks how
   much the masked baseline over-works (32×warp-max vs Σtrip) — biggest for uniform (warp-max≈256). Cured

@@ -39,10 +39,13 @@ control}---not memory irregularity or dependent loads---validated by a graph poi
 control ($1.00\times$), confirmed on MoE top-$k$ routing ($2.36\times$), and with a correct
 \emph{sign-flip} negative on dense ragged attention ($0.64\times$, the tile \emph{wins})---which is why
 Triton excels at flash-attention yet collapses on automata. Finally we take the cure
-into the real compiler: a TritonGPU pass that detects the lock-step region in \texttt{libtriton}, a
-proof that the in-tile-IR lowering is \emph{structurally impossible} (naming the missing per-lane
-loop/exit primitive), an automatic selector that routes the detected region to the thread cure ($3.9\times$); and a
-real in-compiler rewrite (reduce-hoist) built into \texttt{libtriton} and oracle-correct ($1.55\times$).
+into the real compiler. A TritonGPU pass detects the lock-step region in \texttt{libtriton}, and a proof
+shows the in-tile-IR lowering is \emph{structurally impossible} (naming the missing per-lane loop/exit
+primitive)---so, since the tile IR cannot express it, we \textbf{build the cure below it}: a
+\mbox{TritonGPU$\rightarrow$LLVM} pass that redirects the lock-step latch to the per-lane predicate, drops the
+per-iteration cross-lane reduce, and reconverges with a warp barrier. It is oracle-correct and
+\textbf{$4.15\times$} ($39\times$ fewer issued instructions; $2.5$--$7.3\times$ across trip distributions),
+recovering the residual between the in-IR reduce-hoist ($1.55\times$) and the thread bound ($5.64\times$).
 Every kernel is correctness-gated against a CPU oracle; every number traces to a versioned CSV.
 \end{abstract}
 
@@ -71,9 +74,11 @@ closing the residual by construction (Sec.~\ref{sec:implemented}, Fig.~\ref{fig:
 \emph{structurally blocked} (\texttt{scf.condition} is a single \texttt{i1}; the tensors are already
 \texttt{sizePerThread=1}), naming the missing IR primitive (a per-lane sub-tile loop/exit op); and an
 \emph{automatic} detect-and-lower selector that routes the detected region to the thread cure for
-$3.9\times$ (negative-control kernels stay on the tile path); and a real in-compiler rewrite built into
-\texttt{libtriton} (reduce-hoist, $1.55\times$, oracle-correct), honestly partial---the full per-lane
-retirement still needs lowering below the tile IR.
+$3.9\times$ (negative-control kernels stay on the tile path); a real in-compiler rewrite built into
+\texttt{libtriton} (reduce-hoist, $1.55\times$, oracle-correct); \textbf{and the full per-lane retirement
+cure, built below the tile IR}---a \mbox{TritonGPU$\rightarrow$LLVM} pass wired into \texttt{make\_llir},
+oracle-correct and \textbf{$4.15\times$} ($39\times$ fewer issued instructions, $2.5$--$7.3\times$ across
+trip distributions), closing the residual by construction.
 \item A \textbf{generality law} across eight oracle-gated irregular workloads (Sec.~\ref{sec:law},
 Fig.~\ref{fig:law}), including the ML kernels tile DSLs target: regret is created by per-step
 \emph{scalar control}---not memory irregularity---validated by a pointer-chase negative control
@@ -245,8 +250,23 @@ provably-equivalent transformation that preserves per-warp termination. Built in
 verified bit-exact end-to-end and via \texttt{triton-opt} on the rewritten IR, it is \textbf{$1.55\times$}
 faster on the lock-step kernel ($155.6\rightarrow100.4\,\mu$s; detection-only mode is a perf no-op,
 confirming the gain is the rewrite). This is an honest \emph{partial}---it removes the lock-step loop's
-reduce overhead but does \emph{not} grant per-lane (sub-warp) retirement, which still needs lowering
-below the tile IR---but it shows the diagnosis is actionable in the real compiler, not only out-of-band.
+reduce overhead but does \emph{not} grant per-lane (sub-warp) retirement---which we build next, below the tile IR.
+
+\textbf{The full cure, built below the tile IR.} The tile IR cannot express per-lane retirement, but the
+lowering \emph{below} it can. After \texttt{convert-triton-gpu-to-llvm} the per-lane predicate already
+exists as a scalar $j_{\mathrm{lane}}<\mathit{trip}_{\mathrm{lane}}$; the lock-step latch merely
+warp-reduces it (\texttt{nvvm.redux.sync}) to a uniform \texttt{i1} that gates \texttt{llvm.cond\_br}. Our
+pass---a real MLIR pass in \texttt{libtriton}, wired into \texttt{make\_llir}---redirects the branch to the
+\emph{per-lane} predicate (each lane then retires independently under hardware Independent Thread
+Scheduling), deletes the now-dead cross-lane reduce, and inserts a \texttt{bar.warp.sync} at the
+reconvergence block; a body-safety guard bails when the loop carries any cross-lane op. Compiled and run
+end-to-end, it is oracle-correct (bit-exact) and \textbf{$4.15\times$} on the lock-step kernel
+($166.7\rightarrow40.2\,\mu$s), and \textbf{$2.5$--$7.3\times$} across uniform/geometric/pareto trip
+distributions. Nsight attributes the gain to work reduction: issued instructions fall \textbf{$39\times$}
+($36.1\mathrm{M}\rightarrow0.92\mathrm{M}$) because total work scales with $\sum_i \mathit{trip}_i$---each
+lane runs only its own iterations---rather than $32\times$ the busiest lane; threads-per-instruction is
+unchanged, so this is an instruction-issue win, not an occupancy one. This closes the residual the
+reduce-hoist left open: the cure is \emph{built}, oracle-correct, and measured, not merely diagnosed.
 
 \textbf{Automatic detect-and-lower.} A selector closes the loop (Fig.~\ref{fig:selector}): it runs the
 detection pass, and when the lock-step signature is present routes the region to the thread lowering,
