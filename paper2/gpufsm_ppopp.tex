@@ -4,7 +4,10 @@
 \acmConference[PPoPP '27]{ACM SIGPLAN Symposium on Principles and Practice of Parallel Programming}{March 2027}{Salt Lake City, UT, USA}
 \usepackage{lmodern}
 \usepackage{amssymb}
-\microtypesetup{expansion=false}
+\microtypesetup{expansion=true,protrusion=true}
+\emergencystretch=3em
+\tolerance=1000
+\hbadness=2000
 
 \begin{document}
 \title{From Diagnosis to Cure: Decomposing the Tile-SPMD Abstraction Regret on Irregular Automata}
@@ -158,6 +161,7 @@ oracle-gated). Each stage removes one component; $28 \rightarrow 739$ is $3.7\ti
 1.9 = 26\times$.}
 \label{tab:decomp}
 \setlength{\tabcolsep}{4pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lrl@{}}
 \toprule
 Kernel & Gbps & Component removed \\
@@ -167,7 +171,7 @@ Triton worklist (\texttt{nw=4}) & 28 & --- \\
 \quad $+$ lane-packing & 383 & warp redundancy ($3.7\times$) \\
 CUDA worklist (thread-SIMT) & 739 & irreducible latency ($1.9\times$) \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 Table~\ref{tab:decomp} summarizes the multiplicative decomposition: removing the launch artifact
