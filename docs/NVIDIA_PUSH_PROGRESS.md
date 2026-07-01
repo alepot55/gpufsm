@@ -52,6 +52,8 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
 
 ## Findings log (newest first)
 
+- **2026-07-01 SASS-level confirmation.** cuobjdump -sass on both cubins (sm_89): masked latch = `REDUX.MAX.S32 UR6` (hardware warp-collective into a UNIFORM reg) → `@P0 BRA` whole-warp lock-step; cured = no REDUX, per-lane `ISETP`, reconv via `BSSY/BSYNC`. **SASS REDUX 1→0, static instrs 48→40**. Per-lane retirement is in the MACHINE CODE, not just IR — deepest mechanism layer (the ptxas/SASS layer an NVIDIA compiler eng owns). Paper 16pp clean/anon; CSV `cure_ptx_rtx4070.csv` extended ptx+sass.
+
 - **2026-07-01 PTX-level confirmation of the cure.** Dumped emitted PTX both modes on the lock-step kernel: masked = `redux.sync.max.s32`→`setp.lt %r10<1`→whole-warp `bra` (uniform predicate); cured = `setp.lt %r11<%r1` (per-lane j<trip)→`bar.warp.sync`. Exact counts **redux.sync 1→0, bar.warp.sync 0→1, branches 2→1** → paper mechanism claim upgraded prose→verified-IR. `cure_ptx_rtx4070.csv`; dump `tmp/ptx_dump.py`.
 
 - **2026-07-01 out-of-sample validation of the straggler law.** Froze the train fit (`masked=50.3+1.08·E[warp-max]`) and predicted 4 HELD-OUT distributions (bimodal, log-normal, spike, adversarial single-straggler; different seed): masked cost predicted within **5% mean / 7.5% max** → the law generalizes, not an overfit. Adversarial single-straggler warp (1/32 lanes trip=256, rest trip=2, D=25.8) → **6.6×** (one lane taxing 31). One honest sentence into `gpufsm_taco.tex` §implemented (15pp, clean, anon). `cure_heldout_rtx4070.csv`, `experiments/cure/cure_heldout.py`.
