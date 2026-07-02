@@ -391,13 +391,19 @@ negative-control prediction for uniform SpMV that was also wrong ($1.9\times$, n
 All three corrections sharpened, rather than weakened, the central claim.
 
 \section{Threats to Validity}
-\emph{Single GPU.} Results are on one RTX 4070; the \emph{mechanism} (intra-warp latency hiding, the
-issue-activity differential, the DRAM convergence) is a property of the SIMT execution model and the
-tile-vs-thread lowering, hence architecture-general, but the absolute decomposition factors should be
-re-measured on an A100/H100 (larger L2 shifts the DFA crossover). We make this a turnkey step: a
-one-command harness re-runs every witness, the cure, and the selector on a new GPU, tags the output by
-device, and checks the falsifiable prediction that each regret persists in direction (paradigm, not
-architecture) while throughput rescales. \emph{Compiler-pass scope.} Both the detection pass and the per-lane
+\emph{Single GPU.} The primary results are on one RTX 4070; the \emph{mechanism} (intra-warp latency
+hiding, the issue-activity differential, the DRAM convergence) is a property of the SIMT execution model
+and the tile-vs-thread lowering, hence architecture-general, while the absolute decomposition factors
+rescale with the device. We test this with a one-command harness that re-runs every witness on a new GPU,
+tags the output by device, and checks the falsifiable prediction that each regret \emph{persists in
+direction} (paradigm, not architecture) while throughput rescales. On a datacenter \textbf{A100-SXM4-40GB}
+(sm\_80, $6.7\times$ the L2 of the 4070), all five portable witnesses confirm it with genuinely
+re-measured, architecture-different magnitudes: hashprobe $1.40\!\to\!1.48$, power-law SpMV
+$2.17\!\to\!3.20$, uniform SpMV $1.95\!\to\!1.78$, rejection sampling $4.0$, and---decisively---the
+memory-only negative control (the pointer-chase) stays at the paradigm-neutral $\approx\!1.0$
+($0.99\!\to\!0.99$), exactly as predicted: irregular memory alone carries no regret on either
+architecture. So the regret follows the execution paradigm, not the arch, on two GPUs a generation and
+$6.7\times$ of L2 apart. \emph{Compiler-pass scope.} Both the detection pass and the per-lane
 retirement \emph{lowering} are real MLIR passes in \texttt{libtriton} (the latter wired into
 \texttt{make\_llir}); the lowering realizes the cure \emph{below} TritonGPU---in the LLVM lowering, not
 out-of-band (\S\ref{sec:implemented})---because the structured \emph{tile} IR cannot express it:
