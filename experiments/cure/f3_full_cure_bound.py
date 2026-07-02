@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from experiments.cure._cuda_arch import cuda_arch_flag
 
 N = 1 << 20
 
@@ -56,7 +57,7 @@ extern "C" float launch(const int* trip, int* out, int n) {
             "-shared",
             "-Xcompiler",
             "-fPIC",
-            "-arch=sm_89",
+            cuda_arch_flag(),
             "-o",
             str(so),
             str(cu),

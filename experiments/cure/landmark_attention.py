@@ -32,6 +32,7 @@ import numpy as np
 import torch
 import triton
 import triton.language as tl
+from experiments.cure._cuda_arch import cuda_arch_flag
 
 N = 1 << 16  # queries
 D = 8  # head dim (small but real; isolates the variable-context lock-step)
@@ -149,7 +150,7 @@ extern "C" float at_launch(const float* Q, const float* K, const float* V,
     cu.write_text(src)
     nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
     subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
+        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
         check=True,
         capture_output=True,
         text=True,

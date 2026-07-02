@@ -29,6 +29,7 @@ import numpy as np
 import torch
 import triton
 import triton.language as tl
+from experiments.cure._cuda_arch import cuda_arch_flag
 
 EMPTY = -1
 HASHMUL = 2654435761  # Knuth multiplicative
@@ -133,7 +134,7 @@ extern "C" float thr_launch(const int* table, int Tsize, const long long* querie
     cu.write_text(src)
     nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
     subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
+        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
         check=True,
         capture_output=True,
         text=True,

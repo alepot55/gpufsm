@@ -33,6 +33,7 @@ import numpy as np
 import torch
 import triton
 import triton.language as tl
+from experiments.cure._cuda_arch import cuda_arch_flag
 
 A, B, SEED = 1640531527, 1013904223, 12345  # odd mixing constants < 2^31 (int32-literal safe)
 M24 = 0xFFFFFF
@@ -127,7 +128,7 @@ extern "C" float moe_launch(const int* pool, const long long* W, const int* star
     cu.write_text(src)
     nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
     subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
+        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
         check=True,
         capture_output=True,
         text=True,

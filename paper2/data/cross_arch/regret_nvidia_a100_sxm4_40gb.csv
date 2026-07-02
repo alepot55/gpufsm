@@ -1,0 +1,6 @@
+witness,baseline_regret_rtx4070,this_regret,persists,gpu,selector
+hashprobe,1.4,1.477,1,NVIDIA A100-SXM4-40GB,ran
+pointer_chase,0.995,0.991,1,NVIDIA A100-SXM4-40GB,ran
+rejection,4.0,4.0,1,NVIDIA A100-SXM4-40GB,ran
+spmv_powerlaw,2.173,3.198,1,NVIDIA A100-SXM4-40GB,ran
+spmv_uniform,1.945,1.782,1,NVIDIA A100-SXM4-40GB,ran

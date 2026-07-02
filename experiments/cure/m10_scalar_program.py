@@ -31,6 +31,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from experiments.cure._cuda_arch import cuda_arch_flag
 from experiments.cure.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
@@ -134,7 +135,7 @@ extern "C" float sp_launch(
         "nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() is False else "/usr/local/cuda/bin/nvcc"
     )
     subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", "-arch=sm_89", "-o", str(so), str(cu)],
+        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
         check=True,
         capture_output=True,
         text=True,
