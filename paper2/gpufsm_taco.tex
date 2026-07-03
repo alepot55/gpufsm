@@ -410,7 +410,7 @@ $2.17\!\to\!3.20$, uniform SpMV $1.95\!\to\!1.78$, rejection sampling $4.0$, and
 memory-only negative control (the pointer-chase) stays at the paradigm-neutral $\approx\!1.0$
 ($0.99\!\to\!0.99$), exactly as predicted: irregular memory alone carries no regret on either
 architecture. So the regret follows the execution paradigm, not the arch, on two GPUs a generation and
-$6.7\times$ of L2 apart. \emph{Compiler-pass scope.} Both the detection pass and the per-lane
+$6.7\times$ of L2 apart. Crucially, the \emph{flagship decomposition itself} reproduces on the A100: the staged multiplicative ladder (Table~\ref{tab:decomp}) closes to the \emph{same} $26\times$ total with matching stage factors---the \texttt{num\_warps} component is $3.7\times$ on \emph{both} architectures, lane-packing $2.3\times$ (A100) vs.\ $2.6\times$ (4070), and the residual-to-thread stage $3.1\times$ vs.\ $2.8\times$---so the anatomy is architecture-stable, not a 4070 artifact. (The batch-4096 anchor rescales $10.1\times\!\to\!5.6\times$ because that register-resident regime is clock-sensitive and the A100's lower clock compresses both sides; the direction persists.) \emph{Compiler-pass scope.} Both the detection pass and the per-lane
 retirement \emph{lowering} are real MLIR passes in \texttt{libtriton} (the latter wired into
 \texttt{make\_llir}); the lowering realizes the cure \emph{below} TritonGPU---in the LLVM lowering, not
 out-of-band (\S\ref{sec:implemented})---because the structured \emph{tile} IR cannot express it:
