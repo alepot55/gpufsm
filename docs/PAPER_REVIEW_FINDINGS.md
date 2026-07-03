@@ -25,10 +25,14 @@ above-bar substance; the issues below were the reject-risk. Status per item.
   content (monotonicity condition) phrased neutrally.
 
 ## Remaining (for the revise cycle — do before/at submission)
-- **M5 [OPEN, highest remaining lever]** Every FLAGSHIP quantitative result is RTX-4070-only;
-  the A100 run covers only the 5 law-witnesses, NOT the decomposition, residual mechanism,
-  DFA crossover, or the built cure. Run the decomposition + residual profile + reduce-hoist/
-  per-lane passes on the A100 (needs the from-source cure build staged on A100 — infra).
+- **M5 [DONE — decomposition]** The flagship staged decomposition now runs on the A100
+  (Modal, gpufsm CUDA ext built for sm_80). It reproduces to the SAME 26x total with matching
+  stage factors: num_warps 3.7x on BOTH; lane-packing 2.3x(A100)/2.6x(4070); residual-to-thread
+  3.1x/2.8x. The batch-4096 anchor rescales 10.1->5.6x (clock-sensitive register-resident regime;
+  direction persists). Folded into Threats. Data: paper2/data/cross_arch/{m0_anchor,m2f_numwarps,
+  m2_lane_packed,m2e_worklist_packed}_*a100*.csv. NOTE: 2 earlier Modal runs produced FAKE echoes
+  (build failed: missing g++, then clang) — caught by a hardened capture guard, deleted, not
+  committed. STILL OPEN under M5: the built CURE (4.15x pass) on A100 (needs from-source cure build).
 - **M3 [PARTIAL]** In-compiler cure is 4.15x synthetic but 1.14–1.25x on real SpMV/MoE. Lead
   the compiler section with real-workload numbers; present 4.15x as a mechanism-isolating bound.
 - **M6 [OPEN, may be intrinsic]** Clean result lives in ≤64-state register-resident toy regime;
