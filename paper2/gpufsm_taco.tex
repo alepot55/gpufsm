@@ -110,7 +110,8 @@ symbol) is memory-bound. CUDA and NVIDIA Warp~\cite{warp2022} are thread-SIMT (o
 Triton~\cite{triton2019} is tile/SPMD (a program operates on tiles). Correctness gates speed: every
 kernel/config is validated bit-for-bit against a CPU oracle before any throughput is reported. We
 report medians over warmup${+}9$ reps at a GPU-saturating batch~\cite{hoefler2015} (timings on GPUs
-are non-Gaussian, so we avoid mean$\pm$std and best-of-$N$), and sweep batch because the lane-packing
+are non-Gaussian, so we avoid mean$\pm$std and best-of-$N$); the decomposition ratios are medians over 3
+seeds and we give dispersion on the load-bearing anchor (IQR, above), and sweep batch because the lane-packing
 benefit is occupancy-gated. Every mechanism claim is backed by Nsight Compute, not just wall-clock:
 the issue-stall composition (the \texttt{long\_scoreboard} reason isolates dependent-load waits),
 achieved occupancy, issue activity, warp- and thread-instruction counts, and DRAM/L2 traffic. We report negative and partial results and correct
@@ -122,7 +123,7 @@ in-\texttt{libtriton} compiler pass (\S\ref{sec:compiler}) uses a from-source Tr
 
 \subsection{The anchor}
 A work-efficient register-resident worklist ($\le 64$ states, batch 4096, 12 configs): Triton
-$22$\,Gbps vs.\ CUDA $227$\,Gbps $=$ \textbf{$10.1\times$ median} ($9.4$--$12.3\times$).
+$22$\,Gbps vs.\ CUDA $227$\,Gbps $=$ \textbf{$10.1\times$ median} (IQR $[9.9, 10.5]$, range $9.4$--$12.2\times$, $n{=}12$: 3 seeds $\times$ 4 state counts).
 
 \subsection{Component A: launch-configuration artifact}\label{sec:artifact}
 The Triton worklist defaults to \texttt{num\_warps=4}: four warps per program redundantly process the
