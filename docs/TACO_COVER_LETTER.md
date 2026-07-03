@@ -13,10 +13,12 @@ of the residual as abstraction-denied intra-warp latency hiding (fewer warp-inst
 occupancy, below both roofline ceilings, yet a 15.3x dependent-load stall); (3) a **built in-compiler cure**
 — a TritonGPU→LLVM pass, wired into libtriton's `make_llir`, that lowers a detected lock-step region to
 per-lane retirement (each lane exits under hardware Independent Thread Scheduling), removing the
-per-iteration cross-lane reduce. It is oracle-correct and **4.15x** (39x fewer issued instructions;
-2.5–7.3x across trip distributions; and it fires oracle-correct on real SpMV/MoE workloads); and (4) a
-generality law over eight oracle-gated irregular workloads showing the regret is created by per-step
-scalar control, with a correct sign-flip negative on dense ragged attention.
+per-iteration cross-lane reduce. It is oracle-correct and guarded by a static soundness verifier; it gives **4.15x** on a
+mechanism-isolating synthetic kernel and a modest, honest **1.14–1.25x** on real gather-bound SpMV/MoE;
+(4) a generality law over eight oracle-gated irregular workloads showing the regret is created by per-step
+scalar control, with a correct sign-flip negative on dense ragged attention; and (5) a **cross-architecture
+validation**: the full staged decomposition reproduces on an A100 (same 26x total; the num_warps component
+3.7x on both the RTX 4070 and the A100), so the anatomy is a property of the execution paradigm, not one GPU.
 
 **Fit for TACO.** The core is code generation and optimization: a real compiler pass, its structural
 necessity (an in-tile-IR rewrite is provably blocked; we name the missing IR primitive), and a measured,
