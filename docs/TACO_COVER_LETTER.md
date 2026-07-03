@@ -47,3 +47,13 @@ avoid current OpenAI/NVIDIA Triton maintainers we are engaging upstream, to prev
 Thank you for your consideration.
 
 [Author name, affiliation, contact — filled at submission; the manuscript PDF is anonymized per TACO policy.]
+
+## Conflicts of interest (TACO requires this in the cover-letter box — FILL BEFORE SUBMITTING)
+List, one per line:
+- **TACO Associate Editors** any author has a conflict with: [fill — e.g. former advisor/co-author who is a TACO AE; if none, write "None to our knowledge."]
+- **Collaborators (past 5 years)** and their affiliations, for every author: [fill — names + institutions]
+- **Universities / industry sites** each author graduated from or is affiliated with, and the **advisor's name**: [fill]
+
+If you are an independent researcher with no recent co-authors, a truthful minimal entry is acceptable, e.g.:
+"None to our knowledge. Author is an independent researcher; no co-authors or institutional advisor in the past 5 years."
+
