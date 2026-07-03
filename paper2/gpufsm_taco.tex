@@ -18,10 +18,12 @@ Tile-based GPU DSLs (Triton) trail hand-written CUDA by ${\sim}10\times$ on irre
 finite-automata workloads. Prior work attributed this ``abstraction regret'' to the execution
 \emph{paradigm} (tile/SPMD vs.\ thread-SIMT) rather than abstraction height. We turn that diagnosis
 into an anatomy and a cure: we decompose the regret into three independently measured components and
-identify, to the instruction level, the single missing primitive. On a work-efficient NFA worklist
-the $10\times$ anchor decomposes as \textbf{(A)} a launch-configuration artifact (${\sim}3.4\times$,
-default \texttt{num\_warps}), \textbf{(B)} a lane-packing-recoverable component (warp-redundant scalar
-execution), and \textbf{(C)} an irreducible ${\sim}2\times$ residual. Component C is \emph{not}
+identify, to the instruction level, the single missing primitive. On a work-efficient NFA worklist the regret is
+batch-dependent---$10.1\times$ at batch 4096, rising to $26\times$ at a GPU-saturating batch as the
+occupancy-gated component below fills the machine---and decomposes, staged, into \textbf{(A)} a
+launch-configuration artifact (default \texttt{num\_warps}; $2.8$--$3.7\times$ across batch),
+\textbf{(B)} a lane-packing-recoverable component (occupancy-gated warp-redundant scalar execution),
+and \textbf{(C)} an irreducible ${\sim}2\times$ residual. Component C is \emph{not}
 instruction count, occupancy, or memory bandwidth: at matched occupancy and \emph{fewer}
 warp-instructions than CUDA, and sitting below both the issue and bandwidth roofline ceilings, a
 per-lane Triton worklist still spends $15.3\times$ more cycles in the dependent-load stall and issues
@@ -31,14 +33,15 @@ overlap, whereas a lock-step tile serializes the dependent next-state load. We s
 \emph{regime-dependent}: for the memory-bound DFA it closes (lane-packed Triton matches CUDA,
 $1.05\times$, once the table spills to DRAM). We specify the missing IR primitive---a
 \texttt{scalar\_program} region that lowers each lane to an independent instruction stream---and
-\emph{implement its lowering}: the same idiomatic per-lane source, lowered to the thread model, runs
-$4.2\times$ faster than the tile lowering and matches or exceeds hand-written CUDA, closing the
-residual by construction. The phenomenon \emph{generalizes}, including to the ML kernels tile DSLs target: across eight
-oracle-gated irregular workloads the tile-vs-thread regret is created by per-step \emph{scalar
-control}---not memory irregularity or dependent loads---validated by a graph pointer-chase negative
-control ($1.00\times$), confirmed on MoE top-$k$ routing ($2.36\times$), and with a correct
-\emph{sign-flip} negative on dense ragged attention ($0.64\times$, the tile \emph{wins})---which is why
-Triton excels at flash-attention yet collapses on automata. Finally we take the cure
+\emph{implement its lowering}: the same idiomatic per-lane source, lowered out-of-band to the thread
+model (an existence proof, via \texttt{nvcc}), runs $4.2\times$ faster than the tile lowering, closing
+the residual by construction; the \emph{in-compiler} passes below are the load-bearing contribution. The phenomenon \emph{generalizes}: across eight oracle-gated irregular workloads the tile-vs-thread
+regret is created by per-step \emph{scalar control}---not memory irregularity or dependent loads---
+validated by a graph pointer-chase negative control ($1.00\times$). On ML-shaped witnesses under the
+framework's \emph{one-element-per-lane} mapping the same law holds (MoE top-$k$ routing $2.36\times$;
+a \emph{sign-flip} negative on dense ragged attention, $0.64\times$, where the tile \emph{wins});
+whether it survives the warp-cooperative mappings production ML kernels use is future work---
+consistent with why Triton excels at flash-attention yet collapses on automata. Finally we take the cure
 into the real compiler. A TritonGPU pass detects the lock-step region in \texttt{libtriton}, and a proof
 shows the in-tile-IR lowering is \emph{structurally impossible} (naming the missing per-lane loop/exit
 primitive)---so, since the tile IR cannot express it, we \textbf{build the cure below it}: a
@@ -155,8 +158,10 @@ largely hidden by occupancy.
 A per-lane Triton worklist (each lane its own \texttt{ffs} + per-lane CSR gather, no cross-lane reduce,
 no active-set union) beats the union variant $1.27\times$ but is still $0.51\times$ of CUDA
 ($\approx 2\times$ slower). Nsight is decisive (Fig.~\ref{fig:mech}): it has \emph{fewer}
-warp-instructions than CUDA ($4.66$M vs.\ $5.07$M) and the same occupancy ($22.5\%$), yet is $3.3\times$
-slower because issue activity is $9.9\%$. Raising occupancy does not help---a \texttt{BLOCK} sweep
+warp-instructions than CUDA ($4.66$M vs.\ $5.07$M) and the same occupancy ($22.5\%$), yet in this
+Nsight-profiled configuration ($32$ states, batch $16384$) is $3.3\times$ slower because issue activity
+is $9.9\%$ (the $0.51\times$/${\approx}2\times$ above is the median head-to-head across the $\le 64$-state
+sweep; the residual we attribute is this ${\sim}2\times$). Raising occupancy does not help---a \texttt{BLOCK} sweep
 $\{32,64,128,256\}$ only \emph{worsens} it ($0.49\times \rightarrow 0.31\times$): bigger lock-step
 tiles add divergence. \textbf{Direct measurement} confirms the mechanism: at matched occupancy the
 per-lane Triton kernel spends $15.3\times$ more cycles in the \texttt{long\_scoreboard} stall (waiting
@@ -286,7 +291,7 @@ exists as a scalar $j_{\mathrm{lane}}<\mathit{trip}_{\mathrm{lane}}$; the lock-s
 warp-reduces it (\texttt{nvvm.redux.sync}) to a uniform \texttt{i1} that gates \texttt{llvm.cond\_br}. Our
 pass---a real MLIR pass in \texttt{libtriton}, wired into \texttt{make\_llir}---redirects the branch to the
 \emph{per-lane} predicate (each lane then retires independently under hardware Independent Thread Scheduling~\cite{its2017}), deletes the now-dead cross-lane reduce, and inserts a \texttt{bar.warp.sync} at the
-reconvergence block; a body-safety guard bails when the loop carries any cross-lane op. The emitted PTX confirms the rewrite at the instruction level: the masked baseline warp-reduces the active mask (\texttt{redux.sync.max.s32}) and branches the whole warp on the resulting \emph{uniform} predicate, whereas the cured code branches on the \emph{per-lane} test (\texttt{setp.lt.s32} of this lane's counter against its own trip) and carries a \texttt{bar.warp.sync} at reconvergence---\texttt{redux.sync} count $1\!\rightarrow\!0$, \texttt{bar.warp.sync} $0\!\rightarrow\!1$. The rewrite survives \texttt{ptxas} to SASS: the hardware warp-collective reduction \texttt{REDUX.MAX.S32} into a \emph{uniform} register---on which the masked warp branches lock-step---is eliminated (SASS \texttt{REDUX} $1\!\rightarrow\!0$, static instructions $48\!\rightarrow\!40$), the cured latch branching on the per-lane \texttt{ISETP} with reconvergence realized by the standard \texttt{BSSY}/\texttt{BSYNC} convergence barriers. So the per-lane retirement is present in the machine code, not merely the IR. We have since proposed this transformation upstream to the Triton compiler as a verified, opt-in NVIDIA-backend pass---the rewrite guarded by a static verifier that proves observational equivalence (body safety, single exit, live-out freezing through the lowering's struct projections, and predicate \emph{monotonicity}, a condition that live-out freezing alone does not imply)---together with an RFC and reproduction artifacts (links redacted for review). Compiled and run
+reconvergence block; a body-safety guard bails when the loop carries any cross-lane op. The emitted PTX confirms the rewrite at the instruction level: the masked baseline warp-reduces the active mask (\texttt{redux.sync.max.s32}) and branches the whole warp on the resulting \emph{uniform} predicate, whereas the cured code branches on the \emph{per-lane} test (\texttt{setp.lt.s32} of this lane's counter against its own trip) and carries a \texttt{bar.warp.sync} at reconvergence---\texttt{redux.sync} count $1\!\rightarrow\!0$, \texttt{bar.warp.sync} $0\!\rightarrow\!1$. The rewrite survives \texttt{ptxas} to SASS: the hardware warp-collective reduction \texttt{REDUX.MAX.S32} into a \emph{uniform} register---on which the masked warp branches lock-step---is eliminated (SASS \texttt{REDUX} $1\!\rightarrow\!0$, static instructions $48\!\rightarrow\!40$), the cured latch branching on the per-lane \texttt{ISETP} with reconvergence realized by the standard \texttt{BSSY}/\texttt{BSYNC} convergence barriers. So the per-lane retirement is present in the machine code, not merely the IR. The rewrite is guarded by a static verifier that proves observational equivalence before firing---body safety (no cross-lane op in the loop body), single exit, live-out freezing through the lowering's struct projections, and predicate \emph{monotonicity}, a condition that live-out freezing alone does not imply---so it is applied only where provably sound. Compiled and run
 end-to-end, it is oracle-correct (bit-exact) and \textbf{$4.15\times$} on the lock-step kernel
 ($166.7\rightarrow40.2\,\mu$s), and \textbf{$2.5$--$7.3\times$} across uniform/geometric/pareto trip
 distributions. Nsight attributes the gain to work reduction: issued instructions fall \textbf{$39\times$}
