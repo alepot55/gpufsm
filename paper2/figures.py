@@ -318,14 +318,24 @@ def fig_selector() -> None:
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
-    ax.set_xlim(0.0, 12.5)
-    ax.set_ylim(0.55, 5.5)
+    ax.set_xlim(0.2, 12.55)
+    ax.set_ylim(0.45, 5.45)
     ax.axis("off")
 
+    PAD = 0.10  # boxstyle pad in data units (mutation_scale=1 so pad is NOT rescaled)
+
     def box(x, y, w, h, text, fc):
+        # visual edges = (x - PAD, y - PAD) .. (x + w + PAD, y + h + PAD)
         ax.add_patch(
             FancyBboxPatch(
-                (x, y), w, h, boxstyle="round,pad=0.06", fc=fc, ec="#333", lw=1.1, mutation_scale=6
+                (x, y),
+                w,
+                h,
+                boxstyle="round,pad=0.10,rounding_size=0.18",
+                fc=fc,
+                ec="#333",
+                lw=1.1,
+                mutation_scale=1,
             )
         )
         ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=7.5)
@@ -345,34 +355,34 @@ def fig_selector() -> None:
         arrow(xsplit, ytarget, xbox, ytarget, color)
 
     MID = 3.0  # the single horizontal centerline everything aligns to
-    box(0.35, MID - 0.65, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
+    box(0.45, MID - 0.65, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")  # visual right edge 2.25
     box(
-        2.65,
+        2.95,  # visual left edge 2.85 -> clean 0.6 gap after the per-lane box
         MID - 1.0,
         2.75,
         2.0,
         "tritongpu-thread-region\n(detect lock-step:\nscf.while+#blocked\n+tt.reduce)",
         "#fdebd0",
-    )
+    )  # visual right edge 5.80
     cure_txt = (
         f"thread lowering (cure)\n{tile:.0f}→{thread:.0f} Gbps = {speedup:.1f}×\n"
         f"≥ hand-CUDA ({cuda:.0f})"
     )
-    box(7.55, 3.55, 4.55, 1.5, cure_txt, "#abebc6")  # center y = 4.30 (MID + 1.3)
-    box(7.55, 0.95, 4.55, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # center y = 1.70 (MID - 1.3)
+    box(7.85, 3.60, 4.45, 1.5, cure_txt, "#abebc6")  # visual left 7.75, center y = 4.35
+    box(7.85, 0.90, 4.45, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # visual left 7.75, center 1.65
 
-    arrow(2.11, MID, 2.59, MID)  # per-lane -> detect
+    arrow(2.25, MID, 2.85, MID)  # per-lane -> detect (edge to edge)
     # shared stem out of the detector, then two mirrored right-angle branches
-    ax.plot([5.46, 6.5], [MID, MID], color="#333", lw=1.4, solid_capstyle="round", zorder=1)
-    elbow(6.5, MID, 4.30, 7.49, "#1e8449")  # detected -> cure (up)
-    elbow(6.5, MID, 1.70, 7.49, "#7f8c8d")  # no signature -> tile (down)
+    ax.plot([5.80, 6.75], [MID, MID], color="#333", lw=1.4, solid_capstyle="round", zorder=1)
+    elbow(6.75, MID, 4.35, 7.75, "#1e8449")  # detected -> cure (up)
+    elbow(6.75, MID, 1.65, 7.75, "#7f8c8d")  # no signature -> tile (down)
     # labels live in the empty pockets above/below the elbow corners, clear of every line/box
     ax.text(
-        6.3, 4.74, "detected\n(NFA worklist)", ha="center", va="center", fontsize=7, color="#1e8449"
+        6.6, 4.86, "detected\n(NFA worklist)", ha="center", va="center", fontsize=7, color="#1e8449"
     )
     ax.text(
-        6.3,
-        1.26,
+        6.6,
+        1.14,
         "no signature\n(pointer-chase)",
         ha="center",
         va="center",
