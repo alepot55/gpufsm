@@ -152,3 +152,10 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
   much the masked baseline over-works (32×warp-max vs Σtrip) — biggest for uniform (warp-max≈256). Cured
   hits a ~40us floor (work now small → memory/launch bound). CSV cure_generalize_rtx4070.csv. NEXT: M4b fold
   the built+measured+profiled+generalized cure into paper2 (flagship: diagnosed→built, 2.5-7.3x).
+
+## 2026-07-05 — SUBMITTED to ACM TACO ✅
+- **Manuscript ID: TACO-2026-324**, submitted 05-Jul-2026 via ScholarOne (mc.manuscriptcentral.com/taco).
+- Files: taco-submission-anonymous.pdf (16pp, anonymous, acmsmall review) + taco-title-page.pdf.
+- Final polish before submit: all 64 em dashes removed (context-appropriate punctuation); all 8 figures perfected one by one (fig_selector rebuilt as right-angle flowchart after a matplotlib mutation_scale pad bug made boxes overlap).
+- Cover letter: sole-author, conflicts = none + PoliMi affiliation; funding = none; APC $0 expected via ACM Open/CRUI-CARE (PoliMi).
+- Next: await first editorial decision (typ. 2-4 months). Track in Author Dashboard.
