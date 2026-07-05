@@ -321,8 +321,8 @@ def fig_selector() -> None:
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
-    ax.set_xlim(0, 12)
-    ax.set_ylim(0, 6)
+    ax.set_xlim(0.1, 12.4)
+    ax.set_ylim(0.55, 5.5)
     ax.axis("off")
 
     def box(x, y, w, h, text, fc):
@@ -340,9 +340,9 @@ def fig_selector() -> None:
             )
         )
 
-    box(0.1, 2.35, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
+    box(0.4, 2.35, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
     box(
-        2.2,
+        2.6,
         2.0,
         2.7,
         2.0,
@@ -353,21 +353,20 @@ def fig_selector() -> None:
         f"thread lowering (cure)\n{tile:.0f}→{thread:.0f} Gbps = {speedup:.1f}×\n"
         f"≥ hand-CUDA ({cuda:.0f})"
     )
-    box(7.3, 3.4, 4.4, 1.5, cure_txt, "#abebc6")
-    box(7.3, 0.6, 4.4, 1.5, "tile path\n(unchanged)", "#d6dbdf")
+    box(7.7, 3.55, 4.4, 1.5, cure_txt, "#abebc6")  # center y=4.3, symmetric with tile box
+    box(7.7, 0.95, 4.4, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # center y=1.7
 
-    arrow(1.8, 3.0, 2.2, 3.0)  # per-lane -> detect
-    arrow(4.9, 3.3, 7.3, 4.1, "#1e8449")  # detected -> cure (up)
-    arrow(4.9, 2.7, 7.3, 1.5, "#7f8c8d")  # no signature -> tile (down)
-    ax.text(6.0, 4.25, "detected\n(NFA worklist)", ha="center", fontsize=7, color="#1e8449")
-    ax.text(6.0, 1.7, "no signature\n(pointer-chase)", ha="center", fontsize=7, color="#7f8c8d")
+    arrow(2.15, 3.0, 2.6, 3.0)  # per-lane -> detect
+    arrow(5.35, 3.35, 7.65, 4.3, "#1e8449")  # detected -> cure (up, mirror of down arrow)
+    arrow(5.35, 2.65, 7.65, 1.7, "#7f8c8d")  # no signature -> tile (down)
+    ax.text(6.45, 4.35, "detected\n(NFA worklist)", ha="center", fontsize=7, color="#1e8449")
+    ax.text(6.45, 1.55, "no signature\n(pointer-chase)", ha="center", fontsize=7, color="#7f8c8d")
     ax.set_title(
         "Automatic detect→route→lower: lock-step regions go to the thread cure,\n"
         "everything else stays on the tile path (oracle-gated)",
         fontsize=8.5,
     )
-    fig.tight_layout()
-    fig.savefig(OUT / "fig_selector.png", dpi=150)
+    fig.savefig(OUT / "fig_selector.png", dpi=150, bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
 
 
