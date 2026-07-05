@@ -47,35 +47,24 @@ def fig_decomposition() -> None:
     colors = ["#c0392b", "#e67e22", "#2980b9", "#27ae60"]
     fig, ax = plt.subplots(figsize=(6, 4))
     bars = ax.bar(labels, vals, color=colors)
-    for b, v in zip(bars, vals, strict=True):
-        ax.text(b.get_x() + b.get_width() / 2, v + 8, f"{v:.0f}", ha="center", fontsize=9)
+    gains = [None, ws / wt, wp2 / ws, cu / wp2]  # stage-over-stage multiplier
+    top = max(vals)
+    for b, v, g in zip(bars, vals, gains, strict=True):
+        cx = b.get_x() + b.get_width() / 2
+        ax.text(cx, v + top * 0.015, f"{v:.0f}", ha="center", va="bottom", fontsize=9)
+        if g is not None:
+            ax.text(
+                cx,
+                v + top * 0.075,
+                f"×{g:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#555555",
+            )
     ax.set_ylabel("Throughput (Gbps)")
     ax.set_title("Decomposing the NFA worklist regret (batch 16384, ≤64 states)")
-    ax.set_ylim(0, max(vals) * 1.18)
-    ax.annotate(
-        f"artifact ≈{ws / wt:.1f}×",
-        (1, ws),
-        (1, ws + 90),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
-    ax.annotate(
-        f"lane-pack ≈{wp2 / ws:.1f}×",
-        (2, wp2),
-        (1.45, wp2 + 80),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
-    ax.annotate(
-        f"irreducible ≈{cu / wp2:.1f}×",
-        (3, cu),
-        (3, cu - 130),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
+    ax.set_ylim(0, top * 1.17)
     fig.tight_layout()
     fig.savefig(OUT / "fig_decomposition.png", dpi=150)
     plt.close(fig)
@@ -91,14 +80,17 @@ def fig_occupancy_gating() -> None:
     ax.plot(n, cb, "o-", color="#2980b9", label="pure lane-packing (work held equal)")
     ax.plot(n, ca, "s--", color="#8e44ad", label="realistic (vs work-efficient scalar)")
     ax.axhline(32, color="gray", ls=":", lw=1)
-    ax.text(n[0], 32.5, "ideal 32× (warp width)", fontsize=8, color="gray")
+    ax.text(
+        n[-1], 31.2, "ideal 32× (warp width)", fontsize=8, color="gray", ha="right", va="top"
+    )
+    ax.set_ylim(0, 35.5)
     ax.set_xscale("log", base=2)
     ax.set_xticks(n)
     ax.set_xticklabels([str(x) for x in n])
     ax.set_xlabel("batch (strings) → occupancy")
     ax.set_ylabel("lane-packing speedup (×)")
     ax.set_title("Lane-packing is occupancy-gated")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=8, loc="center left")
     fig.tight_layout()
     fig.savefig(OUT / "fig_occupancy_gating.png", dpi=150)
     plt.close(fig)
@@ -129,7 +121,9 @@ def fig_mechanism() -> None:
     ax.bar([i + w / 2 for i in x], cu_v, w, label="CUDA worklist", color="#27ae60")
     ax.set_xticks(list(x))
     ax.set_xticklabels(metrics, fontsize=9)
-    ax.set_title("Same occupancy & warps, fewer warp-inst — yet 3.3× slower (latency-bound)")
+    ax.set_title(
+        "Same occupancy & warps, fewer warp-inst,\nyet 3.3× slower (latency-bound)", fontsize=10
+    )
     ax.legend(fontsize=8)
     for i, (a, b) in enumerate(zip(wp2_v, cu_v, strict=True)):
         ax.text(i - w / 2, a, f"{a:.0f}", ha="center", va="bottom", fontsize=7)
@@ -151,7 +145,9 @@ def fig_dfa_crossover() -> None:
     ax1.plot(tkb, pk, "o-", color="#2980b9", label="lane-packed Triton")
     ax1.plot(tkb, cu, "s-", color="#27ae60", label="CUDA")
     ax1.axvline(6144, color="gray", ls=":", lw=1)
-    ax1.text(6144, min(pk), " L2 (~6 MB)", fontsize=8, color="gray")
+    ax1.text(
+        6144 * 1.12, max(cu), "L2 (~6 MB)", fontsize=8, color="gray", ha="left", va="top"
+    )
     ax1.set_xscale("log", base=2)
     ax1.set_xlabel("DFA table size (KB)")
     ax1.set_ylabel("Throughput (Gbps)")
@@ -185,16 +181,17 @@ def fig_roofline() -> None:
     ax.axhline(100, color="red", ls="--", lw=1)
     ax.text(
         0.5,
-        102,
+        102.5,
         "hardware ceiling (instruction- or bandwidth-bound)",
         fontsize=8,
         color="red",
         ha="center",
+        va="bottom",
     )
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.set_ylabel("% of peak")
-    ax.set_ylim(0, 115)
+    ax.set_ylim(0, 120)
     ax.set_title(
         "Neither kernel is instruction- or bandwidth-bound → latency-bound\n"
         f"(WP2 issues FEWER warp-inst: {int(wp2['warp_inst']):,} vs {int(cu['warp_inst']):,}, "
@@ -204,7 +201,7 @@ def fig_roofline() -> None:
     for i, (a, b) in enumerate(zip(wp2_v, cu_v, strict=True)):
         ax.text(i - w / 2, a + 1, f"{a:.0f}", ha="center", fontsize=8)
         ax.text(i + w / 2, b + 1, f"{b:.0f}", ha="center", fontsize=8)
-    ax.legend(fontsize=8, loc="upper right")
+    ax.legend(fontsize=8, loc="center", bbox_to_anchor=(0.5, 0.55))
     fig.tight_layout()
     fig.savefig(OUT / "fig_roofline.png", dpi=150)
     plt.close(fig)
@@ -282,13 +279,13 @@ def fig_regret_law() -> None:
     fig, ax = plt.subplots(figsize=(7, 4))
     for b, v in zip(ax.bar(labels, vals, color=colors), vals, strict=True):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.05, f"{v:.2f}×", ha="center", fontsize=9)
-    ax.axhline(1.0, color="green", ls="--", lw=1)
-    ax.text(0, 1.06, "no-regret line", fontsize=8, color="green")
+    ax.axhline(1.0, color="green", ls="--", lw=1, label="no-regret line (1×)")
+    ax.legend(fontsize=8, loc="upper left", frameon=False)
     # mark the sign flip: attention (dense ML) dips below 1 -> tile WINS
     ai = order.index("attention_powerlaw")
     ax.annotate(
         "tile WINS\n(dense head-dim)",
-        (ai, vals[ai]),
+        (ai, vals[ai] + 0.17),  # stop the arrow above the value label
         (ai, 1.35),
         ha="center",
         fontsize=7,
