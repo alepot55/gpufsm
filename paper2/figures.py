@@ -318,7 +318,7 @@ def fig_selector() -> None:
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
-    ax.set_xlim(0.1, 12.4)
+    ax.set_xlim(0.0, 12.5)
     ax.set_ylim(0.55, 5.5)
     ax.axis("off")
 
@@ -333,15 +333,23 @@ def fig_selector() -> None:
     def arrow(x0, y0, x1, y1, color="#333"):
         ax.add_patch(
             FancyArrowPatch(
-                (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=11, lw=1.2, color=color
+                (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=11, lw=1.4, color=color
             )
         )
 
-    box(0.4, 2.35, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
+    def elbow(xsplit, ymid, ytarget, xbox, color):
+        """Right-angle connector: vertical from (xsplit, ymid) to ytarget, then arrow into xbox."""
+        ax.plot(
+            [xsplit, xsplit], [ymid, ytarget], color=color, lw=1.4, solid_capstyle="round", zorder=1
+        )
+        arrow(xsplit, ytarget, xbox, ytarget, color)
+
+    MID = 3.0  # the single horizontal centerline everything aligns to
+    box(0.35, MID - 0.65, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
     box(
-        2.6,
-        2.0,
-        2.7,
+        2.65,
+        MID - 1.0,
+        2.75,
         2.0,
         "tritongpu-thread-region\n(detect lock-step:\nscf.while+#blocked\n+tt.reduce)",
         "#fdebd0",
@@ -350,14 +358,27 @@ def fig_selector() -> None:
         f"thread lowering (cure)\n{tile:.0f}→{thread:.0f} Gbps = {speedup:.1f}×\n"
         f"≥ hand-CUDA ({cuda:.0f})"
     )
-    box(7.7, 3.55, 4.4, 1.5, cure_txt, "#abebc6")  # center y=4.3, symmetric with tile box
-    box(7.7, 0.95, 4.4, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # center y=1.7
+    box(7.55, 3.55, 4.55, 1.5, cure_txt, "#abebc6")  # center y = 4.30 (MID + 1.3)
+    box(7.55, 0.95, 4.55, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # center y = 1.70 (MID - 1.3)
 
-    arrow(2.15, 3.0, 2.6, 3.0)  # per-lane -> detect
-    arrow(5.35, 3.35, 7.65, 4.3, "#1e8449")  # detected -> cure (up, mirror of down arrow)
-    arrow(5.35, 2.65, 7.65, 1.7, "#7f8c8d")  # no signature -> tile (down)
-    ax.text(6.45, 4.35, "detected\n(NFA worklist)", ha="center", fontsize=7, color="#1e8449")
-    ax.text(6.45, 1.55, "no signature\n(pointer-chase)", ha="center", fontsize=7, color="#7f8c8d")
+    arrow(2.11, MID, 2.59, MID)  # per-lane -> detect
+    # shared stem out of the detector, then two mirrored right-angle branches
+    ax.plot([5.46, 6.5], [MID, MID], color="#333", lw=1.4, solid_capstyle="round", zorder=1)
+    elbow(6.5, MID, 4.30, 7.49, "#1e8449")  # detected -> cure (up)
+    elbow(6.5, MID, 1.70, 7.49, "#7f8c8d")  # no signature -> tile (down)
+    # labels live in the empty pockets above/below the elbow corners, clear of every line/box
+    ax.text(
+        6.3, 4.74, "detected\n(NFA worklist)", ha="center", va="center", fontsize=7, color="#1e8449"
+    )
+    ax.text(
+        6.3,
+        1.26,
+        "no signature\n(pointer-chase)",
+        ha="center",
+        va="center",
+        fontsize=7,
+        color="#7f8c8d",
+    )
     ax.set_title(
         "Automatic detect→route→lower: lock-step regions go to the thread cure,\n"
         "everything else stays on the tile path (oracle-gated)",
