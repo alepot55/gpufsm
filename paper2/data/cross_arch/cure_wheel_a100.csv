@@ -1,0 +1,9 @@
+# built per-lane-retirement cure, same pinned wheel recipe, NVIDIA A100-SXM4-40GB (Modal)
+experiment,dist_or_workload,masked_us,cured_us,speedup,notes
+bench_geometric,geometric,98.3,54.3,1.81,PTX redux 1->0 bar.warp.sync 0->1
+generalize,uniform,288.8,75.8,3.81,
+generalize,geometric,122.9,74.8,1.64,
+generalize,pareto,161.8,75.8,2.13,cured floor flat ~75us across dists (mechanism signature)
+spmv_powerlaw,spmv,2801.7,2789.4,1.00,gather-bound; no gain
+moe_powerlaw,moe,214.0,214.0,1.00,
+rejection,rejection,82.9,82.9,1.00,verifier declines (same as 4070)

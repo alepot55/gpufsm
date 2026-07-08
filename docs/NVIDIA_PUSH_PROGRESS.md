@@ -159,3 +159,11 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
 - Final polish before submit: all 64 em dashes removed (context-appropriate punctuation); all 8 figures perfected one by one (fig_selector rebuilt as right-angle flowchart after a matplotlib mutation_scale pad bug made boxes overlap).
 - Cover letter: sole-author, conflicts = none + PoliMi affiliation; funding = none; APC $0 expected via ACM Open/CRUI-CARE (PoliMi).
 - Next: await first editorial decision (typ. 2-4 months). Track in Author Dashboard.
+
+## 2026-07-08 — CGO 2027 pivot: cure cross-arch DONE in one day
+- TACO-2026-324 desk-rejected 07-Jul ("too premature"). Same-day pivot to CGO 2027 (deadline 10-Sep-2026).
+- Built the per-lane-retirement pass as a pinned-recipe wheel on Modal (CPU build + A100 run, ~$1 credits).
+- Cure on A100: 1.6-3.8x lock-step, flat cured floor, ~1.0x gather-bound, verifier declines out-of-scope latch.
+- Straggler law refit on the recipe: slope stable (1.09 vs 1.08), R2=0.997, out-of-sample 1.5%/2.1% (better than before).
+- INTEGRITY: old local-build numbers (4.15x etc.) not recipe-reproducible -> replaced throughout the paper.
+- paper2/gpufsm_cgo.tex: sigplan 10pp (limit 11pp text), 0 overfull, anonymous, all numbers CSV-traced.

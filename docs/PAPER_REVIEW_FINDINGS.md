@@ -48,3 +48,23 @@ above-bar substance; the issues below were the reject-risk. Status per item.
 ## Bottom line
 The integrity holes that risked a reject are closed. Biggest remaining credibility lever = M5
 (flagship results on a 2nd GPU). The rest is tightening + honest reframing, all revise-cycle work.
+
+
+## CGO 2027 pivot (2026-07-08, after TACO desk-reject "too premature")
+All remaining items CLOSED with recipe-reproducible data (pinned wheel: triton 3.8.0@81a46fa +
+versioned perlane_retire_full.patch; built on Modal CPU, run on Modal A100 + local RTX 4070):
+- **M5 [CLOSED]** The built cure now reproduces on the A100: lock-step 1.6-3.8x by distribution,
+  same flat cured floor (~75us), SpMV/MoE ~1.0x, verifier declines the out-of-scope latch. Data:
+  paper2/data/cross_arch/cure_wheel_a100.csv + cure_nvidia_a100-sxm4-40gb.log.
+- **M9 [CLOSED]** Dispersion added: geometric-law cure median 2.46x IQR [2.46,2.50] n=5 seeds
+  (cure_ci.py). Straggler law refit on the pinned recipe: t=32.4+1.09*E[warp-max], R2=0.997;
+  floor 43.0+-1.6us; out-of-sample 1.5% mean / 2.1% max (was 5%/7.5%); single-straggler 7.2x.
+- **M3 [CLOSED]** Honest real-workload framing: with the pinned recipe SpMV/MoE gains are ~1.0x
+  (the old 1.14/1.25x did not reproduce); reframed as thesis-confirmation (recoverable regret
+  scales with per-step control). The 4.15x headline replaced by the reproducible 2.3-6.7x range.
+- **NEW (integrity)** The old local-build numbers (4.15x, 2.5-7.3x, SpMV 1.14x, MoE 1.25x,
+  straggler fit 50.3+1.08) were NOT reproducible from the versioned recipe and were REPLACED
+  in the paper by wheel-recipe numbers. Slope stability (1.08 vs 1.09) reported as build-stability.
+- **NEW (soundness)** cure_rejection witness: the verifier correctly DECLINES the accumulate-OR
+  early-exit latch on both GPUs (PTX redux stays 1) -> scope explicit, sound by default.
+Paper: paper2/gpufsm_cgo.tex (sigplan, 10pp incl. refs vs 11pp text limit, 0 overfull).
