@@ -11,3 +11,15 @@ uniform,retire,248.80,128.54,1.936,OK,46.0
 geometric,retire,63.30,15.99,3.958,OK,44.0
 pareto2,retire,72.80,15.78,4.613,OK,41.0
 pareto1.2,retire,120.13,14.21,8.454,OK,40.6
+constant,off,64.00,64.00,1.000,OK,101.3
+lowvar,off,71.84,64.01,1.122,OK,105.8
+uniform,off,248.80,128.54,1.936,OK,302.1
+geometric,off,63.30,15.99,3.958,OK,99.3
+pareto2,off,72.80,15.78,4.613,OK,115.9
+pareto1.2,off,120.13,14.21,8.454,OK,169.0
+constant,retire,64.00,64.00,1.000,OK,42.7
+lowvar,retire,71.84,64.01,1.122,OK,41.0
+uniform,retire,248.80,128.54,1.936,OK,45.1
+geometric,retire,63.30,15.99,3.958,OK,44.0
+pareto2,retire,72.80,15.78,4.613,OK,44.0
+pareto1.2,retire,120.13,14.21,8.454,OK,41.0
