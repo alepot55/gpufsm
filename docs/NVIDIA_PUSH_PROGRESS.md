@@ -167,3 +167,19 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
 - Straggler law refit on the recipe: slope stable (1.09 vs 1.08), R2=0.997, out-of-sample 1.5%/2.1% (better than before).
 - INTEGRITY: old local-build numbers (4.15x etc.) not recipe-reproducible -> replaced throughout the paper.
 - paper2/gpufsm_cgo.tex: sigplan 10pp (limit 11pp text), 0 overfull, anonymous, all numbers CSV-traced.
+
+## 2026-07-10 — PR #10780 reworked docs-only after Jokeren pushback
+- Jokeren (02-Jul): "I don't think this is the right fix", cc @CRobeck. Analysis agreed: the measured
+  ~25us/launch came from the README example hook doing file-read+sha256 per no-arg call; with the hook
+  returning precomputed constants, the per-launch call is negligible -> the runtime memo (module-global in
+  knobs.py, off-style vs the descriptor knob idiom) solved a near-nonexistent problem at the wrong layer.
+- Rework (max merge probability): PR trimmed to **docs-only** — examples precompute PLUGIN_KEY/PLUGIN_HASH
+  at import, README documents the contract ("no-arg form is consulted on every kernel launch, keep it
+  cheap"). Runtime memo + knob helper + test removed. Branch hook-key-cache force-pushed (15048b3, off
+  origin/main 9cf558d); title retagged [RUNTIME]->[DOCS]; body updated; reply posted offering the
+  install-time-derivation descriptor as an optional follow-up if they want to fix the contract instead.
+- PR #10766 (split/join fold): MERGEABLE/BLOCKED = only awaiting review; ping of 05-Jul still unanswered
+  (Raoux last active 02-Jul). Do NOT re-ping before ~13-Jul; next lever if silent: ask peterbell10 (he
+  reviewed) for a formal review.
+- Portfolio state: 10766 open (best merge shot), 10780 open (now trivially mergeable docs fix),
+  10774/10773 closed-by-design (out-of-tree at alepot55/triton-perlane-retire), 10785/10788 closed (dead ends).
