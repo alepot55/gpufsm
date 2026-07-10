@@ -183,3 +183,18 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
   reviewed) for a formal review.
 - Portfolio state: 10766 open (best merge shot), 10780 open (now trivially mergeable docs fix),
   10774/10773 closed-by-design (out-of-tree at alepot55/triton-perlane-retire), 10785/10788 closed (dead ends).
+
+## 2026-07-10 (sera) — CRobeck engaged su #10780; risposta + fix esempio-3
+- CRobeck (20:29 CEST): "doesn't the key need to be recomputed every time because there is no way to
+  know the underlying pipeline was altered between runs?"
+- Risposta (2 metà): (1) esempi 1-2 = pipeline statica: è il modulo importato, non cambia senza re-import
+  (che ricomputa anche le costanti); re-leggere __file__ per-call può solo DIVERGERE (file editato
+  mid-process -> chiave nuova, codice vecchio in esecuzione). (2) esempio 3 = la preoccupazione è REALE
+  (override_stages costruisce la pipeline da compiler_override.py, editato dallo script tra kernel1 e
+  kernel2) MA la chiave upstream non lo tracciava comunque (hasha lo script plugin, non l'override) ->
+  ricomputare per-call non rilevava nulla, né prima né dopo la PR.
+- Fix pushato (a8da3ba, commit incrementale): override_key_hash() deriva la chiave dal contenuto CORRENTE
+  di compiler_override.py a ogni chiamata no-arg — il caso pipeline-dinamica è esattamente ciò per cui il
+  contratto per-launch esiste; solo le derivazioni statiche vanno precomputate. La PR ora MIGLIORA la
+  correttezza dell'esempio 3 oltre a togliere il costo hot-path: risponde all'obiezione trasformandola in
+  un fix.
