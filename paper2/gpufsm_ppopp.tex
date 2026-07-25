@@ -306,7 +306,7 @@ monotonicity and \emph{declines to fire}, on both GPUs, leaving the kernel bit-e
 never rewriting outside its proven scope.
 Table~\ref{tab:builtcure} consolidates the built-cure measurements.
 
-\textbf{The lock-step tax is predictable from the straggler, not the divergence ratio.} A controlled six-distribution sweep (constant, low-variance, wide-uniform, geometric, and two Pareto trip laws; $2^{20}$ elements each, oracle-gated in both modes) pins the mechanism to a single \emph{a-priori} predictor. The masked baseline is governed by the per-warp \emph{straggler} $\mathbb{E}[\max_{\mathrm{warp}}\mathit{trip}]$: a least-squares fit gives $t_{\mathrm{masked}}=32.4+1.09\,\mathbb{E}[\text{warp-max}]\,\mu$s with $R^2=0.997$, exactly as the lock-step latch iterates to the busiest lane. The cured kernel collapses to a flat floor ($43.0\pm1.6\,\mu$s, distribution-independent) because each lane retires at its own trip. Consequently the speedup is predicted by the straggler magnitude ($\mathrm{corr}=0.99$) and \emph{not} by the intra-warp divergence ratio $D=\mathbb{E}[\text{warp-max}]/\mathbb{E}[\mathit{trip}]$ ($\mathrm{corr}=0.06$; a divergence-ratio fit of the masked time has $R^2=0.00$): the geometric law ($D=3.96$) yields only $2.3\times$ while the wide-uniform law ($D=1.94$) yields $6.7\times$, a \emph{higher} divergence ratio but a smaller absolute straggler, hence less lock-step waste. The floor-vs-straggler model predicts every measured speedup to under $8\%$. This sharpens channel~(ii) (\S\ref{sec:law}) from a qualitative ``divergent trips cost more'' into a falsifiable predictor, and corrects the natural but wrong intuition that the divergence \emph{ratio} sets the cost: it is the absolute straggler that does. \emph{Out-of-sample}, with coefficients frozen, the law predicts the masked cost of four \emph{held-out} distributions (bimodal, log-normal, spike, and an adversarial single-straggler warp: $1/32$ lanes at trip $256$, the rest at $2$) generated with a different seed to within $1.5\%$ on average ($2.1\%$ max). The single-straggler case yields $7.2\times$: the purest form of the effect, one slow lane taxing the other $31$ in lock-step, exactly what the per-lane cure removes. The law is also build-stable: an earlier build of the
+\textbf{The lock-step tax is predictable from the straggler, not the divergence ratio.} A controlled six-distribution sweep (constant, low-variance, wide-uniform, geometric, and two Pareto trip laws; $2^{20}$ elements each, oracle-gated in both modes) pins the mechanism to a single \emph{a-priori} predictor. The masked baseline is governed by the per-warp \emph{straggler} $\mathbb{E}[\max_{\mathrm{warp}}\mathit{trip}]$: a least-squares fit gives $t_{\mathrm{masked}}=32.4+1.09\,\mathbb{E}[\text{warp-max}]\,\mu$s with $R^2=0.997$, exactly as the lock-step latch iterates to the busiest lane. The cured kernel collapses to a flat floor ($43.0\pm1.6\,\mu$s, distribution-independent) because each lane retires at its own trip. Consequently the speedup is predicted by the straggler magnitude ($\mathrm{corr}=0.99$) and \emph{not} by the intra-warp divergence ratio $D=\mathbb{E}[\text{warp-max}]/\mathbb{E}[\mathit{trip}]$ ($\mathrm{corr}=0.06$; a divergence-ratio fit of the masked time has $R^2=0.00$): the geometric law ($D=3.96$) yields only $2.3\times$ while the wide-uniform law ($D=1.94$) yields $6.7\times$, a \emph{higher} divergence ratio but a smaller absolute straggler, hence less lock-step waste. The floor-vs-straggler model predicts every measured speedup to under $8\%$. This sharpens channel~(ii) (\S\ref{sec:law}) from a qualitative ``divergent trips cost more'' into a falsifiable predictor, and corrects the natural but wrong intuition that the divergence \emph{ratio} sets the cost: it is the absolute straggler that does. \emph{Out-of-sample}, with coefficients frozen, the law predicts the masked cost of four \emph{held-out} distributions (bimodal, log-normal, spike, and an adversarial single-straggler warp: $1/32$ lanes at trip $256$, the rest at $2$) generated with a different seed to within $1.5\%$ on average ($2.2\%$ max). The single-straggler case yields $7.2\times$: the purest form of the effect, one slow lane taxing the other $31$ in lock-step, exactly what the per-lane cure removes. The law is also build-stable: an earlier build of the
 pass gave the same slope ($1.08$) with a higher intercept ($50\,\mu$s); the slope is the hardware's
 per-iteration lock-step cost, the intercept is compiler overhead.
 
@@ -472,8 +472,10 @@ placement} but not per-lane \emph{control flow} (our probe shows the data-depend
 lower); Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
 drop-to-scalar escape. Warp~\cite{warp2022} is the thread-SIMT existence proof.
 \textbf{Mixing thread- and tile-level execution} is exactly the live frontier, but every approach is
-\emph{manual} or \emph{differently directed}: Prism~\cite{prism2026} lets a programmer hand-annotate
-typed thread/tile ``perspectives''; NVIDIA's cuTile~\cite{cutile2025} (and its MLIR \emph{Tile IR}, now
+\emph{programmer-directed} or \emph{differently directed}: Prism~\cite{prism2026} makes thread
+granularity part of the type system, so group-coordinated code composes safely without perspective
+markers --- but the granularity is still the one the programmer writes, and nothing diagnoses that an
+existing tile kernel is paying a lock-step tax; NVIDIA's cuTile~\cite{cutile2025} (and its MLIR \emph{Tile IR}, now
 being built as a backend for Triton itself) is tile-level and concedes the irregular case to a
 hand-written SIMT fallback, so the per-lane gap we name persists in \emph{both} Triton's TritonGPU and
 NVIDIA's Tile IR (the proposed primitive is complementary to that platform direction, not subsumed by it); Tawa~\cite{tawa2026} auto-restructures Triton but for
@@ -547,6 +549,10 @@ matches the lock-step signature; the lock-step NFA worklist is routed to the thr
 ($378{\to}1555$\,Gbps $=3.9\times$, exceeding hand-CUDA), while a no-signature kernel (pointer-chase)
 stays on the tile path. All routing oracle-gated; numbers from the versioned CSVs.}\label{fig:selector}
 \end{figure}
+
+% Flush every pending float before the bibliography: the page limit counts text
+% and figures but not references, so no figure may land after them.
+\clearpage
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
