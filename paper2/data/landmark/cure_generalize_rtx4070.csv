@@ -1,0 +1,4 @@
+dist,masked_us,cured_us,speedup_x,oracle,gpu
+uniform,300.0,41.0,7.32,OK,RTX4070
+geometric,99.3,39.8,2.49,OK,RTX4070
+pareto,142.0,41.0,3.46,OK,RTX4070

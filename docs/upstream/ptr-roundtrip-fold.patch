@@ -1,0 +1,69 @@
+diff --git a/include/triton/Dialect/Triton/IR/TritonOps.td b/include/triton/Dialect/Triton/IR/TritonOps.td
+index 8bd4d6c..9701fd5 100644
+--- a/include/triton/Dialect/Triton/IR/TritonOps.td
++++ b/include/triton/Dialect/Triton/IR/TritonOps.td
+@@ -63,6 +63,7 @@ def TT_PtrToIntOp : TT_Op<"ptr_to_int", [Elementwise,
+     let results = (outs TT_I64Like:$result);
+ 
+     let assemblyFormat = "$src attr-dict `:` type($src) `->` type($result)";
++    let hasCanonicalizer = 1;
+ }
+ 
+ // arith.bitcast doesn't support pointers
+diff --git a/lib/Dialect/Triton/IR/Ops.cpp b/lib/Dialect/Triton/IR/Ops.cpp
+index be3bc32..5e0cb86 100644
+--- a/lib/Dialect/Triton/IR/Ops.cpp
++++ b/lib/Dialect/Triton/IR/Ops.cpp
+@@ -1262,6 +1262,31 @@ void IntToPtrOp::getCanonicalizationPatterns(RewritePatternSet &results,
+       context);
+ }
+ 
++//-- PtrToIntOp --
++// ptr_to_int(int_to_ptr(val)) -> val
++// Mirror of CanonicalizeIntToPtrOfPtrToInt; eliminates the inverse round-trip.
++struct CanonicalizePtrToIntOfIntToPtr : public OpRewritePattern<PtrToIntOp> {
++  CanonicalizePtrToIntOfIntToPtr(MLIRContext *context)
++      : OpRewritePattern<PtrToIntOp>(context, 1) {}
++
++  LogicalResult matchAndRewrite(PtrToIntOp ptrToIntOp,
++                                PatternRewriter &rewriter) const override {
++    auto intToPtrOp = ptrToIntOp.getSrc().getDefiningOp<IntToPtrOp>();
++    if (!intToPtrOp)
++      return failure();
++    // A bitcast bridges any difference between the original integer type and
++    // this op's result type; a same-type bitcast folds away.
++    rewriter.replaceOpWithNewOp<BitcastOp>(ptrToIntOp, ptrToIntOp.getType(),
++                                           intToPtrOp.getSrc());
++    return success();
++  }
++};
++
++void PtrToIntOp::getCanonicalizationPatterns(RewritePatternSet &results,
++                                             MLIRContext *context) {
++  results.add<CanonicalizePtrToIntOfIntToPtr>(context);
++}
++
+ // The following ops, including `call`, `func`, and `return` are copied and
+ // modified from
+ // https://github.com/llvm/llvm-project/blob/main/mlir/lib/Dialect/Func/IR/FuncOps.cpp
+diff --git a/test/Triton/canonicalize.mlir b/test/Triton/canonicalize.mlir
+index b747cc0..25b9baf 100644
+--- a/test/Triton/canonicalize.mlir
++++ b/test/Triton/canonicalize.mlir
+@@ -260,3 +260,16 @@ tt.func @no_canonicalize_indivisible_offset(%base: tensor<128x!tt.ptr<f32>>) ->
+   %result = tt.int_to_ptr %offset_ptr_int : tensor<128xi64> -> tensor<128x!tt.ptr<f32>>
+   tt.return %result : tensor<128x!tt.ptr<f32>>
+ }
++
++// -----
++
++// CHECK-LABEL: ptr_to_int_of_int_to_ptr
++tt.func @ptr_to_int_of_int_to_ptr(%x: tensor<16xi64>) -> tensor<16xi64> {
++  // ptr_to_int(int_to_ptr(x)) -> x
++  // CHECK-NOT: tt.int_to_ptr
++  // CHECK-NOT: tt.ptr_to_int
++  // CHECK: tt.return %arg0
++  %p = tt.int_to_ptr %x : tensor<16xi64> -> tensor<16x!tt.ptr<f32>>
++  %i = tt.ptr_to_int %p : tensor<16x!tt.ptr<f32>> -> tensor<16xi64>
++  tt.return %i : tensor<16xi64>
++}

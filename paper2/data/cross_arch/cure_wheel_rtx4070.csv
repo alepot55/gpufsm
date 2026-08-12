@@ -1,0 +1,22 @@
+# built per-lane-retirement cure, pinned wheel recipe (triton 3.8.0@81a46fa + perlane_retire_full.patch), RTX 4070
+experiment,dist_or_workload,masked_us,cured_us,speedup,notes
+bench_geometric_ci,geometric,98.3,39.9,2.46,median of 5 seeds; IQR [2.46-2.50]; range [2.45-2.52]; PTX redux 1->0
+generalize,uniform,302.0,49.2,6.14,
+generalize,geometric,104.1,56.2,1.85,
+generalize,pareto,142.3,57.2,2.49,
+predictive_sweep,constant,101.3,42.7,2.37,warpmax=64.0 D=1.00
+predictive_sweep,lowvar,105.8,41.0,2.58,warpmax=71.8 D=1.12
+predictive_sweep,uniform,302.1,45.1,6.70,warpmax=248.8 D=1.94
+predictive_sweep,geometric,99.3,44.0,2.26,warpmax=63.3 D=3.96
+predictive_sweep,pareto2,115.9,44.0,2.63,warpmax=72.8 D=4.61
+predictive_sweep,pareto1.2,169.0,41.0,4.12,warpmax=120.1 D=8.45
+heldout,bimodal,266.1,42.8,6.22,pred err 1.6% with frozen coeffs
+heldout,lognormal,130.0,45.1,2.88,pred err 2.1%
+heldout,single_straggler,309.2,43.0,7.19,pred err 0.8%; 1/32 lanes at trip 256
+heldout,spike,256.0,43.9,5.83,pred err 1.3%
+spmv_powerlaw,spmv,1799.2,1796.1,1.00,gather-bound; no gain (thesis-consistent)
+moe_powerlaw,moe,236.3,255.0,1.00,noise-level across repeats (235-261us both modes)
+rejection,rejection,48.8,49.8,1.00,verifier DECLINES (accumulate-OR early-exit latch out of scope); sound no-op
+# straggler law refit on this recipe: t_masked = 32.4 + 1.091*E[warp-max] us; R2=0.997; cured floor 43.0+-1.6us
+# corr(speedup~warpmax)=0.99 corr(speedup~D)=0.06; D-only fit R2=0.00; in-sample speedup pred err<=7.7%
+# out-of-sample (frozen coeffs, 4 held-out dists): mean 1.5% max 2.1%

@@ -47,35 +47,24 @@ def fig_decomposition() -> None:
     colors = ["#c0392b", "#e67e22", "#2980b9", "#27ae60"]
     fig, ax = plt.subplots(figsize=(6, 4))
     bars = ax.bar(labels, vals, color=colors)
-    for b, v in zip(bars, vals, strict=True):
-        ax.text(b.get_x() + b.get_width() / 2, v + 8, f"{v:.0f}", ha="center", fontsize=9)
+    gains = [None, ws / wt, wp2 / ws, cu / wp2]  # stage-over-stage multiplier
+    top = max(vals)
+    for b, v, g in zip(bars, vals, gains, strict=True):
+        cx = b.get_x() + b.get_width() / 2
+        ax.text(cx, v + top * 0.015, f"{v:.0f}", ha="center", va="bottom", fontsize=9)
+        if g is not None:
+            ax.text(
+                cx,
+                v + top * 0.075,
+                f"×{g:.1f}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#555555",
+            )
     ax.set_ylabel("Throughput (Gbps)")
     ax.set_title("Decomposing the NFA worklist regret (batch 16384, ≤64 states)")
-    ax.set_ylim(0, max(vals) * 1.18)
-    ax.annotate(
-        f"artifact ≈{ws / wt:.1f}×",
-        (1, ws),
-        (1, ws + 90),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
-    ax.annotate(
-        f"lane-pack ≈{wp2 / ws:.1f}×",
-        (2, wp2),
-        (1.45, wp2 + 80),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
-    ax.annotate(
-        f"irreducible ≈{cu / wp2:.1f}×",
-        (3, cu),
-        (3, cu - 130),
-        ha="center",
-        fontsize=8,
-        arrowprops=dict(arrowstyle="->"),
-    )
+    ax.set_ylim(0, top * 1.17)
     fig.tight_layout()
     fig.savefig(OUT / "fig_decomposition.png", dpi=150)
     plt.close(fig)
@@ -91,14 +80,17 @@ def fig_occupancy_gating() -> None:
     ax.plot(n, cb, "o-", color="#2980b9", label="pure lane-packing (work held equal)")
     ax.plot(n, ca, "s--", color="#8e44ad", label="realistic (vs work-efficient scalar)")
     ax.axhline(32, color="gray", ls=":", lw=1)
-    ax.text(n[0], 32.5, "ideal 32× (warp width)", fontsize=8, color="gray")
+    ax.text(
+        n[-1], 31.2, "ideal 32× (warp width)", fontsize=8, color="gray", ha="right", va="top"
+    )
+    ax.set_ylim(0, 35.5)
     ax.set_xscale("log", base=2)
     ax.set_xticks(n)
     ax.set_xticklabels([str(x) for x in n])
     ax.set_xlabel("batch (strings) → occupancy")
     ax.set_ylabel("lane-packing speedup (×)")
     ax.set_title("Lane-packing is occupancy-gated")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=8, loc="center left")
     fig.tight_layout()
     fig.savefig(OUT / "fig_occupancy_gating.png", dpi=150)
     plt.close(fig)
@@ -129,7 +121,9 @@ def fig_mechanism() -> None:
     ax.bar([i + w / 2 for i in x], cu_v, w, label="CUDA worklist", color="#27ae60")
     ax.set_xticks(list(x))
     ax.set_xticklabels(metrics, fontsize=9)
-    ax.set_title("Same occupancy & warps, fewer warp-inst — yet 3.3× slower (latency-bound)")
+    ax.set_title(
+        "Same occupancy & warps, fewer warp-inst,\nyet 3.3× slower (latency-bound)", fontsize=10
+    )
     ax.legend(fontsize=8)
     for i, (a, b) in enumerate(zip(wp2_v, cu_v, strict=True)):
         ax.text(i - w / 2, a, f"{a:.0f}", ha="center", va="bottom", fontsize=7)
@@ -151,7 +145,9 @@ def fig_dfa_crossover() -> None:
     ax1.plot(tkb, pk, "o-", color="#2980b9", label="lane-packed Triton")
     ax1.plot(tkb, cu, "s-", color="#27ae60", label="CUDA")
     ax1.axvline(6144, color="gray", ls=":", lw=1)
-    ax1.text(6144, min(pk), " L2 (~6 MB)", fontsize=8, color="gray")
+    ax1.text(
+        6144 * 1.12, max(cu), "L2 (~6 MB)", fontsize=8, color="gray", ha="left", va="top"
+    )
     ax1.set_xscale("log", base=2)
     ax1.set_xlabel("DFA table size (KB)")
     ax1.set_ylabel("Throughput (Gbps)")
@@ -185,16 +181,17 @@ def fig_roofline() -> None:
     ax.axhline(100, color="red", ls="--", lw=1)
     ax.text(
         0.5,
-        102,
+        102.5,
         "hardware ceiling (instruction- or bandwidth-bound)",
         fontsize=8,
         color="red",
         ha="center",
+        va="bottom",
     )
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.set_ylabel("% of peak")
-    ax.set_ylim(0, 115)
+    ax.set_ylim(0, 120)
     ax.set_title(
         "Neither kernel is instruction- or bandwidth-bound → latency-bound\n"
         f"(WP2 issues FEWER warp-inst: {int(wp2['warp_inst']):,} vs {int(cu['warp_inst']):,}, "
@@ -204,7 +201,7 @@ def fig_roofline() -> None:
     for i, (a, b) in enumerate(zip(wp2_v, cu_v, strict=True)):
         ax.text(i - w / 2, a + 1, f"{a:.0f}", ha="center", fontsize=8)
         ax.text(i + w / 2, b + 1, f"{b:.0f}", ha="center", fontsize=8)
-    ax.legend(fontsize=8, loc="upper right")
+    ax.legend(fontsize=8, loc="center", bbox_to_anchor=(0.5, 0.55))
     fig.tight_layout()
     fig.savefig(OUT / "fig_roofline.png", dpi=150)
     plt.close(fig)
@@ -252,6 +249,8 @@ def fig_regret_law() -> None:
         "automata_nfa",
         "spmv_powerlaw",
         "rejection",
+        "moe_powerlaw",
+        "attention_powerlaw",
     ]
     nice = {
         "pointer_chase": "graph\npointer-chase",
@@ -260,6 +259,8 @@ def fig_regret_law() -> None:
         "automata_nfa": "automata\n(NFA)",
         "spmv_powerlaw": "SpMV\npower-law",
         "rejection": "rejection\nsampling",
+        "moe_powerlaw": "MoE routing\n(ML, scalar)",
+        "attention_powerlaw": "attention\n(ML, dense)",
     }
     mech_color = {
         "negative_control_latency_equal": "#27ae60",
@@ -268,6 +269,8 @@ def fig_regret_law() -> None:
         "latency_starvation": "#c0392b",
         "baseline_plus_divergence": "#8e44ad",
         "masked_waste_pure_compute": "#e67e22",
+        "scalar_control_ml_moe": "#c0392b",
+        "dense_vector_tile_wins": "#16a085",
     }
     by = {r["workload"]: r for r in rows}
     labels = [nice[w] for w in order]
@@ -276,14 +279,25 @@ def fig_regret_law() -> None:
     fig, ax = plt.subplots(figsize=(7, 4))
     for b, v in zip(ax.bar(labels, vals, color=colors), vals, strict=True):
         ax.text(b.get_x() + b.get_width() / 2, v + 0.05, f"{v:.2f}×", ha="center", fontsize=9)
-    ax.axhline(1.0, color="green", ls="--", lw=1)
-    ax.text(0, 1.06, "no-regret line (tile issue ≈ thread issue)", fontsize=8, color="green")
+    ax.axhline(1.0, color="green", ls="--", lw=1, label="no-regret line (1×)")
+    ax.legend(fontsize=8, loc="upper left", frameon=False)
+    # mark the sign flip: attention (dense ML) dips below 1 -> tile WINS
+    ai = order.index("attention_powerlaw")
+    ax.annotate(
+        "tile WINS\n(dense head-dim)",
+        (ai, vals[ai] + 0.17),  # stop the arrow above the value label
+        (ai, 1.35),
+        ha="center",
+        fontsize=7,
+        color="#16a085",
+        arrowprops=dict(arrowstyle="->", color="#16a085"),
+    )
     ax.set_ylabel("tile-vs-thread regret (×)")
     ax.set_ylim(0, max(vals) * 1.15)
+    ax.tick_params(axis="x", labelsize=7.5)
     ax.set_title(
-        "Regret tracks the tile's issue deficit, not memory irregularity: 1.0–4×, by mechanism\n"
-        "(green=irregular negative control, grey=occupancy, red=latency-starvation, "
-        "orange/blue=masked-waste)",
+        "Regret SIGN set by per-step work, not irregularity: scalar control -> tile loses\n"
+        "(grey/red/blue/orange); a dense ML head-dim (attention) inverts it -> tile wins (teal)",
         fontsize=8,
     )
     fig.tight_layout()
@@ -304,14 +318,24 @@ def fig_selector() -> None:
     from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
     fig, ax = plt.subplots(figsize=(7, 3.0))
-    ax.set_xlim(0, 12)
-    ax.set_ylim(0, 6)
+    ax.set_xlim(0.2, 12.55)
+    ax.set_ylim(0.45, 5.45)
     ax.axis("off")
 
+    PAD = 0.10  # boxstyle pad in data units (mutation_scale=1 so pad is NOT rescaled)
+
     def box(x, y, w, h, text, fc):
+        # visual edges = (x - PAD, y - PAD) .. (x + w + PAD, y + h + PAD)
         ax.add_patch(
             FancyBboxPatch(
-                (x, y), w, h, boxstyle="round,pad=0.06", fc=fc, ec="#333", lw=1.1, mutation_scale=6
+                (x, y),
+                w,
+                h,
+                boxstyle="round,pad=0.10,rounding_size=0.18",
+                fc=fc,
+                ec="#333",
+                lw=1.1,
+                mutation_scale=1,
             )
         )
         ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=7.5)
@@ -319,38 +343,58 @@ def fig_selector() -> None:
     def arrow(x0, y0, x1, y1, color="#333"):
         ax.add_patch(
             FancyArrowPatch(
-                (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=11, lw=1.2, color=color
+                (x0, y0), (x1, y1), arrowstyle="-|>", mutation_scale=11, lw=1.4, color=color
             )
         )
 
-    box(0.1, 2.35, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")
+    def elbow(xsplit, ymid, ytarget, xbox, color):
+        """Right-angle connector: vertical from (xsplit, ymid) to ytarget, then arrow into xbox."""
+        ax.plot(
+            [xsplit, xsplit], [ymid, ytarget], color=color, lw=1.4, solid_capstyle="round", zorder=1
+        )
+        arrow(xsplit, ytarget, xbox, ytarget, color)
+
+    MID = 3.0  # the single horizontal centerline everything aligns to
+    box(0.45, MID - 0.65, 1.7, 1.3, "per-lane\nkernel", "#ecf0f1")  # visual right edge 2.25
     box(
-        2.2,
-        2.0,
-        2.7,
+        2.95,  # visual left edge 2.85 -> clean 0.6 gap after the per-lane box
+        MID - 1.0,
+        2.75,
         2.0,
         "tritongpu-thread-region\n(detect lock-step:\nscf.while+#blocked\n+tt.reduce)",
         "#fdebd0",
-    )
+    )  # visual right edge 5.80
     cure_txt = (
         f"thread lowering (cure)\n{tile:.0f}→{thread:.0f} Gbps = {speedup:.1f}×\n"
         f"≥ hand-CUDA ({cuda:.0f})"
     )
-    box(7.3, 3.4, 4.4, 1.5, cure_txt, "#abebc6")
-    box(7.3, 0.6, 4.4, 1.5, "tile path\n(unchanged)", "#d6dbdf")
+    box(7.85, 3.60, 4.45, 1.5, cure_txt, "#abebc6")  # visual left 7.75, center y = 4.35
+    box(7.85, 0.90, 4.45, 1.5, "tile path\n(unchanged)", "#d6dbdf")  # visual left 7.75, center 1.65
 
-    arrow(1.8, 3.0, 2.2, 3.0)  # per-lane -> detect
-    arrow(4.9, 3.3, 7.3, 4.1, "#1e8449")  # detected -> cure (up)
-    arrow(4.9, 2.7, 7.3, 1.5, "#7f8c8d")  # no signature -> tile (down)
-    ax.text(6.0, 4.25, "detected\n(NFA worklist)", ha="center", fontsize=7, color="#1e8449")
-    ax.text(6.0, 1.7, "no signature\n(pointer-chase)", ha="center", fontsize=7, color="#7f8c8d")
+    arrow(2.25, MID, 2.85, MID)  # per-lane -> detect (edge to edge)
+    # shared stem out of the detector, then two mirrored right-angle branches
+    ax.plot([5.80, 6.75], [MID, MID], color="#333", lw=1.4, solid_capstyle="round", zorder=1)
+    elbow(6.75, MID, 4.35, 7.75, "#1e8449")  # detected -> cure (up)
+    elbow(6.75, MID, 1.65, 7.75, "#7f8c8d")  # no signature -> tile (down)
+    # labels live in the empty pockets above/below the elbow corners, clear of every line/box
+    ax.text(
+        6.6, 4.86, "detected\n(NFA worklist)", ha="center", va="center", fontsize=7, color="#1e8449"
+    )
+    ax.text(
+        6.6,
+        1.14,
+        "no signature\n(pointer-chase)",
+        ha="center",
+        va="center",
+        fontsize=7,
+        color="#7f8c8d",
+    )
     ax.set_title(
         "Automatic detect→route→lower: lock-step regions go to the thread cure,\n"
         "everything else stays on the tile path (oracle-gated)",
         fontsize=8.5,
     )
-    fig.tight_layout()
-    fig.savefig(OUT / "fig_selector.png", dpi=150)
+    fig.savefig(OUT / "fig_selector.png", dpi=150, bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
 
 

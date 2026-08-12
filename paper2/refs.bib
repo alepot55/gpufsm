@@ -27,7 +27,7 @@
   doi = {10.1145/3315508.3329973}
 }
 @misc{linearlayouts2025,
-  author = {{Triton contributors}},
+  author = {Zhou, Keren and Lezcano, Mario and Goucher, Adam and Rakhmati, Akhmed and Niu, Jeff and Lebar, Justin and Szczerbuk, Pawel and Bell, Peter and Tillet, Phil and Raoux, Thomas and Moudallal, Zahi},
   title = {Linear Layouts: Robust Code Generation of Efficient Tensor Computation Using $\mathbb{F}_2$},
   year = {2025},
   note = {arXiv:2505.23819}
@@ -40,9 +40,11 @@
   doi = {10.1145/3617232.3624848}
 }
 @article{hybridsa2024,
-  author = {{HybridSA authors}},
+  author = {Le Glaunec, Alexis and Kong, Lingkun and Mamouras, Konstantinos},
   title = {HybridSA: {GPU} Acceleration of Multi-pattern Regex Matching using Bit Parallelism},
-  journal = {Proc. ACM Program. Lang. (OOPSLA)},
+  journal = {Proc. ACM Program. Lang. (OOPSLA2)},
+  volume = {8},
+  pages = {1699--1728},
   year = {2024},
   doi = {10.1145/3689771}
 }
@@ -61,9 +63,11 @@
   doi = {10.1145/3579453}
 }
 @article{automatablas2025,
-  author = {{AutomataBLAS authors}},
+  author = {Wu, Zhenlin and Ge, Tianao and Li, Jiajia and Chen, Xinyu and Liu, Hongyuan},
   title = {Advancing Matrix Operations for High-Performance and Memory-Efficient Automata Processing on {GPUs}},
   journal = {ACM Trans. Archit. Code Optim. (TACO)},
+  volume = {22},
+  number = {4},
   year = {2025},
   doi = {10.1145/3774656}
 }
@@ -145,25 +149,26 @@
   author = {{Anonymous}},
   title = {The Two Faces of Abstraction Regret: Execution Paradigm over Abstraction Height on Irregular Automata},
   year = {2026},
-  note = {Companion diagnosis paper}
+  note = {Manuscript under review, 2026}
 }
-@inproceedings{prism2026,
-  author = {Anonymous},
-  title = {Prism: Typed Perspectives for Mixed Thread- and Tile-Level {GPU} Programming},
-  booktitle = {Proc. ACM Program. Lang. (PLDI)},
+@article{prism2026,
+  author = {Bansal, Manya and Sainati, Daniel and Cutler, Joseph W. and Amarasinghe, Saman and Ragan-Kelley, Jonathan},
+  title = {Modular {GPU} Programming with Typed Perspectives},
+  journal = {Proc. ACM Program. Lang. (PLDI)},
+  volume = {10},
   year = {2026},
   doi = {10.1145/3808290},
   note = {arXiv:2511.11939}
 }
 @misc{cutile2025,
   author = {{NVIDIA}},
-  title = {{cuTile} and {Tile IR}: a tile-level programming model for {CUDA}},
+  title = {{cuTile} and {CUDA Tile IR}: a tile-level model and {MLIR} {IR}, with a {Tile IR} backend for {OpenAI Triton}},
   year = {2025},
-  note = {CUDA 13.1; \url{https://github.com/NVIDIA/cuda-tile}}
+  note = {CUDA 13.1; developer.nvidia.com/blog (CUDA Tile IR Backend for OpenAI Triton); \url{https://github.com/NVIDIA/cuda-tile}}
 }
 @misc{tawa2026,
-  author = {Anonymous},
-  title = {{Tawa}: Automatic Warp Specialization for {Triton}},
+  author = {Chen, Hongzheng and Fan, Bin and Collins, Alexander and Hagedorn, Bastian and Gaburov, Evghenii and Masuda, Masahiro and Brookhart, Matthew and Sullivan, Chris and Knight, Jason and Zhang, Zhiru and Grover, Vinod},
+  title = {{Tawa}: Automatic Warp Specialization for Modern {GPUs} with Asynchronous References},
   year = {2026},
   note = {CGO; arXiv:2510.14719}
 }
@@ -173,4 +178,11 @@
   booktitle = {Proc. PLDI},
   year = {2018},
   doi = {10.1145/3192366.3192413}
+}
+
+@misc{its2017,
+  author = {{NVIDIA Corporation}},
+  title = {{NVIDIA} {Tesla} {V100} {GPU} Architecture: The World's Most Advanced Data Center {GPU}},
+  year = {2017},
+  note = {Whitepaper WP-08608-001-v1.1; introduces Independent Thread Scheduling}
 }

@@ -1,0 +1,39 @@
+diff --git a/python/src/passes.cc b/python/src/passes.cc
+index 608d93e..95f867e 100644
+--- a/python/src/passes.cc
++++ b/python/src/passes.cc
+@@ -61,6 +61,9 @@ void init_triton_passes_ttgpuir(py::module_ &m) {
+   using namespace mlir::triton::gpu;
+   using namespace mlir::triton::instrument;
+   ADD_PASS_WRAPPER_0("add_coalesce", createTritonGPUCoalesce);
++  ADD_PASS_WRAPPER_0("add_thread_region", createTritonGPUThreadRegion);
++  ADD_PASS_WRAPPER_0("add_lower_thread_region_retire",
++                    createTritonGPULowerThreadRegionRetire);
+   ADD_PASS_WRAPPER_0("add_optimize_thread_locality",
+                      createTritonGPUOptimizeThreadLocality);
+   ADD_PASS_OPTION_WRAPPER_1("add_hoist_tmem_alloc",
+diff --git a/third_party/nvidia/backend/compiler.py b/third_party/nvidia/backend/compiler.py
+index 8b713cb..a53cb1d 100644
+--- a/third_party/nvidia/backend/compiler.py
++++ b/third_party/nvidia/backend/compiler.py
+@@ -267,6 +267,10 @@ class CUDABackend(BaseBackend):
+         dump_enabled = pm.enable_debug()
+         emuTF32 = (capability // 10 >= 8)
+         passes.ttir.add_convert_to_ttgpuir(pm, f"cuda:{capability}", opt.num_warps, 32, opt.num_ctas)
++        # gpufsm research pass: detect lock-step irregular regions (thread_region candidates).
++        # Gated by env var so it is a no-op for normal compilation. See docs/P2_PASS_DESIGN.md.
++        if os.environ.get("GPUFSM_THREAD_REGION"):
++            passes.ttgpuir.add_thread_region(pm)
+         # optimize TTGIR
+         passes.ttgpuir.add_coalesce(pm)
+         passes.ttgpuir.add_f32_dot_tc(pm, emuTF32)
+@@ -390,6 +394,9 @@ class CUDABackend(BaseBackend):
+         nvidia.passes.ttnvgpuir.add_proxy_fence_insertion(pm, capability)
+         nvidia.passes.ttnvgpuir.add_tmem_barrier_insertion(pm)
+         nvidia.passes.ttgpuir.add_to_llvmir(pm, capability, ptx_version, "consan" in options.instrumentation_mode)
++        # gpufsm cure (M1): per-lane retirement lowering, gated by env (retire mode only).
++        if os.environ.get("GPUFSM_THREAD_REGION") == "retire":
++            passes.ttgpuir.add_lower_thread_region_retire(pm)
+         nvidia.passes.ttnvgpuir.add_initialize_ws_cluster_barriers(pm, capability, ptx_version)
+         passes.ttgpuir.add_canonicalize_llvm_ir(pm)
+         passes.common.add_cse(pm)
