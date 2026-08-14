@@ -78,6 +78,9 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - Esiste un report `/deep-research` (verifica citazioni/numeri esatti) — integrare quando disponibile.
 
 ## 6. Convenzioni di sviluppo
+> 🗣️ **Stile delle risposte (preferenza utente, 2026-08-14): BREVI e CONCISE.** Risultato e punti
+> critici, niente riepiloghi lunghi, niente elenchi di cose già dette. Il dettaglio sta nei commit e nei
+> doc, non nel messaggio. Vale anche per la prosa dei paper: **mai em dash**.
 > ⚠️ **CI parity (la CI falliva sempre):** la CI esegue **`ruff format --check`** oltre a `ruff check`.
 > Prima di OGNI commit lanciare: `ruff format src tests scripts paper/figures.py && ruff check src tests && mypy && pytest -m "not gpu"`.
 > Non basta `ruff check`: serve anche il **format**.
@@ -93,6 +96,44 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
 
 ## 7. Stato corrente (handoff sessione 2)
+
+### ⚠️ AZIONE APERTA (2026-08-14): sottomettere ad ASPLOS 2027 entro il **9 SET 2026 AoE**
+**PPoPP 2027 È STATA PERSA.** Deadline reale confermata = 3 ago 2026 AoE (non più una stima). La Gmail
+lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug. Account creato,
+**submit mai premuto**. Prima ancora: TACO-2026-324 sottomessa il 5 lug → **desk-reject**.
+- **Nuovo target: ASPLOS 2027 ciclo Fall — paper 9 set 2026 AoE**, nessuna abstract deadline separata,
+  notifica 21 dic 2026, conf 11-15 apr 2027 Heraklion. 11pp **escluse** le referenze. Double-blind +
+  **rapid-review che legge solo le prime 2 pagine**. Formato imposto:
+  `\documentclass[sigplan,anonymous,review,nonacm]{acmart}`, corpo **10pt (non 9)**, nulla sotto 8pt.
+- **Alternative verificate** (12 venue, fonti primarie): CGO 2027 R2 10 set (fit 5/5, stessa settimana
+  di ASPLOS → sceglierne UNA); EuroSys 2027 fall 24 set (fit 3/5); IPDPS 2027 9 ott (fit 4/5);
+  TOPLAS rolling (rete di sicurezza, mai "persa", ma 6-12+ mesi). **CFP non ancora usciti**: PLDI 2027
+  (Atlanta FCRC giu 2027, storicamente deadline ~nov 2026 → 3ª chance), CC 2027, PACT 2027, ICS 2027,
+  MICRO 2027. HPCA 2027 (31 lug) e PPoPP: scadute.
+- **PRONTO E COMMITTATO**: `paper2/gpufsm_asplos.{tex,pdf}` (anonimo, da caricare),
+  `paper2/gpufsm_asplos_named.{tex,pdf}` (con autore, NON caricare), `paper2/ASPLOS_ABSTRACT.txt`
+  (ASCII da incollare nel form), `docs/SUBMISSION_ASPLOS.md` (compliance + passi HotCRP).
+  Verificato: 9pp testo (ref da p.10) su 11, 0 errori/overfull/undefined/warning, 0 em dash, anonimato
+  pulito in testo E metadati. Contenuto invariato: conversione solo di formato.
+- **3 rischi di reject-senza-review corretti** in questa sessione: (a) `tab:builtcure` era `resizebox`-ata
+  a **~7.1pt**, sotto il minimo 8pt → entrambe le tabelle ora `\footnotesize` (8pt) naturali, caption
+  `\small` (9pt), nessuno scaling; (b) `\usepackage{lmodern}` sovrascriveva i font ufficiali acmart →
+  rimosso (Libertine/newtx autentici; è emerso 1 overfull, sistemato); (c) mancavano i `\Description`
+  ACM su tutte le 8 figure → aggiunti. Più: guard `\let\Bbbk\relax` prima di `amssymb` (acmart+newtxmath
+  vanno in conflitto) e rimozione dei 2 em dash.
+- 🚫 **BLOCCANTE, serve sessione LOCALE con Chrome**: in questa sessione remota il proxy di egress
+  restituisce **403 di policy** su `hotcrp.com` e `asplos-conference.org` (e su arxiv.org,
+  conf.researchr.org, ecc.). Chrome nel container esce dalla stessa strada → non raggiunge il sito, e la
+  policy vieta di aggirarla. La submission va fatta da locale. **Premere davvero SUBMIT**: un draft
+  salvato non conta (è esattamente l'errore di PPoPP). Da confermare a browser sul CFP: ora esatto della
+  deadline, URL HotCRP del ciclo di settembre, ORCID, ed eventuale **disclosure sull'uso di AI generativa**
+  (ASPLOS la elenca tra le sezioni escluse dal conteggio pagine → probabilmente obbligatoria; va compilata
+  onestamente vista la quantità di lavoro passata da qui).
+- **Toolchain LaTeX** (installata qui, serve per ricompilare): `texlive-latex-{base,recommended,extra}`,
+  `texlive-fonts-{recommended,extra}`, `texlive-bibtex-extra`, `texlive-publishers`, `texlive-plain-generic`
+  (per `binhex.tex`, richiesto da newtxmath), `lmodern`, `poppler-utils`. Build:
+  `pdflatex → bibtex → pdflatex ×2`.
+- **Merge fatto**: `dev` → `main` (93 commit, nessun conflitto, merge `a3400ae`). `main` è ora la verità.
 
 ### ⬆️ UPSTREAM TRITON — stato al 2026-08-14 (leggere per primo se si riprende da qui)
 - **2 PR ancora APERTE e ora rinfrescate su `main` (087e9724, 13 ago), CI ri-partita:**
@@ -114,7 +155,6 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (fast-forward, come il pulsante "Update branch" di GitHub), non rebase.
 - Ipotesi scartata onestamente: `FpSanitizer.cpp` crea split e join ma ai due estremi di una ricorsione
   con un mma in mezzo ⇒ non è il round-trip diretto che il fold richiede, non usarlo come use-case.
-
 
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
 - **[Iter più recente] VENUE DECISO + versione HPEC 6pp PRONTA (2026-06-27).** Dopo deep-research
