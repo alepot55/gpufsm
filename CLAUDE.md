@@ -121,14 +121,28 @@ lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug
   rimosso (Libertine/newtx autentici; è emerso 1 overfull, sistemato); (c) mancavano i `\Description`
   ACM su tutte le 8 figure → aggiunti. Più: guard `\let\Bbbk\relax` prima di `amssymb` (acmart+newtxmath
   vanno in conflitto) e rimozione dei 2 em dash.
-- 🚫 **BLOCCANTE, serve sessione LOCALE con Chrome**: in questa sessione remota il proxy di egress
-  restituisce **403 di policy** su `hotcrp.com` e `asplos-conference.org` (e su arxiv.org,
-  conf.researchr.org, ecc.). Chrome nel container esce dalla stessa strada → non raggiunge il sito, e la
-  policy vieta di aggirarla. La submission va fatta da locale. **Premere davvero SUBMIT**: un draft
-  salvato non conta (è esattamente l'errore di PPoPP). Da confermare a browser sul CFP: ora esatto della
-  deadline, URL HotCRP del ciclo di settembre, ORCID, ed eventuale **disclosure sull'uso di AI generativa**
-  (ASPLOS la elenca tra le sezioni escluse dal conteggio pagine → probabilmente obbligatoria; va compilata
-  onestamente vista la quantità di lavoro passata da qui).
+- ✅ **CFP LETTO A BROWSER (14 ago, sessione locale)** — le 4 domande aperte sono chiuse:
+  (a) **deadline esatta**: 9 set AoE = **gio 10 set 2026, 13:59 CEST**;
+  (b) **URL HotCRP settembre: NON ESISTE ANCORA**. Il CFP linka solo il ciclo di aprile
+  (`asplos27-apr.hotcrp.com`, chiuso); `asplos27-sep`/`-sept`/`-fall` danno tutti "no such conference" e
+  l'indice HotCRP non elenca nessun sito settembre '27. Convenzione ('26 spring/summer, '27 apr) ⇒ atteso
+  `asplos27-sep.hotcrp.com`, ma **prendere l'URL dal CFP, non indovinarlo**;
+  (c) **ORCID**: non serve al submit, serve agli autori dei paper **accettati** per chiudere la pubblicazione ACM;
+  (d) **disclosure AI generativa: OBBLIGATORIA** (ACM authorship policy), in acknowledgments subito prima
+  delle referenze, fuori dal conteggio pagine. In più: **artifact evaluation è post-accettazione** (AEC
+  Summer, artifact 7 gen 2027), niente da spuntare al submit.
+- ✅ **DUE MANCANZE TROVATE E SANATE** (14 ago): (1) `\section*{Acknowledgments}` con la disclosure AI
+  onesta in entrambe le build (usato `\section*` e NON l'ambiente `acks`: con `anonymous` acmart lo
+  sopprime, la disclosure sarebbe sparita in silenzio); (2) **nota di resubmission obbligatoria** (il CFP
+  la impone per lavoro già sottomesso ad altri venue): `paper2/resubmission_note.pdf`, 1pp anonima, dice
+  il desk-reject TACO senza girarci intorno e i 4 cambiamenti sostanziali dopo (cura ricostruita da
+  ricetta pinnata + riprodotta su A100; numeri non riproducibili ri-misurati; straggler law rifittata e
+  validata out-of-sample; risultati negativi aggiunti). Ricompilato: **9pp testo, ack+ref da p.10, 0
+  errori/overfull/undefined, 0 em dash, anonimato pulito**. Bib: aggiunti gli URL arXiv/tech-report
+  mancanti (il CFP chiede link cliccabili per ogni entry).
+- 🚫 **BLOCCANTE (non nostro): il sito di submission non è ancora aperto.** Tutto il resto è pronto.
+  Promemoria calendario creati: **1 set** (submit) e **10 set 12:30** (deadline scade alle 13:59).
+  **Premere davvero SUBMIT**: un draft salvato non conta (è esattamente l'errore di PPoPP).
 - **Toolchain LaTeX** (installata qui, serve per ricompilare): `texlive-latex-{base,recommended,extra}`,
   `texlive-fonts-{recommended,extra}`, `texlive-bibtex-extra`, `texlive-publishers`, `texlive-plain-generic`
   (per `binhex.tex`, richiesto da newtxmath), `lmodern`, `poppler-utils`. Build:

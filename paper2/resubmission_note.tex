@@ -1,0 +1,60 @@
+% ASPLOS'27 requires a separate note describing the changes since any previous
+% submission of the work, at any venue. Kept to one page, anonymous.
+\documentclass[10pt]{article}
+\usepackage[letterpaper,top=1in,bottom=1in,left=1in,right=1in]{geometry}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+
+\title{\vspace{-2.5em}Resubmission note\\
+\large From Diagnosis to Cure: Decomposing the Tile-SPMD Abstraction Regret on Irregular Automata}
+\date{}
+\author{}
+
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+\textbf{Previous submission.} This work was submitted once before, to ACM TACO, on
+5 July 2026. It was returned by the Editor-in-Chief on 7 July 2026 as an editorial
+decision, without external review and without reviewer reports. The stated grounds
+were that the manuscript did not meet the journal's novelty and quality bar, and
+that the results were ``too premature for publication,'' with more work needed to
+substantiate the conclusions. It has not been submitted to ASPLOS before, nor to
+any other venue, and it is under review nowhere else.
+
+\textbf{How the work changed since.} Because no reviewer reports were provided, we
+treated the one substantive signal we had, prematurity, as the thing to fix. The
+weakest claim at the time was the cure: it existed as a single compiler build on a
+single GPU, which is exactly the shape of a result that cannot yet carry a
+conclusion. Four changes followed.
+
+\emph{1. The cure is now cross-architectural and rebuildable.} The
+TritonGPU$\rightarrow$LLVM per-lane-retirement pass is rebuilt from a pinned
+one-command recipe, and the speedup reproduces on a second architecture: 1.6 to
+3.8$\times$ on an A100, against 2.3 to 6.7$\times$ on the RTX 4070, from the same
+artifact. The cure is no longer one machine and one build.
+
+\emph{2. Numbers that could not be reproduced from the pinned recipe were
+replaced.} During the rebuild we found that some figures came from an earlier local
+build that the pinned recipe did not reproduce exactly. Those numbers were
+re-measured and replaced rather than carried over.
+
+\emph{3. The predictive claim was refit and tested out of sample.} The straggler law
+was refit ($R^2 = 0.997$) and validated on held-out configurations, with 1.5\% and
+2.1\% out-of-sample error, so it is now a prediction rather than a fit.
+
+\emph{4. Negative results were added, deliberately.} The paper now carries a
+cure-rejection witness (a kernel where the pass correctly declines to fire) and a
+generality law over eight oracle-gated workloads, including a pointer-chase negative
+control at 1.00$\times$ and a case where the sign inverts and the tile wins
+(0.64$\times$). These bound the claim instead of extending it.
+
+\textbf{Presentation.} The manuscript was condensed from the 16-page
+\texttt{acmsmall} journal format to the ASPLOS format and page limit, the
+contribution list was consolidated, and the abstract was tightened. An
+acknowledgments section disclosing the use of a generative AI assistant was added,
+per the ACM authorship policy. The technical content is otherwise the content
+described above.
+
+\end{document}
