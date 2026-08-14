@@ -78,6 +78,9 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 - Esiste un report `/deep-research` (verifica citazioni/numeri esatti) — integrare quando disponibile.
 
 ## 6. Convenzioni di sviluppo
+> 🗣️ **Stile delle risposte (preferenza utente, 2026-08-14): BREVI e CONCISE.** Risultato e punti
+> critici, niente riepiloghi lunghi, niente elenchi di cose già dette. Il dettaglio sta nei commit e nei
+> doc, non nel messaggio. Vale anche per la prosa dei paper: **mai em dash**.
 > ⚠️ **CI parity (la CI falliva sempre):** la CI esegue **`ruff format --check`** oltre a `ruff check`.
 > Prima di OGNI commit lanciare: `ruff format src tests scripts paper/figures.py && ruff check src tests && mypy && pytest -m "not gpu"`.
 > Non basta `ruff check`: serve anche il **format**.
