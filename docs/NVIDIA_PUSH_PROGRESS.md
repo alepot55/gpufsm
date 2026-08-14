@@ -52,6 +52,29 @@ Triton PRs/issues/maintainer replies autonomously. Lesson: run the FULL lit suit
 
 ## Findings log (newest first)
 
+- **2026-08-14 UPSTREAM PR TRIAGE dopo 5 settimane di stallo — 2 aperte rinfrescate, 3 chiuse.**
+  Stato verificato: **#10766** (fold split/join) APERTA, CI verde, tutte le review risolte, ferma dal
+  ping del 5 lug; **#10780** (docs plugin examples) APERTA, discussione con CRobeck chiusa il 10 lug;
+  **#10788** CHIUSA da Raoux ("block pointer is deprecated and will be removed soon, so I don't think
+  we want patches for it") — coerente col pattern noto: merge solo root-fix di bug reali e raggiungibili;
+  #10785/#10774 gia' chiuse. Nessuna delle due aperte ha conflitti: entrambe mergiano pulito su main
+  (087e9724, 13 ago). Azioni: (a) merge di main in entrambi i branch + push su alepot55/triton -> CI
+  ri-gira sulla base di oggi (force-push evitato, il classifier lo blocca; il merge e' fast-forward e
+  non distruttivo). (b) **Ri-validato #10766 contro #10749** (neildhar, 7 lug, "Generalize split and
+  join layout handling"): ha rilassato JoinOp::verify/SplitOp::isCompatibleReturnTypes a
+  ignoreRegBroadcast=true -> i nostri fold usano uguaglianza ESATTA dei tipi, quindi restano
+  strettamente piu' conservativi = sound; limite onesto: round-trip che differiscono solo per
+  register-broadcast non foldano. (c) **Trovato e fixato un difetto reale in #10780**: l'Example 3 di
+  examples/plugins/README.md NON COMPILA su main (`IndentationError: unindent does not match any outer
+  indentation level`) — dump_stages_hook/override_stages indentano la guardia di early-return a 2 spazi
+  col corpo a 4. Fix di 5 righe; verificato estraendo ogni blocco ```python dal README e passandolo a
+  compile(): 4/4 ok (prima 3/4). Questo alza la PR da "miglioria" a "fix di un esempio rotto" = la
+  soglia di merge che questi maintainer applicano. (d) Ipotesi SCARTATA onestamente: FpSanitizer.cpp
+  crea split e join ma ai due estremi di una ricorsione con mma in mezzo -> NON e' un round-trip
+  diretto, non lo usiamo come use-case. ⚠️ Questa sessione non puo' commentare su triton-lang/triton
+  (scope GitHub = alepot55/*, cross-tier add rifiutato) -> commenti pronti in `docs/upstream/PING_DRAFTS.md`,
+  da incollare a mano.
+
 - **2026-07-03 06:40 PIVOT to Raoux-mergeable profile → PR #10788 (fixes REGRESSION #10751).** Learned the pattern: Raoux rejected BOTH band-aids (#10766 workaround, #10785 crash-diagnostic 'can this happen in real life? not the right fix'). He merges ROOT fixes of REAL, reachable bugs. Closed #10785 gracefully (agreed: the AMD global_scratch path isn't reachable from real kernels). Retargeted to the agent's best-fixability lead: **#10751** — fp8 block-pointer load with padding_option='zero' fails to compile ('cannot cast int32 to fp8e4nv'), a fresh REGRESSION from #9668, user-reported, reachable. Reproduced on from-source triton 3.8 + RTX 4070; root cause = the 'zero' padding value is a Python int → int→fp8 cast has no path. Root fix in core.py: float zero for floating-point pointees (mirrors the nan branch). Verified padding is EXACTLY zero across fp8/fp16/bf16/fp32/int8/int32 (correctness, not just compile); added fp8 regression test (the existing test_block_copy never covered fp8 — why it slipped). Full test_block_pointer.py green (235 pass). **PR #10788 (Fixes #10751)** — regression-restore + clean root fix + verified + frontend-only (fast CI) = highest merge-prob so far. LIVE PRs: #10766 (folds), #10780 (hook memo), #10788 (fp8 regression). #10785 closed. Monitor bi61421pj.
 
 - **2026-07-03 01:00 THIRD upstream PR — #10785 fixes a verified core-conversion CRASH (issue #9078).** User mandate: leverage our deep Triton knowledge for a high-value, uniquely-ours contribution. Two agent-driven issue trawls (WS-specific, then all-passes) + local verification: the WS bug well is thin (both top candidates #7354/#7244 already fixed on main), but found **#9078** — `GlobalScratchAllocOpConversion` (lib/Conversion/TritonGPUToLLVM/MemoryOpToLLVM.cpp:89) `assert(opOffsetAttr)` ABORTS the compiler when the op reaches lowering without the offset attr (AMD pipeline, which doesn't run the allocation pass since the op is NVIDIA-TMA-only). Reproduced on clean origin/main (SIGABRT), fixed = replace assert with `notifyMatchFailure` (clean 'failed to legalize' diagnostic, mirrors the existing !funcOp early-out). Added AMD -verify-diagnostics test; full lit suite green (278). PR #10785 (Fixes #9078), tags peterbell10 (who commented on #9078 AND reviewed #10766). High merge-probability: crash→clean-error is unambiguously correct, core shared conversion, arch-independent, tested. Now THREE live PRs: #10766 (folds, green-lit by Raoux, in CI), #10780 (hook memo, awaiting CRobeck), #10785 (crash fix).
