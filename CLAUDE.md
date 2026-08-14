@@ -94,6 +94,28 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
 
 ## 7. Stato corrente (handoff sessione 2)
 
+### ⬆️ UPSTREAM TRITON — stato al 2026-08-14 (leggere per primo se si riprende da qui)
+- **2 PR ancora APERTE e ora rinfrescate su `main` (087e9724, 13 ago), CI ri-partita:**
+  - **#10766** fold `split(join)`/`join(split)` — ogni review risolta (Raoux + peterbell10), CI verde,
+    ferma dal ping del 5 lug, manca solo che qualcuno la mergi. Branch `fold-split-join` su
+    `alepot55/triton`. Ri-validata contro **#10749** (7 lug, rilassa `JoinOp::verify` /
+    `SplitOp::isCompatibleReturnTypes` a `ignoreRegBroadcast=true`): i nostri fold usano uguaglianza
+    **esatta** dei tipi ⇒ strettamente più conservativi, sound. Limite onesto: round-trip che
+    differiscono solo per register-broadcast non foldano.
+  - **#10780** docs plugin examples — branch `hook-key-cache`. Aggiunto un **fix di difetto reale**:
+    l'Example 3 di `examples/plugins/README.md` **non compila** su main (`IndentationError`), la guardia
+    di early-return è a 2 spazi col corpo a 4. Fix di 5 righe, verificato con `compile()` su tutti i
+    blocchi ```python (4/4 ok, prima 3/4). Alza la PR da miglioria a fix di un esempio rotto.
+- **Chiuse:** #10788 (Raoux: "block pointer is deprecated and will be removed soon"), #10785, #10774.
+- ⚠️ **Le sessioni cloud non possono commentare su `triton-lang/triton`** (scope GitHub = `alepot55/*`,
+  cross-tier `add_repo` rifiutato). I due commenti sono pronti in **`docs/upstream/PING_DRAFTS.md`** —
+  vanno incollati a mano (o da una sessione locale con `gh`).
+- ⚠️ Il classifier blocca `git push --force`: per aggiornare un branch di PR usare **merge di `main`**
+  (fast-forward, come il pulsante "Update branch" di GitHub), non rebase.
+- Ipotesi scartata onestamente: `FpSanitizer.cpp` crea split e join ma ai due estremi di una ricorsione
+  con un mma in mezzo ⇒ non è il round-trip diretto che il fold richiede, non usarlo come use-case.
+
+
 ### Fatto e verde (GPU) — sessione 2, RTX 4070 (sm_89), CUDA toolkit 13.3 / driver 580 (max CUDA 13.0)
 - **[Iter più recente] VENUE DECISO + versione HPEC 6pp PRONTA (2026-06-27).** Dopo deep-research
   (4 agent: SC-workshops/conferenze/journal/CV-value) l'utente ha scelto **IEEE HPEC 2026** come target
