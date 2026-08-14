@@ -135,7 +135,33 @@ lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug
   `pdflatex → bibtex → pdflatex ×2`.
 - **Merge fatto**: `dev` → `main` (93 commit, nessun conflitto, merge `a3400ae`). `main` è ora la verità.
 
-### ⬆️ UPSTREAM TRITON — stato al 2026-08-14 (leggere per primo se si riprende da qui)
+### ⬆️ UPSTREAM TRITON — stato al 2026-08-14, sera (leggere per primo se si riprende da qui)
+- **SCOPERTA CHE CAMBIA IL GIOCO: la CI degli outside contributor non parte da sola.** Il repo gira con
+  "require approval for all outside collaborators": ogni push mette la run in `action_required` finche' un
+  maintainer non clicca **Approve and run workflows** (non e' la variante primo-contributo: eravamo gia'
+  stati approvati 3 volte). ⇒ **ogni push cancella il verde**, incluso il merge di `main` per rinfrescare
+  il branch (il refresh di stamattina ha azzerato la CI verde che #10766 aveva dal 2 lug). Regola: fare
+  tutti i push in una volta, poi **congelare il branch** e pingare citando l'URL della run pendente
+  (`gh api 'repos/triton-lang/triton/actions/runs?status=action_required'`).
+- **CODEOWNERS e' un vicolo cieco**: nessuna regola per `lib/Dialect/Triton/IR/`, `test/`, `examples/` ⇒
+  tutto cade su `*  @ptillet`, auto-assegnato ma senza review ne' merge dal 17 giu. Mai pingare lui.
+  Chi mergia (5,5 settimane): Jokeren 15, ThomasRaoux 9, peterbell10 9, lezcano 7. Dialect/canonicalize →
+  ThomasRaoux; `examples/plugins/` → Jokeren; semantica split/join → neildhar (dopo #10749).
+- **#10766 rilanciata con lo use case misurato** che Raoux chiedeva dal 1 lug: helper `@triton.jit` che
+  ritorna `tl.join(cheap, tl.dot(x,w))` + chiamante che splitta e usa solo la meta' economica ⇒ il
+  round-trip tiene vivo il dot morto **e il suo staging in shared memory**: 16 KB smem, 78 vs 40 reg,
+  224 vs 72 SASS, 1,35x (4070). ⚠️ Caveat da non perdere: se la meta' morta e' solo una load, **ptxas la
+  toglie da solo** e il SASS e' identico ⇒ rivendicare solo il caso shared-memory. Descrizione riscritta,
+  ping postato a ThomasRaoux (cc peterbell10, neildhar), thread di review vecchio risolto, offerta di
+  chiusura ritirata.
+- **#10780 splittata**: il difetto reale (blocco python dell'**Example 4** di `examples/plugins/README.md`
+  che non parsa, `IndentationError` da #8401, piu' `pathlib`/`hashlib` usati senza import) e' ora la PR
+  **#11311** da sola (+9/-5, un file). #10780 resta con la sola parte contestata (precompute key/hash) e
+  descrizione ripulita: rimosso il numero "38,9→12,4 us", veniva da un runtime patchato in locale.
+  ⚠️ Era **Example 4**, non 3: i vecchi commenti/commit lo chiamavano 3, corretto pubblicamente.
+- Dettagli e testi in `docs/upstream/PING_DRAFTS.md`. Memoria: [[triton-upstream-merge-mechanics]].
+
+### ⬆️ UPSTREAM TRITON — stato al 2026-08-14, mattina (storico)
 - **2 PR ancora APERTE e ora rinfrescate su `main` (087e9724, 13 ago), CI ri-partita:**
   - **#10766** fold `split(join)`/`join(split)` — ogni review risolta (Raoux + peterbell10), CI verde,
     ferma dal ping del 5 lug, manca solo che qualcuno la mergi. Branch `fold-split-join` su
