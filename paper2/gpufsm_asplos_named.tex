@@ -566,6 +566,24 @@ stays on the tile path. All routing oracle-gated; numbers from the versioned CSV
 % and figures but not references, so no figure may land after them.
 \clearpage
 
+% ASPLOS'27 CFP: use of generative AI must be fully disclosed per the ACM
+% authorship policy, in an Acknowledgments section placed immediately before the
+% references. Acknowledgments do not count against the 11-page limit.
+\section*{Acknowledgments}
+\emph{Disclosure of generative AI use, per the ACM Publications Policy on
+Authorship.} We used a generative AI coding assistant (Anthropic's Claude, driven
+through an agentic command-line interface) extensively in producing this work. It
+wrote and refactored the bulk of the kernel, harness, and analysis code, including
+the compiler pass described in Section~\ref{sec:cure}; it ran the measurement
+scripts; it generated the figures from the versioned CSVs; and it drafted and
+revised the text of this paper. The research questions, the hypotheses, the
+experimental designs, and every scientific claim are ours, as are the decisions
+about what to keep, retract, or re-measure. No number in this paper is
+assistant-generated prose: each one is a recorded measurement in a versioned CSV,
+and each kernel is correctness-gated against a CPU oracle, so the results stand or
+fall on the artifact rather than on the assistant. We have verified the content
+and take full responsibility for it.
+
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
 \end{document}
