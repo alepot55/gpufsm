@@ -141,6 +141,29 @@ if modal is not None:
 # --------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------
+def _proxy_ca_missing_from_certifi() -> str | None:
+    """Return the proxy CA path when it is absent from certifi's bundle, else None.
+
+    Modal's gRPC channel and its blob client both build their SSL context from
+    `certifi.where()`, so a TLS-terminating egress proxy stays untrusted no matter what
+    SSL_CERT_FILE says: the CA has to be appended to that bundle.
+    """
+    candidates = [pathlib.Path("/root/.ccr/agent-proxy-ca.crt")]
+    ssl_env = os.environ.get("SSL_CERT_FILE")
+    if ssl_env:
+        candidates.insert(0, pathlib.Path(ssl_env).with_name("agent-proxy-ca.crt"))
+    try:
+        import certifi
+
+        bundle = pathlib.Path(certifi.where()).read_text()
+    except Exception:
+        return None
+    for ca in candidates:
+        if ca.exists() and ca.read_text().strip() not in bundle:
+            return str(ca)
+    return None
+
+
 def preflight() -> int:
     """Report whether this machine can drive Modal. Returns a process exit code."""
     import urllib.error
@@ -173,8 +196,8 @@ def preflight() -> int:
         (
             "modal credentials",
             has_tokens or has_config,
-            "set MODAL_TOKEN_ID / MODAL_TOKEN_SECRET (modal.com/settings/tokens), or run "
-            "`modal token new` locally",
+            "`modal token set --token-id ak-... --token-secret as-... --no-verify`, or set "
+            "MODAL_TOKEN_ID / MODAL_TOKEN_SECRET (modal.com/settings/tokens)",
         )
     )
 
@@ -191,6 +214,15 @@ def preflight() -> int:
                 "proxy support (HTTPS_PROXY is set)",
                 proxy_ok,
                 "pip install 'modal[api-proxy-support]' so the client honours HTTPS_PROXY",
+            )
+        )
+
+        missing_ca = _proxy_ca_missing_from_certifi()
+        checks.append(
+            (
+                "proxy CA trusted by certifi",
+                missing_ca is None,
+                f"cat {missing_ca} >> \"$(python -c 'import certifi;print(certifi.where())')\"",
             )
         )
 

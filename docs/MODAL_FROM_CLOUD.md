@@ -21,29 +21,40 @@ Fix, una volta sola:
    d'ambiente e setup script.
 3. **Network access**: `Full`, oppure `Custom` con `*.modal.com` e la casella *"Also include default
    list of common package managers"* spuntata (serve a tenere PyPI e GitHub).
-4. **Environment variables** (formato `.env`, una coppia per riga), da
-   [modal.com/settings/tokens](https://modal.com/settings/tokens):
-
-   ```text
-   MODAL_TOKEN_ID=ak-...
-   MODAL_TOKEN_SECRET=as-...
-   ```
-
-5. **Setup script** (opzionale, evita di reinstallare a mano ogni volta):
+4. **Setup script** — gira a ogni avvio di sessione, che è esattamente ciò che serve: il container è
+   effimero, quindi `~/.modal.toml` va riscritto ogni volta. Le tre righe vanno in quest'ordine
+   (`certifi` arriva con `modal`, quindi prima l'install):
 
    ```bash
-   pip install 'modal[api-proxy-support]'
+   pip install -q 'modal[api-proxy-support]'
+   cat /root/.ccr/agent-proxy-ca.crt >> "$(python -c 'import certifi;print(certifi.where())')"
+   modal token set --token-id ak-... --token-secret as-... --no-verify
    ```
+
+   In alternativa al comando `modal token set`, le due env var `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`
+   nel campo **Environment variables** (formato `.env`) fanno la stessa cosa: il client legge entrambe
+   le forme. I token si generano su [modal.com/settings/tokens](https://modal.com/settings/tokens).
+
+Perché ognuna delle tre righe:
+
+- **`api-proxy-support`** (tira dentro `python-socks` + `aiohttp-socks`): la sandbox impone
+  `HTTPS_PROXY` e senza quell'extra il client Modal non lo onora — solleva direttamente un
+  `ImportError` che lo dice.
+- **La riga della CA non è opzionale.** Il proxy ri-termina il TLS, e Modal costruisce il suo SSL
+  context da `certifi.where()` sia sul canale gRPC (via grpclib) sia sul client blob: `SSL_CERT_FILE`,
+  che l'ambiente imposta già, viene **ignorato**. Senza append: `CERTIFICATE_VERIFY_FAILED:
+  self-signed certificate in certificate chain`. Verificato in sessione, prima e dopo.
+- **`--no-verify`**: il default di `modal token set` è `--verify`, che fa una chiamata di rete vera. In
+  un setup script è fragile (una sessione che parte con la rete non ancora aperta fallirebbe lo
+  script); la verifica la fa `--preflight`, con una diagnosi migliore.
 
 ⚠️ Due avvertenze oneste:
 
-- Le variabili vengono copiate **all'avvio della sessione**: dopo la modifica serve una **sessione
-  nuova**, quella in corso non le rilegge.
-- Il token Modal finisce dentro la sandbox, leggibile da qualunque comando della sessione. È un token
-  con pieni poteri sul workspace Modal: se non ti va, tieni il path RunPod/locale e ruotalo quando vuoi.
-
-L'extra `api-proxy-support` (tira dentro `python-socks` + `aiohttp-socks`) non è cosmetico: la sandbox
-imposta `HTTPS_PROXY`, e senza quell'extra il client Modal non lo onora.
+- La configurazione dell'ambiente viene letta **all'avvio della sessione**: dopo la modifica serve una
+  **sessione nuova**, quella in corso non la rilegge.
+- Il token Modal finisce dentro la sandbox, leggibile da qualunque comando della sessione (e in chiaro
+  nel setup script). È un token con pieni poteri sul workspace Modal: se non ti va, tieni il path
+  RunPod/locale e ruotalo quando vuoi.
 
 ## 2. Preflight
 
@@ -52,7 +63,8 @@ python scripts/modal_gpu.py --preflight
 ```
 
 Stampa PASS/FAIL su: modal installato, `api.modal.com` raggiungibile, credenziali presenti, supporto
-proxy. Ogni FAIL riporta il comando esatto per sistemarlo. Da eseguire per primo in ogni sessione nuova.
+proxy, CA del proxy dentro il bundle certifi. Ogni FAIL riporta il comando esatto per sistemarlo. Da
+eseguire per primo in ogni sessione nuova.
 
 ## 3. Lanciare lavoro
 
@@ -101,5 +113,7 @@ il container muore a fine funzione.
 ## Stato di verifica
 
 Verificato in sessione cloud: il blocco `403` su `api.modal.com` (proxy e diretto), la costruzione
-dell'app Modal, il preflight, il dry-run della CLI. **Non** verificato end-to-end: l'esecuzione remota
-richiede l'egress aperto e i token, che stanno nelle impostazioni dell'account.
+dell'app Modal, il preflight (entrambi gli esiti del check CA), il dry-run della CLI, e il fix della CA
+misurato su una connessione reale attraverso il proxy (`CERTIFICATE_VERIFY_FAILED` prima, handshake OK
+dopo). **Non** verificato end-to-end: l'esecuzione remota richiede l'egress aperto e i token, che stanno
+nelle impostazioni dell'account.
