@@ -164,6 +164,28 @@ def _proxy_ca_missing_from_certifi() -> str | None:
     return None
 
 
+def _trust_proxy_ca_in_certifi() -> str | None:
+    """Append the session's proxy CA to certifi's bundle when missing. Returns what it fixed.
+
+    Done here rather than in the environment's setup script because `/root/.ccr/` does not
+    exist yet at that point: the proxy is materialized after setup runs. Idempotent, gated on
+    HTTPS_PROXY being set and on the CA file existing, so it never touches a normal machine.
+    """
+    if not os.environ.get("HTTPS_PROXY"):
+        return None
+    missing = _proxy_ca_missing_from_certifi()
+    if missing is None:
+        return None
+    try:
+        import certifi
+
+        with pathlib.Path(certifi.where()).open("a") as fh:
+            fh.write("\n" + pathlib.Path(missing).read_text().strip() + "\n")
+    except Exception:
+        return None  # best effort; the preflight check re-tests and reports the manual fix
+    return missing
+
+
 def preflight() -> int:
     """Report whether this machine can drive Modal. Returns a process exit code."""
     import urllib.error
@@ -217,10 +239,11 @@ def preflight() -> int:
             )
         )
 
+        appended = _trust_proxy_ca_in_certifi()
         missing_ca = _proxy_ca_missing_from_certifi()
         checks.append(
             (
-                "proxy CA trusted by certifi",
+                "proxy CA trusted by certifi" + (" (appended just now)" if appended else ""),
                 missing_ca is None,
                 f"cat {missing_ca} >> \"$(python -c 'import certifi;print(certifi.where())')\"",
             )
@@ -270,6 +293,8 @@ def cli() -> int:
         print(json.dumps(shown, indent=2))
         print(" ".join(cmd))
         return 0
+    if appended := _trust_proxy_ca_in_certifi():
+        print(f"trusted {appended} in certifi's bundle")
     return subprocess.run(cmd, env=env).returncode
 
 
