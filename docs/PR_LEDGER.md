@@ -1,11 +1,24 @@
-# Ledger delle PR — stato verificato il 2026-08-15
+# Ledger delle PR — stato verificato il 2026-08-15 (ri-verificato la sera, da locale)
 
 Registro unico di **tutte** le pull request del progetto, interne e upstream, con lo stato verificato
-alla fonte (pagine GitHub pubbliche + `git ls-remote refs/pull/*`, non dalla memoria). Serve a non
-riscoprire ogni sessione cosa è stato mandato, cosa è vivo e cosa vale.
+alla fonte (non dalla memoria). Serve a non riscoprire ogni sessione cosa è stato mandato, cosa è vivo
+e cosa vale.
 
-Metodo di verifica riproducibile da una sessione cloud (l'API GitHub su `triton-lang/triton` risponde
-403, lo scope è `alepot55/*`):
+**Metodo — da sessione LOCALE (preferito).** Con `GITHUB_TOKEN` in env l'API GitHub su
+`triton-lang/triton` risponde **200**: il 403 di cui parlano le note più vecchie era del **proxy della
+sessione cloud**, non di GitHub e non del token. Verificato il 15 ago dal portatile.
+
+```
+gh api "search/issues?q=repo:triton-lang/triton+author:alepot55+type:pr" \
+  --jq '.items[] | "\(.number) \(.state) \(.pull_request.merged_at // "not-merged") \(.title)"'
+gh api repos/triton-lang/triton/pulls/<N> --jq '{state,mergeable,mergeable_state,updated_at}'
+gh api "repos/triton-lang/triton/actions/runs?status=action_required" \
+  --jq '.workflow_runs[] | select(.head_repository.owner.login=="alepot55") | "\(.name) \(.head_branch) \(.html_url)"'
+```
+Permessi sulla repo upstream: `pull` only (nessun push) — normale per contributor esterno: i push vanno
+sul fork `alepot55/triton`, i commenti passano dalle issues API (**da locale si può commentare davvero**).
+
+**Metodo — da sessione CLOUD (ripiego, l'API dà 403):**
 
 ```
 git ls-remote https://github.com/triton-lang/triton 'refs/pull/<N>/*'
@@ -23,8 +36,8 @@ Score: **1 mergiata, 2 aperte, 3 chiuse + 1 RFC chiusa.**
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
-| [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, mergeable | in attesa (ping 14 ago) |
-| [#10780](https://github.com/triton-lang/triton/pull/10780) | `[DOCS] Precompute the stages-inspection key/hash in the plugin examples` | 2 lug | **APERTA**, contestata | CRobeck ha obiettato |
+| [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
+| [#10780](https://github.com/triton-lang/triton/pull/10780) | `[DOCS] Precompute the stages-inspection key/hash in the plugin examples` | 2 lug | **APERTA**, contestata, CI da approvare | CRobeck ha obiettato |
 | [#10788](https://github.com/triton-lang/triton/pull/10788) | `[FRONTEND] Fix fp8 block-pointer load with padding_option="zero"` | 4 lug | CHIUSA 4 lug | ThomasRaoux |
 | [#10785](https://github.com/triton-lang/triton/pull/10785) | `[TritonGPU] Fail cleanly when lowering global_scratch_alloc without an offset` | 3 lug | CHIUSA 3 lug | ThomasRaoux |
 | [#10774](https://github.com/triton-lang/triton/pull/10774) | `[NVIDIA] Add verified opt-in per-lane loop retirement pass (RFC #10773)` | 1 lug | CHIUSA (era draft) | ritirata da noi |
@@ -54,12 +67,27 @@ tipi per uguaglianza **esatta**, quindi sono strettamente più conservativi; dec
 differiscono solo per register broadcast.
 Nessuna risposta di un maintainer dopo il 14 ago. **Branch `fold-split-join` da congelare.**
 
+Stato esatto al 15 ago sera (`gh api`, head `00ae4d7e`): `state: open`, `mergeable: true`,
+`mergeable_state: "blocked"`, 8 commenti + 1 review comment (peterbell10, 2 lug), ultimo evento = il
+nostro ping del 14 ago 10:08 con menzione di ThomasRaoux/peterbell10/neildhar. ⚠️ **Zero check-runs sul
+head attuale**: il refresh del 14 ago ha rimesso la run in `action_required`
+([run 31785463900](https://github.com/triton-lang/triton/actions/runs/31785463900)) — cioè oggi la PR
+**non ha il verde**, non perché sia rotta ma perché nessuno ha cliccato "Approve and run workflows".
+Nota di contesto: **#10749 ("Generalize split and join layout handling") è stata mergiata il 7 lug**;
+i nostri fold restano sound perché confrontano i tipi per uguaglianza esatta.
+
 ### #10780 — resta solo la parte contestata
 Dopo lo split contiene **solo** il precompute di key/hash (+26/-17). Obiezione di CRobeck (le chiavi non
 vanno ricalcolate per intercettare cambi di pipeline?) già risposta: una pipeline statica costruita da
 moduli importati non cambia senza re-import, e l'Example 4 dinamico deriva comunque la chiave dal
 contenuto corrente. Rimosso dalla descrizione il numero "38,9 → 12,4 µs": veniva da un runtime patchato
 in locale, non da Triton stock. Chiusura già offerta a Jokeren/CRobeck.
+
+Stato esatto al 15 ago sera (head `0fd6ff8b`, 5 commit, 1 file): `mergeable: true`,
+`mergeable_state: "blocked"`, ultima attività = il **nostro** commento delle 13:23 dopo aver mergiato
+`main` (post-merge di #11311, così il branch porta solo il precompute). Quel merge ha creato una nuova
+run in `action_required` ([31887095757](https://github.com/triton-lang/triton/actions/runs/31887095757)):
+anche qui nessun check verde finché un maintainer non approva.
 
 ### Le chiuse — perché, senza girarci intorno
 - **#10788**: ThomasRaoux, *"block pointer is deprecated and will be removed soon, so I don't think we
@@ -85,9 +113,10 @@ in locale, non da Triton stock. Chiusura già offerta a Jokeren/CRobeck.
   `examples/plugins/` → Jokeren; semantica split/join → neildhar.
 - **Niente `git push --force`** (bloccato dal classifier e comunque sgradito): per aggiornare un branch di
   PR usare il merge di `main`, come il pulsante "Update branch".
-- **Le sessioni cloud non possono commentare** su `triton-lang/triton`, e **un token GitHub in env non
-  cambia niente** (verificato il 15 ago, non assunto). Il blocco è del **proxy della sessione**, non di
-  GitHub: `api.github.com` è intercettato e risponde 403 con un messaggio suo. Con `GITHUB_TOKEN` in env:
+- **Le sessioni cloud non possono commentare** su `triton-lang/triton`, e lì **un token GitHub in env non
+  cambia niente** (verificato il 15 ago, non assunto). ⚠️ Vale **solo per il cloud**: dal portatile, con
+  lo stesso tipo di token in env, la stessa API risponde 200 (vedi il metodo in cima). Il blocco è del
+  **proxy della sessione**, non di GitHub: `api.github.com` è intercettato e risponde 403 con un messaggio suo. Con `GITHUB_TOKEN` in env:
   `GET /user` → 200 `alepot55` (il token è valido), `GET /repos/triton-lang/triton/pulls/10766` → 403
   "not enabled for this session", e persino `GET /repos/alepot55/gpufsm` → 403 "An org admin must connect
   the Claude GitHub App". `/root/.ccr/README.md` dice esplicitamente di non aggirare il blocco. Vie
@@ -113,7 +142,7 @@ in locale, non da Triton stock. Chiusura già offerta a Jokeren/CRobeck.
 
 ---
 
-## B. Interne `alepot55/gpufsm` — 22 PR, **tutte mergiate**, nessuna aperta
+## B. Interne `alepot55/gpufsm` — 23 PR, **tutte mergiate**, nessuna aperta
 
 Sono PR di lavoro auto-mergiate: il contributo è il contenuto, non la PR. Elencate perché sono l'indice
 cronologico più leggibile di cosa è stato fatto e quando.
@@ -140,6 +169,7 @@ cronologico più leggibile di cosa è stato fatto e quando.
 | 20 | Upstream: refresh delle due PR Triton vive + stato registrato | 14 ago |
 | 21 | Infra: runner GPU generico su **Modal** guidato da sessione cloud | 15 ago |
 | 22 | Fix: lo script di setup non deve `cat` la CA del proxy (non esiste ancora) | 15 ago |
+| 23 | Questo ledger + modello operativo local-first | 15 ago |
 
 ⚠️ **Buco nel registro delle PR, non nel lavoro:** tra la #19 (30 giu) e la #20 (14 ago) ci sono **53
 commit su `main` senza PR** — sottomissione TACO (desk-reject), pivot CGO/PPoPP, generalizzazione della
