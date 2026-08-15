@@ -58,9 +58,15 @@ Corpus `triton-opt -test-print-membar`, barriere emesse:
 
 | file | baseline | v1 (WS + yield) | v2 (solo WS) |
 |------|---------:|----------------:|-------------:|
-| `test/Analysis/test-membar.mlir` | 127 | 123 | da misurare |
-| `test/Analysis/test-membar-ttng.mlir` | 27 | 27 | — |
-| `test/TritonNvidiaGPU/membar-cluster.mlir` | 29 | 29 | — |
+| `test/Analysis/test-membar.mlir` | 127 | 123 | **124** |
+| `test/Analysis/test-membar-ttng.mlir` | 27 | 27 | 27 |
+| `test/TritonNvidiaGPU/membar-cluster.mlir` | 29 | 29 | 29 |
+
+**Il caso discriminante è stato costruito e misurato**, non lasciato alla teoria
+(`docs/upstream/artifacts/ws_consan_war.mlir`): un buffer che muore prima della `warp_specialize`,
+così l'allocatore può riusarne i byte per lo scratch che il sanitizer riserva. Baseline: la barriera
+prima della `warp_specialize` **c'è**. v1: **sparisce** (era il bug). v2: **resta**. È esattamente la
+differenza tra il gate sbagliato e quello giusto, e gira senza GPU.
 
 Le funzioni toccate da v1: `warp_specialize_into_default` (2→1), `default_region_cfg` (3→1),
 `check_barrier_no_duplication` (2→1). Con v2 resta la barriera dopo la region in
