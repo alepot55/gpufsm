@@ -3,6 +3,12 @@
 Memoria di progetto per Claude Code. Auto-caricata a ogni sessione in questa repo. Tienila aggiornata
 quando cambiano decisioni o convenzioni.
 
+> 🧠 **La memoria sta nella repo, non nello store locale di Claude.** Fatti trasversali e preferenze di
+> lavoro: **`docs/memory/`** (un file = un fatto, indice in `docs/memory/MEMORY.md`). Lo store
+> per-macchina `~/.claude/projects/*/memory/` contiene solo un puntatore qui.
+> ⚡ **Autonomia: non chiedere conferme per i passi operativi** (aprire/mergiare PR interne, installare
+> dipendenze, configurare infra). Si fanno e si riporta. Vedi `docs/memory/be-autonomous-no-confirmations.md`.
+
 ## 1. Cos'è questo progetto (contesto & tesi)
 `gpufsm` è il refactoring publication-grade di `triton_vs_cuda_fsm`: uno studio + framework sulla
 **elaborazione di automi a stati finiti (NFA/FSM) su GPU**, che confronta **OpenAI Triton** (DSL block-based)
@@ -104,9 +110,11 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
     un sottoinsieme).
   - 🔑 **Token già in env sul portatile (15 ago sera):** `GITHUB_TOKEN` (PAT classico, scope `repo`,
     `workflow`, …), `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`. `gh` li usa da sé (`gh auth status` →
-    "Logged in ... (GITHUB_TOKEN)"). ⚠️ **Il client Modal NON è installato sul portatile** (nessun
-    binario `modal`, nessun modulo python): prima di `scripts/modal_gpu.py` serve `pip install modal`
-    nel venv. Non stampare mai i valori dei token.
+    "Logged in ... (GITHUB_TOKEN)"). Non stampare mai i valori dei token.
+    **Modal è installato e verificato sul portatile (15 ago sera):** venv `/home/alepot55/Desktop/projects/gpufsm/.venv`
+    (`python3 -m venv .venv --system-site-packages`, l'host è PEP 668) + `modal 1.5.4`;
+    `.venv/bin/python scripts/modal_gpu.py --preflight` → **3 PASS** (modal installato, `api.modal.com`
+    raggiungibile, credenziali valide). Da qui la GPU si affitta, non si aspetta.
   - **Upstream Triton si fa da locale con `gh`.** Verificato il 15 ago **da entrambi i lati**: da cloud
     l'API GitHub risponde **403 anche con un token valido in env** perché il blocco è del **proxy della
     sessione**, non di GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo);
