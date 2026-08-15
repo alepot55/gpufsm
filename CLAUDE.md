@@ -192,6 +192,22 @@ lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug
   desk-reject, pivot CGO/PPoPP, generalizzazione della cura, prima ondata upstream), arrivati via `dev`
   con `a3400ae`. Cercare quel periodo in `git log` e nei `docs/`, non nelle PR. Indice: `docs/PR_LEDGER.md`.
 
+### ⬆️ UPSTREAM TRITON — contributo in volo (notte 15→16 ago): membar × warp_specialize
+> 📄 Analisi: `docs/upstream/WS_MEMBAR_SYNCPOINT.md` · testo PR: `docs/upstream/WS_MEMBAR_PR_DRAFT.md`
+> · lead successivo: `docs/upstream/CLC_ARRIVE_LEAD.md` · scartato con motivo: `docs/upstream/MEMBAR_CANSKIPBARSYNC.md`
+- **Cosa**: la membar analysis non sa che entrare nella default region di `ttg.warp_specialize` passa
+  già per due barriere CTA-wide emesse dal lowering → inserisce una `ttg.barrier` ridondante. Patch di
+  18 righe in `lib/Analysis/Membar.cpp` (`getLocalBarrierStages`), gate su `!hasScratchBarrier`.
+- **Misure**: 127 → 124 barriere sul corpus membar (stesso file, due binari); nessun nuovo lit failure
+  su Analysis/TritonGPU/Conversion/TritonNvidiaGPU/NVWS; `clang-format` pulito.
+- **Perché il gate NON è `getCaptureSize() == 0`**: sotto ConSan ogni `warp_specialize` riceve byte di
+  capture riservati → lo scratch esiste anche senza capture e la barriera serve ancora. Verificato con
+  un caso costruito apposta, non dedotto.
+- **Branch pronto**: `membar-ws-syncpoint` in `/home/alepot55/Desktop/projects/triton-src`, 1 commit,
+  push sul fork verificato in dry-run. Destinatario naturale: **@Jokeren** (CODEOWNER del file).
+- **Harness**: `scripts/modal_triton.py` — due alberi persistenti nel Volume Modal (`--tree main` e
+  `--tree ws`), build su CPU, GPU solo per i test. Confronto senza rebuild.
+
 ### ⬆️ UPSTREAM TRITON — stato VERIFICATO al 2026-08-15 (leggere per primo se si riprende da qui)
 > 📒 **Registro completo di TUTTE le PR (interne + upstream) = `docs/PR_LEDGER.md`.** Stato verificato
 > alla fonte, non dalla memoria. **Da locale** si usa `gh api repos/triton-lang/triton/...` (risponde
