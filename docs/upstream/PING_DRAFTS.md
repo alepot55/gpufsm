@@ -1,4 +1,24 @@
-# Upstream Triton, stato al 2026-08-14 (i due commenti sono stati POSTATI)
+# Upstream Triton, stato al 2026-08-15
+
+## 🎉 PRIMO MERGE UPSTREAM: PR #11311 mergiata
+
+`[DOCS] examples/plugins: make the Example 4 python block parse` mergiata da **Jokeren** il
+2026-08-15 13:18Z come **c346e50c7** su `triton-lang/triton` main. Aperta il 14 ago, approvata e
+mergiata in meno di 24 ore, con la CI sbloccata nello stesso giro. E' la prima nostra PR accettata
+upstream e chiude la debolezza "nessun contributo upstream".
+
+**La tattica che ha funzionato: lo split.** La stessa identica correzione, impacchettata dentro
+#10780 insieme a una modifica che un maintainer aveva gia' respinto, era ferma da 43 giorni senza
+CI. Estratta da sola, su un branch nuovo da `main`, un file solo, e' passata subito. Regola: mai
+legare un fix non controverso a una modifica contestata.
+
+Dopo il merge, `main` e' entrata in conflitto con `hook-key-cache`: mergiata `main` dentro il branch
+(obbligatorio, altrimenti la PR resta CONFLICTING), e ora #10780 contiene **solo** il precompute
+(+26/-17), che e' esattamente il punto in discussione.
+
+---
+
+# Stato al 2026-08-14 (i due commenti sono stati POSTATI)
 
 I draft che stavano qui sono stati rivisti e pubblicati da sessione locale con `gh`. Questo file
 ora registra cosa e' stato fatto e cosa resta.
