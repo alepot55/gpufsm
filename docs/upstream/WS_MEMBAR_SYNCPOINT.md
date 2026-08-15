@@ -117,3 +117,22 @@ citare il punto del lowering, altrimenti la prossima modifica lo rompe in silenz
   `test/TritonNvidiaGPU`, `test/NVWS`: la lista dei test falliti è identica prima e dopo (29 in
   entrambi i casi, tutti dovuti al sostituto `filecheck`, non alla patch).
 - `clang-format` pulito sul file toccato.
+
+
+## Verifica su H100 (Modal) — il dato che ridimensiona la portata
+
+Stessa suite, stesso container, due compilatori (baseline e patchato):
+
+- `python/test/unit/language/test_warp_specialization.py`: **145 passed, 1432 skipped** in entrambi i
+  casi → la patch non rompe nulla su hardware vero.
+- Barriere nel PTX generato: **2356 su 75 file PTX in entrambi i casi** → **la regola non scatta nel
+  codice generato**.
+
+Il motivo è strutturale e va detto nella PR invece di lasciarlo scoprire a un reviewer: le partizioni
+di `ttg.warp_specialize` sono `IsolatedFromAbove`, quindi nel codice prodotto dal pipeliner l'op ha
+sempre capture esplicite → possiede uno scratch buffer → il rendezvous era **già** modellato dal path
+scratch. Il buco riguarda la forma **senza capture**, che è quella dei test e dei kernel Gluon scritti
+a mano.
+
+⇒ La PR va presentata per quello che è: completamento del modello, non guadagno di performance.
+Rivendicare velocità qui sarebbe falso e verificabile in trenta secondi da chi la legge.
