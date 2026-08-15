@@ -94,12 +94,19 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (mai link privati/SharePoint).
 - **Branch di lavoro**: `claude/repo-refactor-optimize-snflie`. Commit chiari e atomici.
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
-- **GPU da sessioni cloud (no Remote Control)**: le VM Claude cloud sono CPU-only e i self-hosted
-  environments sono Team/Enterprise, quindi la GPU si affitta su **Modal** (free tier $30/mese) e la
-  sessione fa solo da driver. Runner generico: `scripts/modal_gpu.py --preflight` /
-  `--gpu H100 --cmd ... --fetch ...`. ⚠️ Con la policy di rete **Trusted** (default) `api.modal.com` è
-  bloccato (403 su CONNECT, anche in diretta): serve un ambiente con network **Full**/**Custom** +
-  `*.modal.com` e i token in env var. Setup completo in `docs/MODAL_FROM_CLOUD.md`.
+- 🖥️ **DOVE SI LAVORA (deciso 2026-08-15): in LOCALE, come prima.** Sessioni Claude Code sul PC o sul
+  portatile; il cloud resta un ripiego (CPU-only + GitHub scoped a una sola repo, vedi sotto).
+  - **PC** = RTX 4070 diretta: build CUDA, Nsight (sudo passwordless), sweep, tutto lì.
+  - **Portatile** = niente GPU → **Modal** (free tier $30/mese), la sessione fa solo da driver:
+    `scripts/modal_gpu.py --preflight` poi `--gpu H100 --cmd ... --fetch ...`. Da locale serve solo il
+    token in env: il blocco `api.modal.com` (403 su CONNECT) era della policy di rete **Trusted** delle
+    VM cloud, qui non si applica. Guida: `docs/MODAL_FROM_CLOUD.md` (scritta per il cloud, da locale è
+    un sottoinsieme).
+  - **Upstream Triton si fa da locale con `gh`.** Verificato il 15 ago: da cloud l'API GitHub risponde
+    **403 anche con un token valido in env** perché il blocco è del **proxy della sessione**, non di
+    GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo). `add_repo` read = solo
+    git anonimo, push = negato dal classifier. Da cloud si legge (pagine pubbliche + `git ls-remote
+    refs/pull/*`), da locale si scrive. Dettagli e ricetta per allargare l'accesso: `docs/PR_LEDGER.md`.
 
 ## 7. Stato corrente (handoff sessione 2)
 
