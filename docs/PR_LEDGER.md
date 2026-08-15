@@ -96,6 +96,20 @@ in locale, non da Triton stock. Chiusura già offerta a Jokeren/CRobeck.
   `alepot55/gpufsm`) per la repo nostra, e le pagine pubbliche + `git ls-remote` in lettura per Triton.**
   I testi dei commenti si preparano in `docs/upstream/PING_DRAFTS.md` e si postano da sessione locale
   con `gh`.
+- **Come allargare l'accesso oltre la singola repo** (dai doc ufficiali, 15 ago): l'installazione della
+  GitHub App **non è** il controllo d'accesso — *"a cloud session can access any repository the connecting
+  GitHub account can see, not just the repositories the Claude GitHub App is installed on. App
+  installation enables PR webhooks for Auto-fix; it is not a session-level access control."* Quindi:
+  1. **una volta sola**, dal terminale locale dentro `claude`: **`/web-setup`** → lega il token del `gh`
+     locale all'account Claude (`Connected as alepot55`); le sessioni cloud vedono quello che vede `gh`;
+  2. **per sessione**: il selettore repo di claude.ai/code accetta **più repo**, oppure si prefilla
+     `https://claude.ai/code?repositories=alepot55/gpufsm,triton-lang/triton`;
+  3. **a sessione avviata**: `add_repo`, che però chiede un'approvazione di permesso (in auto mode il
+     classifier nega da solo).
+  ⚠️ Non verificato: se la piattaforma accetti di attaccare una repo di un'**org terza** dove non siamo
+  collaboratori (`add_repo` avvisa che "cross-owner attachments may still be refused"). Ripiego sicuro =
+  il fork `alepot55/triton` (nostro). Per **commentare** upstream resta comunque `gh` locale.
+  Fonti: `code.claude.com/docs/en/claude-code-on-the-web`, `.../web-quickstart`.
 
 ---
 
