@@ -159,3 +159,24 @@ Cosa è cambiato rispetto alla v2 grazie alla review pre-submit (tre reviewer in
 Verifica finale: **lit con il FileCheck vero di Triton** (che sta in `python/triton/FileCheck`, non
 nel pacchetto LLVM scaricato) su 5 suite → stesso identico set di 14 fallimenti pre-esistenti prima e
 dopo, nessuno è un test membar; `pre-commit` verde.
+
+
+## La regola `warp_yield`: quella che vale davvero (misurata il 16 ago, notte)
+
+Tenuta fuori dalla prima PR per disciplina di scope. Misurata dopo, ed è il contrario di quello che
+sembrava: **è lei quella con impatto sul codice generato.**
+
+| albero | corpus membar | PTX generato (suite warp-specialization, H100) | test |
+|---|---:|---:|---|
+| baseline | 127 | 2356 barriere / 75 kernel | 145 passed |
+| solo entry (PR #11323) | 124 | 2356 (invariato) | 145 passed |
+| entry + yield | 123 | **2326 (−30)** | 145 passed |
+| solo yield | 126 | da confermare (atteso 2326) | — |
+
+Soundness verificata alla fonte, non per analogia: `WarpSpecializeUtility.cpp` emette
+`createAllBarrier` a **ogni `WarpReturnOp`** delle partizioni (:420-426) e a **ogni `WarpYieldOp`**
+della default region, con lo **stesso `switchLoopBarrierIdx`** → è letteralmente la stessa barriera
+CTA-wide, quindi un rendezvous fra i gruppi di warp. Il conteggio degli arrivi torna: su ogni path
+ciascuna warp ne esegue esattamente tre.
+
+Lit: stesso identico set di 14 fallimenti pre-esistenti, nessuna regressione.
