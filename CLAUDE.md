@@ -94,6 +94,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   (mai link privati/SharePoint).
 - **Branch di lavoro**: `claude/repo-refactor-optimize-snflie`. Commit chiari e atomici.
 - **Riproducibilità**: figure del paper rigenerate SOLO da CSV versionati; `gpufsm env` cattura versioni/GPU.
+- **GPU da sessioni cloud (no Remote Control)**: le VM Claude cloud sono CPU-only e i self-hosted
+  environments sono Team/Enterprise, quindi la GPU si affitta su **Modal** (free tier $30/mese) e la
+  sessione fa solo da driver. Runner generico: `scripts/modal_gpu.py --preflight` /
+  `--gpu H100 --cmd ... --fetch ...`. ⚠️ Con la policy di rete **Trusted** (default) `api.modal.com` è
+  bloccato (403 su CONNECT, anche in diretta): serve un ambiente con network **Full**/**Custom** +
+  `*.modal.com` e i token in env var. Setup completo in `docs/MODAL_FROM_CLOUD.md`.
 
 ## 7. Stato corrente (handoff sessione 2)
 
