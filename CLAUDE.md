@@ -154,8 +154,35 @@ lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug
   (per `binhex.tex`, richiesto da newtxmath), `lmodern`, `poppler-utils`. Build:
   `pdflatex → bibtex → pdflatex ×2`.
 - **Merge fatto**: `dev` → `main` (93 commit, nessun conflitto, merge `a3400ae`). `main` è ora la verità.
+- ⚠️ **Le PR interne non coprono tutto il lavoro:** 22 PR su `alepot55/gpufsm`, tutte mergiate, nessuna
+  aperta — ma tra la #19 (30 giu) e la #20 (14 ago) ci sono **53 commit su `main` senza PR** (TACO
+  desk-reject, pivot CGO/PPoPP, generalizzazione della cura, prima ondata upstream), arrivati via `dev`
+  con `a3400ae`. Cercare quel periodo in `git log` e nei `docs/`, non nelle PR. Indice: `docs/PR_LEDGER.md`.
 
-### ⬆️ UPSTREAM TRITON — stato al 2026-08-14, sera (leggere per primo se si riprende da qui)
+### ⬆️ UPSTREAM TRITON — stato VERIFICATO al 2026-08-15 (leggere per primo se si riprende da qui)
+> 📒 **Registro completo di TUTTE le PR (interne + upstream) = `docs/PR_LEDGER.md`.** Stato verificato
+> alla fonte, non dalla memoria. Da una sessione cloud l'API GitHub su `triton-lang/triton` dà **403**
+> (scope = `alepot55/*`): si verifica con `git ls-remote https://github.com/triton-lang/triton
+> 'refs/pull/<N>/*'` (head+merge = aperta e mergeable; solo head = chiusa o mergiata) + pagina pubblica.
+- 🎉 **PRIMO MERGE UPSTREAM: #11311 MERGIATA** il 15 ago da **Jokeren** (`c346e50c7bb102f35f04d7200a3bc6194bec4c33`),
+  `examples/plugins/README.md` +9/-5, aperta il 14 → mergiata in <24h. Valore tecnico ≈ 0 (docs), valore
+  reale = precedente + chiude "nessun contributo upstream". **La tattica che ha funzionato è lo SPLIT:**
+  la stessa correzione dentro #10780 (insieme a una modifica già respinta) era ferma da 43 giorni senza
+  CI; da sola, su un branch nuovo da `main`, un file, è passata subito. ⇒ **mai legare un fix non
+  controverso a una modifica contestata.**
+- **Score upstream: 1 mergiata (#11311) / 2 aperte (#10766, #10780) / 3 chiuse (#10788, #10785, #10774)
+  + RFC #10773 chiusa.** #10766 e #10780 hanno ancora `refs/pull/N/merge` ⇒ aperte e mergeable.
+- **#10766 è l'unica con sostanza** (codice nel dialect, non docs): nessuna risposta di un maintainer dopo
+  il ping del 14 ago. **Non ritoccare `fold-split-join` né `hook-key-cache`**: ogni push richiede un nuovo
+  click di approvazione della CI. Monitorare e rispondere, non pushare.
+- **Chiuse, motivi reali:** #10788 → Raoux "block pointer is deprecated and will be removed soon";
+  #10785 → Raoux "either this path should never happen or we should make it work" (il path è raggiungibile
+  solo da MLIR a mano su pipeline AMD, band-aid rifiutato giustamente); #10774+#10773 (per-lane loop
+  retirement) → **de-prioritizzata di proposito**, non fallita: primitiva SIMT in TritonGPU = territorio
+  core-maintainer contro la direzione cuTile/Tile-IR; i numeri (2,5–4,2×, 39× istruzioni in meno) restano
+  artefatto del paper.
+
+### ⬆️ UPSTREAM TRITON — stato al 2026-08-14, sera (storico)
 - **SCOPERTA CHE CAMBIA IL GIOCO: la CI degli outside contributor non parte da sola.** Il repo gira con
   "require approval for all outside collaborators": ogni push mette la run in `action_required` finche' un
   maintainer non clicca **Approve and run workflows** (non e' la variante primo-contributo: eravamo gia'
