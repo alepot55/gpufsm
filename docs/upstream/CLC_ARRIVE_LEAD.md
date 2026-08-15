@@ -1,5 +1,7 @@
 # Lead #2: l'arrive di `clusterlaunchcontrol.try_cancel` non ha una barriera propria
 
+**Stato 16 ago: patch scritta e verificata, ma da mandare come ISSUE, non come PR** (vedi in fondo).
+
 Trovato mentre si verificava l'invariante di #10035. **Verificato alla fonte, non dedotto.**
 
 ## Il fatto
@@ -77,3 +79,16 @@ Commento postato con la triage che nel thread non c'era
 | due store, **int8** | pulito → è legato alla conversione fp8, non allo store a 8 bit |
 
 più il fatto che la corruzione **non** è una barriera mancante (esperimento con la barriera CTA piena).
+
+
+## Verificata, e poi riclassificata (16 ago, notte)
+
+Patch pronta sul branch `membar-clc-arrive` (+9 righe, 3 file): barriera emessa nel lowering come per
+`arrive_barrier`/`barrier_expect`/`tc_gen5_commit`, più `CLCTryCancelOp` in `containsLocalBarrier` e i
+CHECK aggiornati (nel dialect LLVM la barriera è `nvvm.barrier`, non la forma PTX — primo tentativo
+sbagliato proprio lì). Lit: **stesso identico set di fallimenti pre-esistenti**, nessuna regressione.
+
+**Perché non diventa una PR:** la barriera aggiunta è ridondante in tutti i path attuali, perché il
+`barrier_expect` adiacente la porta già. Quindi oggi costa e compra solo robustezza contro refactor
+futuri — e il costo non è misurabile senza hardware SM100. Proporla come patch invita un "no"
+ragionevole. Va mandata come **issue** che descrive la fragilità, offrendo la patch se la vogliono.
