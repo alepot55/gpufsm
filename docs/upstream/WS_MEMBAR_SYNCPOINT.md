@@ -90,3 +90,19 @@ emettere quella barriera. L'header documenta `createAllBarrier` come *"synchroni
 whole CTA"* e non dice nulla sull'ordinamento della shared memory. Entrambi i backend in-tree
 soddisfano la proprietà più forte, ma la PR deve dirlo esplicitamente e il commento nel codice deve
 citare il punto del lowering, altrimenti la prossima modifica lo rompe in silenzio.
+
+
+## Trappole trovate scrivendo i test (da non riscoprire)
+
+1. **`test/Analysis/test-membar.mlir` ha DUE RUN line**: la seconda gira il pass membar **AMD**
+   (`-test-tritonamdgpu-membar`) sullo stesso file, con lo stesso prefisso `CHECK`. Un test che
+   dipende dal backend (per esempio dai byte di capture che il sanitizer riserva, che solo lo
+   scratch-size fn NVIDIA somma) **fallisce sulla seconda RUN**. Il primo tentativo di test è morto
+   esattamente così. Soluzione: scrivere il caso in modo backend-agnostico — capture vere invece
+   dell'attributo del sanitizer — e tenere l'argomento ConSan nella prosa della PR, non nel lit test.
+2. Il pass AMD annota `ttg.amdg.syncedViaAsyncWait` sulle `local_load`: le CHECK devono restare
+   sottostringhe (`local_load`), non righe intere.
+3. **`filecheck` di PyPI** funziona come sostituto di `FileCheck` (non è nel pacchetto LLVM che
+   Triton scarica): `pip install filecheck` + symlink `FileCheck` nel venv. Non è identico
+   all'originale, quindi il metodo giusto è **confrontare la lista dei test falliti prima e dopo**,
+   non guardare il numero assoluto: sul baseline ne falliscono già 29 per differenze del sostituto.
