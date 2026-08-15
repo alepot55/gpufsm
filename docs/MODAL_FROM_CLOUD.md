@@ -22,12 +22,10 @@ Fix, una volta sola:
 3. **Network access**: `Full`, oppure `Custom` con `*.modal.com` e la casella *"Also include default
    list of common package managers"* spuntata (serve a tenere PyPI e GitHub).
 4. **Setup script** — gira a ogni avvio di sessione, che è esattamente ciò che serve: il container è
-   effimero, quindi `~/.modal.toml` va riscritto ogni volta. Le tre righe vanno in quest'ordine
-   (`certifi` arriva con `modal`, quindi prima l'install):
+   effimero, quindi `~/.modal.toml` va riscritto ogni volta. Due righe, in quest'ordine:
 
    ```bash
    pip install -q 'modal[api-proxy-support]'
-   cat /root/.ccr/agent-proxy-ca.crt >> "$(python -c 'import certifi;print(certifi.where())')"
    modal token set --token-id ak-... --token-secret as-... --no-verify
    ```
 
@@ -35,18 +33,31 @@ Fix, una volta sola:
    nel campo **Environment variables** (formato `.env`) fanno la stessa cosa: il client legge entrambe
    le forme. I token si generano su [modal.com/settings/tokens](https://modal.com/settings/tokens).
 
-Perché ognuna delle tre righe:
+Perché così:
 
 - **`api-proxy-support`** (tira dentro `python-socks` + `aiohttp-socks`): la sandbox impone
   `HTTPS_PROXY` e senza quell'extra il client Modal non lo onora — solleva direttamente un
   `ImportError` che lo dice.
-- **La riga della CA non è opzionale.** Il proxy ri-termina il TLS, e Modal costruisce il suo SSL
-  context da `certifi.where()` sia sul canale gRPC (via grpclib) sia sul client blob: `SSL_CERT_FILE`,
-  che l'ambiente imposta già, viene **ignorato**. Senza append: `CERTIFICATE_VERIFY_FAILED:
-  self-signed certificate in certificate chain`. Verificato in sessione, prima e dopo.
 - **`--no-verify`**: il default di `modal token set` è `--verify`, che fa una chiamata di rete vera. In
-  un setup script è fragile (una sessione che parte con la rete non ancora aperta fallirebbe lo
-  script); la verifica la fa `--preflight`, con una diagnosi migliore.
+  un setup script è fragile (la sessione che parte con la rete non ancora aperta fallirebbe lo script);
+  la verifica la fa `--preflight`, con una diagnosi migliore.
+- **La CA del proxy non va messa qui.** Serve (vedi sotto), ma `/root/.ccr/agent-proxy-ca.crt` **non
+  esiste ancora** quando gira il setup script — il proxy viene materializzato dopo, e un `cat` su quel
+  path fa fallire il setup con `No such file or directory`. Ci pensa `scripts/modal_gpu.py`, che se la
+  aggiunge da solo (idempotente, solo se `HTTPS_PROXY` è impostato e il file esiste).
+
+### La trappola della CA
+
+Il proxy ri-termina il TLS, e Modal costruisce il suo SSL context da `certifi.where()` sia sul canale
+gRPC (via grpclib) sia sul client blob: `SSL_CERT_FILE`, che l'ambiente imposta già, viene **ignorato**.
+Senza la CA dentro il bundle certifi si prende `CERTIFICATE_VERIFY_FAILED: self-signed certificate in
+certificate chain` anche con l'egress aperto. Verificato su una connessione reale, prima e dopo.
+
+Se serve farlo a mano (fuori da `modal_gpu.py`), da dentro la sessione:
+
+```bash
+cat /root/.ccr/agent-proxy-ca.crt >> "$(python -c 'import certifi;print(certifi.where())')"
+```
 
 ⚠️ Due avvertenze oneste:
 

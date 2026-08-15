@@ -107,6 +107,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
     GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo). `add_repo` read = solo
     git anonimo, push = negato dal classifier. Da cloud si legge (pagine pubbliche + `git ls-remote
     refs/pull/*`), da locale si scrive. Dettagli e ricetta per allargare l'accesso: `docs/PR_LEDGER.md`.
+  - **Se e solo se si torna su una sessione cloud** (ripiego), i caveat Modal restano validi: le VM sono
+    CPU-only e i self-hosted environments sono Team/Enterprise; con la policy di rete **Trusted**
+    (default) `api.modal.com` è bloccato (403 su CONNECT) → serve network **Full**/**Custom** +
+    `*.modal.com`, e i token via setup script (`modal token set ... --no-verify`) o env var. ⚠️ La CA
+    del proxy **non** va nel setup script (`/root/.ccr/` non esiste ancora a quel punto → setup fallito):
+    la aggiunge da sé `modal_gpu.py`, perché Modal pinna certifi e ignora `SSL_CERT_FILE`.
 
 ## 7. Stato corrente (handoff sessione 2)
 
