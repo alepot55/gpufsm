@@ -1,6 +1,6 @@
 # Contributo upstream in preparazione: `warp_specialize` come punto di sincronizzazione in membar
 
-Stato: **v2 verificata, 2026-08-15 notte.** Sostituisce il bersaglio precedente
+Stato: **PR aperta upstream il 2026-08-16: triton-lang/triton#11323.** Sostituisce il bersaglio precedente
 (`WaitBarrier ↔ TMA`, scartato — vedi `MEMBAR_CANSKIPBARSYNC.md` e la sezione "perché no" qui sotto).
 
 ## Il buco
@@ -136,3 +136,26 @@ a mano.
 
 ⇒ La PR va presentata per quello che è: completamento del modello, non guadagno di performance.
 Rivendicare velocità qui sarebbe falso e verificabile in trenta secondi da chi la legge.
+
+
+## PR aperta
+
+<https://github.com/triton-lang/triton/pull/11323> — 3 file, +81/-4, review auto-assegnata dal
+CODEOWNERS a **Jokeren** (proprietario di `lib/Analysis/Membar.cpp`) e ptillet. CI in
+`action_required`: serve il click di un maintainer, quindi **branch congelato**.
+
+Cosa è cambiato rispetto alla v2 grazie alla review pre-submit (tre reviewer indipendenti):
+1. Il commento citava `lowerWarpSpecialize` in un file dove quella funzione non esiste. Il punto giusto
+   è `lowerWarpSpecializeCommon` in `WarpSpecializeUtility.cpp`. È l'unica riga che giustifica
+   l'assunzione cross-pass: sbagliarla avrebbe fatto perdere fiducia nel resto.
+2. **Secondo effetto non dichiarato**: `beforeMemoryEffects` è letto anche da
+   `hasSyncPointBeforeMemoryEffect`, quindi una wait di memoria subito prima di una
+   `warp_specialize` senza capture ora rimanda la sua barriera all'ingresso della regione, e una
+   `warp_group_dot_wait` in quella posizione viene marcata `warpGroupLocal`. Misurato, testato (3 test
+   nuovi) e scritto nella descrizione invece che scoperto in review.
+3. Un test dipendeva dal piazzamento dell'allocatore (coincidenza di offset): sostituito con due che
+   non dipendono da nulla del genere.
+
+Verifica finale: **lit con il FileCheck vero di Triton** (che sta in `python/triton/FileCheck`, non
+nel pacchetto LLVM scaricato) su 5 suite → stesso identico set di 14 fallimenti pre-esistenti prima e
+dopo, nessuno è un test membar; `pre-commit` verde.
