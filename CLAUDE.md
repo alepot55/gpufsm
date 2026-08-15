@@ -102,11 +102,18 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
     token in env: il blocco `api.modal.com` (403 su CONNECT) era della policy di rete **Trusted** delle
     VM cloud, qui non si applica. Guida: `docs/MODAL_FROM_CLOUD.md` (scritta per il cloud, da locale è
     un sottoinsieme).
-  - **Upstream Triton si fa da locale con `gh`.** Verificato il 15 ago: da cloud l'API GitHub risponde
-    **403 anche con un token valido in env** perché il blocco è del **proxy della sessione**, non di
-    GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo). `add_repo` read = solo
-    git anonimo, push = negato dal classifier. Da cloud si legge (pagine pubbliche + `git ls-remote
-    refs/pull/*`), da locale si scrive. Dettagli e ricetta per allargare l'accesso: `docs/PR_LEDGER.md`.
+  - 🔑 **Token già in env sul portatile (15 ago sera):** `GITHUB_TOKEN` (PAT classico, scope `repo`,
+    `workflow`, …), `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`. `gh` li usa da sé (`gh auth status` →
+    "Logged in ... (GITHUB_TOKEN)"). ⚠️ **Il client Modal NON è installato sul portatile** (nessun
+    binario `modal`, nessun modulo python): prima di `scripts/modal_gpu.py` serve `pip install modal`
+    nel venv. Non stampare mai i valori dei token.
+  - **Upstream Triton si fa da locale con `gh`.** Verificato il 15 ago **da entrambi i lati**: da cloud
+    l'API GitHub risponde **403 anche con un token valido in env** perché il blocco è del **proxy della
+    sessione**, non di GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo);
+    **da locale la stessa API risponde 200** su `triton-lang/triton` (PR, commenti, timeline,
+    `actions/runs`), permessi `pull` only → push sul fork, commenti via issues API. `add_repo` read =
+    solo git anonimo, push = negato dal classifier. Da cloud si legge (pagine pubbliche + `git ls-remote
+    refs/pull/*`), da locale si legge E si scrive. Dettagli: `docs/PR_LEDGER.md`.
   - **Se e solo se si torna su una sessione cloud** (ripiego), i caveat Modal restano validi: le VM sono
     CPU-only e i self-hosted environments sono Team/Enterprise; con la policy di rete **Trusted**
     (default) `api.modal.com` è bloccato (403 su CONNECT) → serve network **Full**/**Custom** +
@@ -174,9 +181,16 @@ lo prova: unica mail HotCRP mai ricevuta = `[PPoPP 2027] New account` dell'8 lug
 
 ### ⬆️ UPSTREAM TRITON — stato VERIFICATO al 2026-08-15 (leggere per primo se si riprende da qui)
 > 📒 **Registro completo di TUTTE le PR (interne + upstream) = `docs/PR_LEDGER.md`.** Stato verificato
-> alla fonte, non dalla memoria. Da una sessione cloud l'API GitHub su `triton-lang/triton` dà **403**
-> (scope = `alepot55/*`): si verifica con `git ls-remote https://github.com/triton-lang/triton
-> 'refs/pull/<N>/*'` (head+merge = aperta e mergeable; solo head = chiusa o mergiata) + pagina pubblica.
+> alla fonte, non dalla memoria. **Da locale** si usa `gh api repos/triton-lang/triton/...` (risponde
+> 200, token in env). Da una sessione cloud l'API dà **403** (blocco del proxy): lì si ripiega su
+> `git ls-remote https://github.com/triton-lang/triton 'refs/pull/<N>/*'` (head+merge = aperta e
+> mergeable; solo head = chiusa o mergiata) + pagina pubblica.
+- 🔁 **Ri-verifica del 15 ago sera, da locale (`gh api`, non memoria):** score invariato. **#10766**
+  `open`, `mergeable:true`, `mergeable_state:blocked`, head `00ae4d7e`, ultimo evento = il nostro ping
+  del 14 ago, **nessuna risposta di maintainer**. **#10780** `open`, `blocked`, head `0fd6ff8b`, ultima
+  attività = il nostro commento del 15 ago 13:23 dopo il merge di `main`. ⚠️ **Nessuna delle due ha
+  check verdi adesso**: 3 run ferme in `action_required` (fold-split-join 14 ago, hook-key-cache 14 ago
+  e 15 ago). È l'approvazione mancante, non un fallimento. Interne: **23 PR, tutte mergiate, 0 aperte**.
 - 🎉 **PRIMO MERGE UPSTREAM: #11311 MERGIATA** il 15 ago da **Jokeren** (`c346e50c7bb102f35f04d7200a3bc6194bec4c33`),
   `examples/plugins/README.md` +9/-5, aperta il 14 → mergiata in <24h. Valore tecnico ≈ 0 (docs), valore
   reale = precedente + chiude "nessun contributo upstream". **La tattica che ha funzionato è lo SPLIT:**
