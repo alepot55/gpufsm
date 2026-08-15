@@ -10,3 +10,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [git push e il credential helper](git-push-credential-helper.md) — il 403 su push era una credenziale vecchia in `store`, non il token.
 - [Da locale l'API GitHub funziona](github-api-works-from-local.md) — il 403 upstream era il proxy delle sessioni cloud.
 - [La CI di Triton va approvata a mano](triton-ci-needs-maintainer-approval.md) — ogni push azzera il verde.
+- [Metodo per i contributi upstream](upstream-contribution-method.md) — cosa ha prodotto #11323 e #11324, e cosa è costato non farlo.
+- [Harness di build Triton su Modal](triton-build-harness-on-modal.md) — alberi paralleli, FileCheck vero, trappole già pagate.
