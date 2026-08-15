@@ -114,7 +114,12 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
     **Modal è installato e verificato sul portatile (15 ago sera):** venv `/home/alepot55/Desktop/projects/gpufsm/.venv`
     (`python3 -m venv .venv --system-site-packages`, l'host è PEP 668) + `modal 1.5.4`;
     `.venv/bin/python scripts/modal_gpu.py --preflight` → **3 PASS** (modal installato, `api.modal.com`
-    raggiungibile, credenziali valide). Da qui la GPU si affitta, non si aspetta.
+    raggiungibile, credenziali valide) e **smoke test end-to-end su T4 riuscito** (container avviato,
+    `torch.cuda.get_device_name` → `Tesla T4`, exit 0, container fermato). Da qui la GPU si affitta.
+  - ⚠️ **`git push` dava 403** (`Permission to alepot55/gpufsm.git denied to alepot55`) mentre l'API
+    diceva `push: true`: colpa del `credential.helper=store` globale che serviva una credenziale vecchia
+    prima di `GITHUB_TOKEN`. Risolto pinnando l'helper di `gh` nella config **locale** della repo.
+    Dettagli e comando una-tantum: `docs/memory/git-push-credential-helper.md`.
   - **Upstream Triton si fa da locale con `gh`.** Verificato il 15 ago **da entrambi i lati**: da cloud
     l'API GitHub risponde **403 anche con un token valido in env** perché il blocco è del **proxy della
     sessione**, non di GitHub (`GET /user` passa, `GET /repos/...` no, nemmeno sulla nostra repo);
