@@ -169,6 +169,10 @@ if modal is not None:
                     "PATH": f"{venv}/bin:/usr/local/bin:/usr/bin:/bin",
                     "HOME": "/root",
                     "TRITON_CACHE_DIR": f"{WORK}/triton-cache",
+                    # The editable-install finder does not survive importing the
+                    # backends from an arbitrary cwd; pointing at the source tree
+                    # directly makes `import triton` work anywhere.
+                    "PYTHONPATH": f"{repo}/python",
                 },
             )
             out.append(
