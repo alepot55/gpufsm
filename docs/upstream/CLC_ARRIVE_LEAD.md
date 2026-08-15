@@ -43,3 +43,22 @@ e non ne aggiunge una seconda. Costo: due righe più un lit test.
    una prova a runtime no, e va detto nella PR invece di lasciarlo intendere.
 3. Stesso destinatario dell'altra PR (area membar/barriere), quindi **aprirla solo dopo** che la prima
    è stata giudicata: due PR insieme dallo stesso outside contributor diluiscono l'attenzione.
+
+
+---
+
+# Nota: il bug #11111 (store fp8 trasposto) NON è un target
+
+Indagato la notte del 16 ago, riprodotto su H100 con `main` di oggi (11 configurazioni, output
+trasposto tutto Inf, contiguo pulito). Poi, leggendo il thread: **masahi il 3 ago aveva già scritto
+che è un bug di `ptxas` 12.9** (che Triton usa ancora su Hopper) e che sparisce con ptxas 13.3.
+
+Cosa resta di utile:
+- Ipotesi "barriera insufficiente nella conversione di layout" (Triton usa `bar.warp.sync`, che è di
+  convergenza e non di memoria, per le conversioni intra-warp — introdotta in #7810) **falsificata**
+  con un esperimento: sostituita con la barriera CTA piena, la corruzione è identica.
+- Il probe con valori distinguibili mostra che l'output trasposto contiene **dati estranei** (byte che
+  non esistono nell'input), non una permutazione: coerente con un miscompile a valle del PTX.
+
+**Regola da ricordare: leggere i commenti dell'issue PRIMA di investigare.** Qui la causa era già nel
+thread e ho speso ~40 minuti di riproduzione per riscoprirla.
