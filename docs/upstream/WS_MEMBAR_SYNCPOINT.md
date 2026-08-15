@@ -1,6 +1,6 @@
 # Contributo upstream in preparazione: `warp_specialize` come punto di sincronizzazione in membar
 
-Stato: **patch v2 in verifica, 2026-08-15.** Sostituisce il bersaglio precedente
+Stato: **v2 verificata, 2026-08-15 notte.** Sostituisce il bersaglio precedente
 (`WaitBarrier ↔ TMA`, scartato — vedi `MEMBAR_CANSKIPBARSYNC.md` e la sezione "perché no" qui sotto).
 
 ## Il buco
@@ -106,3 +106,14 @@ citare il punto del lowering, altrimenti la prossima modifica lo rompe in silenz
    Triton scarica): `pip install filecheck` + symlink `FileCheck` nel venv. Non è identico
    all'originale, quindi il metodo giusto è **confrontare la lista dei test falliti prima e dopo**,
    non guardare il numero assoluto: sul baseline ne falliscono già 29 per differenze del sostituto.
+
+
+## Verifica finale (misurata, non dedotta)
+
+- **127 → 124** barriere emesse: stesso file di test non modificato, due binari diversi
+  (`triton-opt` dell'albero baseline e di quello patchato nel volume Modal). È il confronto pulito:
+  nessuna modifica ai test può inquinarlo.
+- **Nessun nuovo lit failure** su `test/Analysis`, `test/TritonGPU`, `test/Conversion`,
+  `test/TritonNvidiaGPU`, `test/NVWS`: la lista dei test falliti è identica prima e dopo (29 in
+  entrambi i casi, tutti dovuti al sostituto `filecheck`, non alla patch).
+- `clang-format` pulito sul file toccato.
