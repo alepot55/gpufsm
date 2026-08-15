@@ -62,3 +62,18 @@ Cosa resta di utile:
 
 **Regola da ricordare: leggere i commenti dell'issue PRIMA di investigare.** Qui la causa era già nel
 thread e ho speso ~40 minuti di riproduzione per riscoprirla.
+
+
+## Cosa è stato comunque contribuito su #11111
+
+Commento postato con la triage che nel thread non c'era
+(<https://github.com/triton-lang/triton/issues/11111#issuecomment-5304744938>):
+
+| variante (XBLOCK=32, num_warps=1) | output trasposto |
+|---|---|
+| due store, e5m2 | corrotto (byte estranei 0x60, 0xFC) |
+| **solo** lo store trasposto | pulito → servono entrambi gli store |
+| due store, **e4m3** | corrotto → **non è specifico di e5m2** |
+| due store, **int8** | pulito → è legato alla conversione fp8, non allo store a 8 bit |
+
+più il fatto che la corruzione **non** è una barriera mancante (esperimento con la barriera CTA piena).
