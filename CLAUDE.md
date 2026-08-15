@@ -99,7 +99,10 @@ quanta parte del gap Triton↔CUDA (10–30×) si chiude riorganizzando *solo la
   sessione fa solo da driver. Runner generico: `scripts/modal_gpu.py --preflight` /
   `--gpu H100 --cmd ... --fetch ...`. ⚠️ Con la policy di rete **Trusted** (default) `api.modal.com` è
   bloccato (403 su CONNECT, anche in diretta): serve un ambiente con network **Full**/**Custom** +
-  `*.modal.com` e i token in env var. Setup completo in `docs/MODAL_FROM_CLOUD.md`.
+  `*.modal.com` e i token via setup script (`modal token set ... --no-verify`) o env var. ⚠️ La CA del
+  proxy NON va nel setup script (`/root/.ccr/` non esiste ancora a quel punto → setup fallito): la
+  aggiunge da sé `modal_gpu.py`, perché Modal pinna certifi e ignora `SSL_CERT_FILE`. Setup completo
+  in `docs/MODAL_FROM_CLOUD.md`.
 
 ## 7. Stato corrente (handoff sessione 2)
 
