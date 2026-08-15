@@ -142,7 +142,7 @@ anche qui nessun check verde finché un maintainer non approva.
 
 ---
 
-## B. Interne `alepot55/gpufsm` — 24 PR, **tutte mergiate**, nessuna aperta
+## B. Interne `alepot55/gpufsm` — 25 PR, **tutte mergiate**, nessuna aperta
 
 Sono PR di lavoro auto-mergiate: il contributo è il contenuto, non la PR. Elencate perché sono l'indice
 cronologico più leggibile di cosa è stato fatto e quando.
@@ -171,6 +171,7 @@ cronologico più leggibile di cosa è stato fatto e quando.
 | 22 | Fix: lo script di setup non deve `cat` la CA del proxy (non esiste ancora) | 15 ago |
 | 23 | Questo ledger + modello operativo local-first | 15 ago |
 | 24 | Memoria di progetto dentro la repo (`docs/memory/`) + ri-verifica PR da locale + Modal pronto sul portatile | 15 ago |
+| 25 | Trappola del credential helper di git + Modal verificato end-to-end su T4 | 15 ago |
 
 ⚠️ **Buco nel registro delle PR, non nel lavoro:** tra la #19 (30 giu) e la #20 (14 ago) ci sono **53
 commit su `main` senza PR** — sottomissione TACO (desk-reject), pivot CGO/PPoPP, generalizzazione della
