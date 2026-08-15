@@ -24,6 +24,17 @@ import sys
 
 VOLUME = "triton-upstream"
 WORK = "/work"
+# One checkout + venv per named tree, so a baseline and a patched build can coexist and
+# neither has to be rebuilt just to look at the other. Rebuilding to flip between them was
+# the slowest thing in the loop.
+TREES = {"main": f"{WORK}/triton", "ws": f"{WORK}/triton-ws"}
+
+
+def tree_paths(tree: str) -> tuple[str, str]:
+    repo = TREES.get(tree, f"{WORK}/triton-{tree}")
+    return repo, f"{WORK}/venv-{tree}" if tree != "main" else f"{WORK}/venv"
+
+
 REPO = f"{WORK}/triton"
 VENV = f"{WORK}/venv"
 PY = f"{VENV}/bin/python"
@@ -32,7 +43,7 @@ UPSTREAM = "https://github.com/triton-lang/triton"
 # Ada/Hopper/Blackwell: what we can actually rent. Keeping the list short keeps the build
 # short — Triton compiles a backend per listed target.
 GPU_DEFAULT = "H100"
-BUILD_CPUS = 16.0
+BUILD_CPUS = 32.0
 BUILD_MEMORY_MB = 32768
 BUILD_TIMEOUT = 5400
 RUN_TIMEOUT = 3600
@@ -60,8 +71,10 @@ def _sh(cmd: str, cwd: str | None = None, env: dict[str, str] | None = None) -> 
     if r.stdout:
         print(r.stdout[-8000:], flush=True)
     if r.returncode != 0:
-        print(r.stderr[-8000:], file=sys.stderr, flush=True)
-        raise RuntimeError(f"command failed (rc={r.returncode}): {cmd}")
+        # The tail goes into the exception too: Modal ships the traceback back to the
+        # caller, but container stderr is easy to lose in the log.
+        tail = r.stderr[-4000:] or r.stdout[-4000:]
+        raise RuntimeError(f"command failed (rc={r.returncode}): {cmd}\n{tail}")
     return r.stdout
 
 
@@ -85,10 +98,12 @@ if modal is not None:
         memory=BUILD_MEMORY_MB,
         timeout=BUILD_TIMEOUT,
     )
-    def build(ref: str, patch_b64: str | None, patch_name: str) -> dict:
+    def build(ref: str, patch_b64: str | None, patch_name: str, tree: str = "main") -> dict:
         """Check out `ref`, optionally apply a patch, and (re)build Triton in the Volume."""
         import os
 
+        repo, venv = tree_paths(tree)
+        py = f"{venv}/bin/python"
         env = {
             "CCACHE_DIR": f"{WORK}/ccache",
             "TRITON_BUILD_WITH_CCACHE": "true",
@@ -96,42 +111,44 @@ if modal is not None:
         }
         os.makedirs(f"{WORK}/ccache", exist_ok=True)
 
-        if not os.path.exists(f"{REPO}/.git"):
-            _sh(f"git clone {UPSTREAM} {REPO}")
-        _sh("git fetch origin --tags --force", cwd=REPO)
-        _sh("git reset --hard && git clean -fd", cwd=REPO)
-        _sh(f"git checkout --detach {ref}", cwd=REPO)
-        head = _sh("git rev-parse HEAD", cwd=REPO).strip()
+        if not os.path.exists(f"{repo}/.git"):
+            # Reuse an existing checkout's objects when cloning a sibling tree.
+            ref_arg = f"--reference {REPO}" if os.path.exists(f"{REPO}/.git") else ""
+            _sh(f"git clone {ref_arg} --dissociate {UPSTREAM} {repo}")
+        _sh("git fetch origin --tags --force", cwd=repo)
+        _sh("git reset --hard && git clean -fd", cwd=repo)
+        _sh(f"git checkout --detach {ref}", cwd=repo)
+        head = _sh("git rev-parse HEAD", cwd=repo).strip()
 
         applied = None
         if patch_b64:
             path = f"{WORK}/{patch_name}"
             pathlib.Path(path).write_bytes(base64.b64decode(patch_b64))
             # `git apply` keeps the tree at `ref` + patch, with no commit noise.
-            _sh(f"git apply --3way --verbose {path}", cwd=REPO)
+            _sh(f"git apply --3way --verbose {path}", cwd=repo)
             applied = patch_name
 
-        if not os.path.exists(PY):
-            _sh(f"python3 -m venv {VENV}")
-            _sh(f"{PY} -m pip install -q --upgrade pip wheel setuptools")
-            _sh(f"{PY} -m pip install -q torch numpy pytest")
+        if not os.path.exists(py):
+            _sh(f"python3 -m venv {venv}")
+            _sh(f"{py} -m pip install -q --upgrade pip wheel setuptools")
+        # Kept outside the venv-creation branch on purpose: a venv left behind by a failed
+        # run must still end up with the deps. Build deps have to live in the venv itself
+        # because the install below runs with --no-build-isolation, so it uses this
+        # interpreter and not the image's. The list is Triton's own requirements file
+        # (nanobind, not pybind11, pinned to the version the bindings are generated against).
+        _sh(f"{py} -m pip install -q -r python/requirements.txt", cwd=repo)
+        _sh(f"{py} -m pip install -q torch numpy pytest")
 
-        _sh(f"{PY} -m pip install -e . --no-build-isolation -v", cwd=REPO, env=env)
+        _sh(f"{py} -m pip install -e . --no-build-isolation -v", cwd=repo, env=env)
         version = _sh(
-            f"{PY} -c \"import triton;print(triton.__version__, triton.__file__)\""
+            f"{py} -c \"import triton;print(triton.__version__, triton.__file__)\""
         ).strip()
         volume.commit()
-        return {"head": head, "patch": applied, "triton": version}
+        return {"head": head, "patch": applied, "triton": version, "tree": tree}
 
-    @app.function(
-        image=image,
-        volumes={WORK: volume},
-        gpu=GPU_DEFAULT,
-        timeout=RUN_TIMEOUT,
-        memory=BUILD_MEMORY_MB,
-    )
-    def run(cmds: list[str], upload: dict[str, str] | None = None) -> list[dict]:
-        """Run commands against the built Triton on a GPU. Files in `upload` land in /work."""
+    def _run_impl(cmds: list[str], upload: dict[str, str] | None = None,
+                  tree: str = "main") -> list[dict]:
+        """Run commands against the built Triton. Files in `upload` land in /work."""
         import subprocess
 
         for name, b64 in (upload or {}).items():
@@ -139,16 +156,17 @@ if modal is not None:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(base64.b64decode(b64))
 
+        repo, venv = tree_paths(tree)
         out = []
         for cmd in cmds:
             r = subprocess.run(
                 cmd,
                 shell=True,
-                cwd=REPO,
+                cwd=repo,
                 capture_output=True,
                 text=True,
                 env={
-                    "PATH": f"{VENV}/bin:/usr/local/bin:/usr/bin:/bin",
+                    "PATH": f"{venv}/bin:/usr/local/bin:/usr/bin:/bin",
                     "HOME": "/root",
                     "TRITON_CACHE_DIR": f"{WORK}/triton-cache",
                 },
@@ -162,6 +180,17 @@ if modal is not None:
                 }
             )
         return out
+
+    # Two entry points over the same body: MLIR-level work (triton-opt, lit) needs no GPU
+    # and renting one for it is pure waste; only running kernels does.
+    run = app.function(
+        image=image, volumes={WORK: volume}, gpu=GPU_DEFAULT, timeout=RUN_TIMEOUT,
+        memory=BUILD_MEMORY_MB, name="run_gpu",
+    )(_run_impl)
+    run_cpu = app.function(
+        image=image, volumes={WORK: volume}, cpu=8.0, timeout=RUN_TIMEOUT,
+        memory=BUILD_MEMORY_MB, name="run_cpu",
+    )(_run_impl)
 
 
 def _b64(path: str | None) -> tuple[str | None, str]:
@@ -178,10 +207,13 @@ def main() -> int:
     b = sub.add_parser("build", help="build Triton in the Modal Volume")
     b.add_argument("--ref", default="main", help="commit/branch to check out")
     b.add_argument("--patch", help="patch file applied on top of --ref")
+    b.add_argument("--tree", default="main", help="named checkout in the volume (main, ws, ...)")
 
-    r = sub.add_parser("run", help="run commands on the GPU against the built Triton")
+    r = sub.add_parser("run", help="run commands against the built Triton")
     r.add_argument("--cmd", action="append", required=True)
     r.add_argument("--upload", action="append", default=[], help="file to copy to /work")
+    r.add_argument("--cpu", action="store_true", help="no GPU (triton-opt, lit, MLIR work)")
+    r.add_argument("--tree", default="main", help="named checkout to run from")
 
     o = sub.add_parser("opt", help="shortcut: run triton-opt on one MLIR file")
     o.add_argument("--file", required=True)
@@ -195,22 +227,26 @@ def main() -> int:
     with app.run():
         if args.action == "build":
             patch_b64, patch_name = _b64(args.patch)
-            res = build.remote(args.ref, patch_b64, patch_name)
-            print(f"built {res['triton']}\n  head={res['head']}\n  patch={res['patch']}")
+            res = build.remote(args.ref, patch_b64, patch_name, args.tree)
+            print(
+                f"built {res['triton']}\n  tree={res['tree']}\n  head={res['head']}"
+                f"\n  patch={res['patch']}"
+            )
             return 0
 
         if args.action == "opt":
             payload, name = _b64(args.file)
             assert payload
             cmds = [f"{REPO}/build/*/bin/triton-opt {args.args} {WORK}/{name}"]
-            sections = run.remote(cmds, {name: payload})
+            sections = run_cpu.remote(cmds, {name: payload}, "main")
         else:
             uploads = {}
             for path in args.upload:
                 payload, name = _b64(path)
                 assert payload
                 uploads[name] = payload
-            sections = run.remote(args.cmd, uploads)
+            fn = run_cpu if args.cpu else run
+            sections = fn.remote(args.cmd, uploads, args.tree)
 
         failed = 0
         for s in sections:
