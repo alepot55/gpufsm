@@ -22,16 +22,15 @@ from __future__ import annotations
 
 import ctypes
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 A, B, C, E = 2654435761, 2246822519, 3266489917, 668265263  # odd mixing constants
 SEED = 12345
@@ -127,24 +126,18 @@ extern "C" float rj_launch(const long long* thresh, int n, long long* out,
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_rejection"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="rj_", dir=str(cache)))
-    cu, so = d / "rj.cu", d / "rj.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    return load_library(
+        src,
+        "landmark_rejection",
+        {
+            "rj_launch": (
+                ctypes.c_float,
+                [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+                + [ctypes.c_longlong] * 5
+                + [ctypes.c_int],
+            )
+        },
     )
-    lib = ctypes.CDLL(str(so))
-    lib.rj_launch.restype = ctypes.c_float
-    lib.rj_launch.argtypes = (
-        [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p] + [ctypes.c_longlong] * 5 + [ctypes.c_int]
-    )
-    return lib
 
 
 _THR = None

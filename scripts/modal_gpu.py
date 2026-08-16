@@ -42,6 +42,7 @@ FETCH: list[str] = json.loads(os.environ.get("GPUFSM_MODAL_FETCH", "[]"))
 IGNORE = [
     ".git",
     ".venv",
+    ".tmp",
     "build",
     "**/__pycache__",
     "*.pdf",
@@ -51,8 +52,15 @@ IGNORE = [
 ]
 
 
-def _run_remote() -> dict:
-    """Body of the Modal function: run the commands, collect the requested files."""
+def _run_remote(cmds: list[str], fetch: list[str], timeout: int) -> dict:
+    """Body of the Modal function: run the commands, collect the requested files.
+
+    ``cmds``/``fetch``/``timeout`` are arguments, not the module globals above, and that
+    is load-bearing: Modal re-imports this module inside the container, where the
+    GPUFSM_MODAL_* environment variables do not exist. Reading the globals here made
+    every ``--cmd`` and ``--fetch`` silently fall back to the default probe — the run
+    reported rc=0 for a command nobody asked for.
+    """
     import glob
     import subprocess
     import sys
@@ -67,9 +75,9 @@ def _run_remote() -> dict:
         gpu = f"UNKNOWN({exc})"
 
     sections = []
-    for cmd in CMDS:
+    for cmd in cmds:
         r = subprocess.run(
-            cmd, shell=True, env=env, capture_output=True, text=True, timeout=TIMEOUT
+            cmd, shell=True, env=env, capture_output=True, text=True, timeout=timeout
         )
         sections.append(
             {
@@ -83,7 +91,7 @@ def _run_remote() -> dict:
 
     files: dict[str, str] = {}
     skipped: list[str] = []
-    for pattern in FETCH:
+    for pattern in fetch:
         for path in glob.glob(pattern, recursive=True):
             p = pathlib.Path(path)
             if not p.is_file():
@@ -119,7 +127,7 @@ if modal is not None:
 
     @app.local_entrypoint()
     def main() -> None:
-        res = remote_run.remote()
+        res = remote_run.remote(CMDS, FETCH, TIMEOUT)
         print(f"== GPU: {res['gpu']} ==")
         failed = 0
         for s in res["sections"]:

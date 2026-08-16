@@ -90,29 +90,27 @@ def detect_lockstep(kind: str) -> bool:
 def _measure_nfa_routed() -> tuple[float, bool]:
     """Auto-routed NFA: thread (sp_run) vs tile (wp2), oracle-gated. Returns (sp/wp2, oracle)."""
     # imports are local: they pull in system Triton + gpufsm, kept out of the detection subprocess.
-    from experiments.cure.m3_lite_scalarlane import launch_wp2, max_outdeg
-    from experiments.cure.m10_scalar_program import (
+    from experiments.cure.milestones.m3_lite_scalarlane import launch_wp2, max_outdeg
+    from experiments.cure.milestones.m10_scalar_program import (
         N_STRINGS,
         SLEN,
-        make_batch_local,
         oracle_ok,
-        random_nfa,
-        random_nfa_noaccept,
         sp_run,
         to_device,
     )
+    from gpufsm.bench import DENSE, NO_ACCEPT, random_batch_2d, random_nfa
 
     warmup, samples = 3, 9
     total_bits = N_STRINGS * SLEN * 8
     ratios, oracle_all = [], True
     for ns in (16, 32, 48, 64):  # same state sweep as M10's headline, for a consistent ratio
         for seed in (0, 1):
-            data = make_batch_local(seed)
-            nfa_acc = random_nfa(ns, seed=1000 + ns + seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
+            nfa_acc = random_nfa(ns, seed=1000 + ns + seed, shape=DENSE)
             if not oracle_ok(nfa_acc, data, to_device(nfa_acc)):
                 oracle_all = False
                 continue
-            nfa = random_nfa_noaccept(ns, seed=1000 + ns + seed)
+            nfa = random_nfa(ns, seed=1000 + ns + seed, shape=NO_ACCEPT)
             g = to_device(nfa)
 
             def med(fn):

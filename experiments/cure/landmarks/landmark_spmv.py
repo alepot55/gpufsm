@@ -25,22 +25,21 @@ from __future__ import annotations
 
 import ctypes
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
 
 N_ROWS = 1 << 20  # 1M rows
 NCOLS = 1 << 22  # x has 4M float32 = 16 MB -> DRAM-resident (gather pays memory latency)
 K_UNIFORM = 16  # uniform nnz/row
 WARMUP, SAMPLES = 3, 9
 import os  # noqa: E402
+
+from gpufsm.bench.nvcc import load_library
 
 BLOCK = int(
     os.environ.get("SPMV_BLOCK", "32")
@@ -113,21 +112,11 @@ extern "C" float sp_launch(const int* rowptr, const int* colidx, const float* va
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_spmv"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="sp_", dir=str(cache)))
-    cu, so = d / "sp.cu", d / "sp.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    lib = load_library(
+        src,
+        "landmark_spmv",
+        {"sp_launch": (ctypes.c_float, [ctypes.c_void_p] * 4 + [ctypes.c_int, ctypes.c_void_p])},
     )
-    lib = ctypes.CDLL(str(so))
-    lib.sp_launch.restype = ctypes.c_float
-    lib.sp_launch.argtypes = [ctypes.c_void_p] * 4 + [ctypes.c_int, ctypes.c_void_p]
     return lib
 
 

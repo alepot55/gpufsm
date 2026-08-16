@@ -3,6 +3,7 @@ Same _rejection_tile lock-step kernel as landmark_rejection; masked
 (TRITON_ENABLE_PERLANE_LOOP_RETIREMENT unset) vs cured (=1). The regret law predicts the
 LARGEST real-workload cure gain here (regret 4.0x was pure masked-lane waste).
 Oracle: numpy-vectorized exact 64-bit-wrap accept iteration. Prints median time per mode."""
+
 from __future__ import annotations
 
 import os
@@ -23,9 +24,17 @@ BLOCK = 32
 
 @triton.jit
 def _rejection_tile(
-    thresh, n, out,
-    A: tl.constexpr, B: tl.constexpr, C: tl.constexpr, E: tl.constexpr,
-    SEED: tl.constexpr, M24: tl.constexpr, MAXITER: tl.constexpr, BLOCK: tl.constexpr,
+    thresh,
+    n,
+    out,
+    A: tl.constexpr,
+    B: tl.constexpr,
+    C: tl.constexpr,
+    E: tl.constexpr,
+    SEED: tl.constexpr,
+    M24: tl.constexpr,
+    MAXITER: tl.constexpr,
+    BLOCK: tl.constexpr,
 ):
     pid = tl.program_id(0)
     i = pid * BLOCK + tl.arange(0, BLOCK)
@@ -52,7 +61,7 @@ def oracle(thresh: np.ndarray) -> np.ndarray:
     acc = np.full(N, MAXITER, dtype=np.int64)
     done = np.zeros(N, dtype=bool)
     for j in range(MAXITER):
-        t = (i * np.uint64(A) + np.uint64(j) * np.uint64(B) + np.uint64(SEED))
+        t = i * np.uint64(A) + np.uint64(j) * np.uint64(B) + np.uint64(SEED)
         t = t * np.uint64(C)
         t = t * np.uint64(E)
         draw = (t & np.uint64(M24)).astype(np.int64)
@@ -80,8 +89,18 @@ def main() -> int:
         e1 = torch.cuda.Event(enable_timing=True)
         e0.record()
         _rejection_tile[(triton.cdiv(N, BLOCK),)](
-            d_th, N, out, A=A, B=B, C=C, E=E, SEED=SEED, M24=M24,
-            MAXITER=MAXITER, BLOCK=BLOCK, num_warps=1,
+            d_th,
+            N,
+            out,
+            A=A,
+            B=B,
+            C=C,
+            E=E,
+            SEED=SEED,
+            M24=M24,
+            MAXITER=MAXITER,
+            BLOCK=BLOCK,
+            num_warps=1,
         )
         e1.record()
         torch.cuda.synchronize()
@@ -92,7 +111,7 @@ def main() -> int:
     for _ in range(3):
         run()
     t = statistics.median([run()[1] for _ in range(9)])
-    print(f"rejection mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t*1e3:8.1f}us")
+    print(f"rejection mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t * 1e3:8.1f}us")
     return 0 if ok else 1
 
 

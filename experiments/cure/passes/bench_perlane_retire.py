@@ -69,8 +69,12 @@ def main() -> int:
 
     ok0, t0, rdx0, ws0 = run(d, ref, retire=False)
     ok1, t1, rdx1, ws1 = run(d, ref, retire=True)
-    print(f"baseline: oracle={'OK' if ok0 else 'FAIL'} time={t0:7.1f}us ptx redux.sync={rdx0} bar.warp.sync={ws0}")
-    print(f"retire  : oracle={'OK' if ok1 else 'FAIL'} time={t1:7.1f}us ptx redux.sync={rdx1} bar.warp.sync={ws1}")
+    print(
+        f"baseline: oracle={'OK' if ok0 else 'FAIL'} time={t0:7.1f}us ptx redux.sync={rdx0} bar.warp.sync={ws0}"
+    )
+    print(
+        f"retire  : oracle={'OK' if ok1 else 'FAIL'} time={t1:7.1f}us ptx redux.sync={rdx1} bar.warp.sync={ws1}"
+    )
     print(f"speedup : {t0 / t1:.2f}x")
     assert ok0 and ok1, "oracle mismatch"
     assert rdx0 >= 1 and rdx1 == 0, "pass did not fire"

@@ -110,8 +110,20 @@ def main() -> int:
         for _ in range(3):
             run()
         t = statistics.median([run()[1] for _ in range(9)]) * 1e3  # us
-        rows.append((kind, mode, f"{warpmax:.2f}", f"{mean:.2f}", f"{D:.3f}", "OK" if ok else "FAIL", f"{t:.1f}"))
-        print(f"dist={kind:10} D={D:6.2f} warpmax={warpmax:6.1f} mean={mean:5.1f} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us")
+        rows.append(
+            (
+                kind,
+                mode,
+                f"{warpmax:.2f}",
+                f"{mean:.2f}",
+                f"{D:.3f}",
+                "OK" if ok else "FAIL",
+                f"{t:.1f}",
+            )
+        )
+        print(
+            f"dist={kind:10} D={D:6.2f} warpmax={warpmax:6.1f} mean={mean:5.1f} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us"
+        )
 
     with CSV.open("a", newline="") as fh:
         wr = csv.writer(fh)

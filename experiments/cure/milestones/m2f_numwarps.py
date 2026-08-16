@@ -20,16 +20,15 @@ import numpy as np
 import torch
 
 # reuse the validated kernel + helpers from M2e (import does not run its main())
-from experiments.cure.m2e_worklist_packed import (
+from experiments.cure.milestones.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
     _wl_scalar,
-    random_nfa,
     to_device,
 )
-
 from gpufsm.api import run
+from gpufsm.bench import DENSE, random_nfa
 from gpufsm.core.registry import Backend
 
 BATCHES = [int(b) for b in os.environ.get("M2F_BATCHES", "4096,16384,65536").split(",")]
@@ -95,7 +94,7 @@ def main() -> int:
     print(f"{'batch':>7}{hdr}{'nw1/nw4':>10}")
     for batch in BATCHES:
         data = make_batch_for(ns, batch)
-        nfa = random_nfa(ns, seed=1000 + ns)
+        nfa = random_nfa(ns, seed=1000 + ns, shape=DENSE)
         g = to_device(nfa)
         total_bits = batch * SLEN * 8
         gv = {}
@@ -133,7 +132,7 @@ def main() -> int:
 
 
 def make_batch_for(ns, batch):
-    # build a batch of an explicit size (m2e.make_batch reads a module-level N_STRINGS)
+    # build a batch of an explicit size (the old local helper read a module-level N_STRINGS)
     rng = np.random.default_rng(0)
     flat = rng.integers(ord("a"), ord("a") + 5, size=batch * SLEN, dtype=np.uint8)
     return flat.reshape(batch, SLEN)

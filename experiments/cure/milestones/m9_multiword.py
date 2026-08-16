@@ -27,20 +27,19 @@ import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure.m2e_worklist_packed import (
+from triton.language.extra import libdevice
+
+from experiments.cure.milestones.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
-    make_batch,
-    random_nfa,
     to_device,
 )
-from triton.language.extra import libdevice
-
 from gpufsm.api import run, run_batch
+from gpufsm.bench import DENSE, random_batch_2d, random_nfa
 from gpufsm.core.registry import Backend
 
-N_STRINGS = 4096  # matches m2e.make_batch's batch size
+N_STRINGS = 4096  # matches the shared generator's batch size
 BLOCK = 32
 
 
@@ -192,9 +191,9 @@ def main() -> int:
     for ns in (96, 128, 192, 256):
         need = (ns + 63) // 64
         nwords = 1 << (need - 1).bit_length()  # next power of 2 (tl.arange needs pow2)
-        nfa = random_nfa(ns, seed=1000 + ns)
+        nfa = random_nfa(ns, seed=1000 + ns, shape=DENSE)
         g = to_device(nfa)
-        data = make_batch(0)
+        data = random_batch_2d(N_STRINGS, SLEN, 0)
         md = max_outdeg(nfa)
         if not oracle_ok(nfa, data, g, nwords, md):
             print(f"{ns:7d}{nwords:7d}  ORACLE FAIL")

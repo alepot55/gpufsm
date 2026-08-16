@@ -25,8 +25,17 @@ vol = modal.Volume.from_name("gpufsm-triton-wheel", create_if_missing=True)
 
 build_image = (
     modal.Image.debian_slim(python_version="3.12")
-    .apt_install("git", "build-essential", "g++", "gcc", "cmake", "ninja-build",
-                 "zlib1g-dev", "curl", "ca-certificates")
+    .apt_install(
+        "git",
+        "build-essential",
+        "g++",
+        "gcc",
+        "cmake",
+        "ninja-build",
+        "zlib1g-dev",
+        "curl",
+        "ca-certificates",
+    )
     .pip_install("cmake<4", "ninja", "wheel", "setuptools", "pybind11")
     .add_local_file(str(LOCAL_REPO / PATCH), "/root/perlane.patch")
 )
@@ -34,8 +43,9 @@ build_image = (
 gpu_image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
     .pip_install("torch", "numpy")
-    .add_local_dir(str(LOCAL_REPO / "experiments"), "/root/repo/experiments",
-                   ignore=["**/__pycache__"])
+    .add_local_dir(
+        str(LOCAL_REPO / "experiments"), "/root/repo/experiments", ignore=["**/__pycache__"]
+    )
 )
 
 
@@ -60,10 +70,21 @@ def build_wheel() -> str:
     run(f"git fetch -q --depth 1 origin {BASE_COMMIT}")
     run(f"git checkout -q {BASE_COMMIT}")
     run("git apply /root/perlane.patch")
-    env = {**os.environ, "MAX_JOBS": "16", "TRITON_PARALLEL_LINK_JOBS": "2",
-           "CC": "gcc", "CXX": "g++"}
-    r = subprocess.run("pip wheel . -w /vol/wheels --no-deps -v", shell=True, cwd=src,
-                       env=env, capture_output=True, text=True)
+    env = {
+        **os.environ,
+        "MAX_JOBS": "16",
+        "TRITON_PARALLEL_LINK_JOBS": "2",
+        "CC": "gcc",
+        "CXX": "g++",
+    }
+    r = subprocess.run(
+        "pip wheel . -w /vol/wheels --no-deps -v",
+        shell=True,
+        cwd=src,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
     tail = (r.stdout + r.stderr)[-3000:]
     if r.returncode != 0:
         raise RuntimeError(f"wheel build failed:\n{tail}")
@@ -80,14 +101,19 @@ def run_cure() -> dict:
 
     wheels = glob.glob("/vol/wheels/triton-*.whl")
     assert wheels, "no wheel in volume"
-    subprocess.run(f"pip install -q {wheels[0]} --force-reinstall --no-deps",
-                   shell=True, check=True)
+    subprocess.run(
+        f"pip install -q {wheels[0]} --force-reinstall --no-deps", shell=True, check=True
+    )
     import torch
+
     gpu = torch.cuda.get_device_name(0).replace(" ", "_") if torch.cuda.is_available() else "NOCUDA"
 
     base_env = {**os.environ, "TRITON_ALWAYS_COMPILE": "1", "PYTHONPATH": "/root/repo"}
-    cure_env = {**base_env, "TRITON_ENABLE_PERLANE_LOOP_RETIREMENT": "1",
-                "GPUFSM_THREAD_REGION": "retire"}
+    cure_env = {
+        **base_env,
+        "TRITON_ENABLE_PERLANE_LOOP_RETIREMENT": "1",
+        "GPUFSM_THREAD_REGION": "retire",
+    }
     exp = "/root/repo/experiments/cure"
     jobs = [
         ("bench_perlane_retire", f"python {exp}/bench_perlane_retire.py", base_env),
@@ -102,8 +128,7 @@ def run_cure() -> dict:
     ]
     out = {"gpu": gpu, "sections": {}}
     for name, cmd, env in jobs:
-        r = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True,
-                           timeout=900)
+        r = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True, timeout=900)
         out["sections"][name] = {
             "rc": r.returncode,
             "stdout": r.stdout[-4000:],

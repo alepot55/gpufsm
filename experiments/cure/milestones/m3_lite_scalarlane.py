@@ -32,20 +32,19 @@ import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure.m2e_worklist_packed import (
+from triton.language.extra import libdevice
+
+from experiments.cure.milestones.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
-    make_batch,
-    random_nfa,
     to_device,
 )
-from experiments.cure.m2e_worklist_packed import (
+from experiments.cure.milestones.m2e_worklist_packed import (
     launch as launch_m2e,  # WP (union) launcher
 )
-from triton.language.extra import libdevice
-
 from gpufsm.api import run, run_batch
+from gpufsm.bench import DENSE, random_batch_2d, random_nfa
 from gpufsm.core.registry import Backend
 
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))
@@ -172,9 +171,9 @@ def main() -> int:
         return 0
     if len(sys.argv) >= 3 and sys.argv[1] == "profile":
         ns = int(sys.argv[2])
-        nfa = random_nfa(ns, seed=1000 + ns)
+        nfa = random_nfa(ns, seed=1000 + ns, shape=DENSE)
         g = to_device(nfa)
-        launch_wp2(g, make_batch(0), max_outdeg(nfa))
+        launch_wp2(g, random_batch_2d(N_STRINGS, SLEN, 0), max_outdeg(nfa))
         return 0
 
     rows = []
@@ -203,9 +202,9 @@ def main() -> int:
 
     for ns in (8, 16, 24, 32):
         for seed in (0, 1):
-            nfa = random_nfa(ns, seed=1000 + ns + seed)
+            nfa = random_nfa(ns, seed=1000 + ns + seed, shape=DENSE)
             g = to_device(nfa)
-            data = make_batch(seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
             md = max_outdeg(nfa)
             if not oracle_ok_wp2(nfa, data, g, md):
                 print(f"{ns:4d}{seed:3d}  ORACLE FAIL wp2")

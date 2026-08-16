@@ -11,15 +11,14 @@ Usage:  .venv/bin/python experiments/cure/m0_anchor.py
 
 from __future__ import annotations
 
-import random
 import statistics
 import sys
 from pathlib import Path
 
-import numpy as np
-
-from gpufsm.api import run, run_batch
-from gpufsm.core.nfa import NFABuilder
+from gpufsm.api import run_batch
+from gpufsm.bench import random_batch, random_nfa
+from gpufsm.bench.oracle import matches as oracle_match
+from gpufsm.bench.timing import repeat, summarize
 from gpufsm.core.registry import Backend, available_backends, list_techniques
 
 SLEN = 256
@@ -29,46 +28,15 @@ WARMUP = 3
 SAMPLES = 9
 
 
-def random_nfa(n: int, seed: int):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice(ALPHABET)), rng.randrange(n))
-    return b.build()
-
-
-def make_batch(seed: int) -> tuple[list[bytes], int]:
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(ord("a"), ord("a") + len(ALPHABET), size=N_STRINGS * SLEN, dtype=np.uint8)
-    buf = flat.tobytes()
-    return [buf[i * SLEN : (i + 1) * SLEN] for i in range(N_STRINGS)], N_STRINGS * SLEN
-
-
-def oracle_match(nfa, batch, backend, technique, n_check: int = 64) -> bool:
-    """Bit-for-bit check vs the CPU reference oracle on a sample of the batch."""
-    got = run_batch(nfa, batch[:n_check], backend=backend, technique=technique)
-    for s, r in zip(batch[:n_check], got, strict=True):
-        ref = run(nfa, s, backend=Backend.CPU, technique="reference")
-        if (r.accepted, r.match_len) != (ref.accepted, ref.match_len):
-            return False
-    return True
-
-
-def measure_gbps(nfa, batch, total_bytes, backend, technique) -> tuple[float, float, float]:
-    for _ in range(WARMUP):
-        run_batch(nfa, batch, backend=backend, technique=technique)
-    samples = []
-    for _ in range(SAMPLES):
-        km = run_batch(nfa, batch, backend=backend, technique=technique)[0].kernel_ms
-        if km > 0:
-            samples.append(km)
-    med = statistics.median(samples)
-    gbps = total_bytes * 8.0 / (med * 1e-3) / 1e9
-    return gbps, med, statistics.pstdev(samples) if len(samples) > 1 else 0.0
+def _measure(nfa, batch, total_bytes, backend, technique) -> tuple[float, float]:
+    """Median throughput (Gbps) and median kernel time (ms) for one (backend, technique)."""
+    samples = repeat(
+        lambda: run_batch(nfa, batch, backend=backend, technique=technique)[0].kernel_ms,
+        warmup=WARMUP,
+        samples=SAMPLES,
+    )
+    stats = summarize(samples, total_bytes)
+    return stats["gbps"], stats["median_ms"]
 
 
 def main() -> int:
@@ -96,14 +64,14 @@ def main() -> int:
     for n in (16, 32, 48, 64):
         for seed in (0, 1, 2):
             nfa = random_nfa(n, seed=1000 + n + seed)
-            batch, total = make_batch(seed)
+            batch, total = random_batch(N_STRINGS, SLEN, seed, ALPHABET)
             ok_t = oracle_match(nfa, batch, Backend.TRITON, tri)
             ok_c = oracle_match(nfa, batch, Backend.CUDA, cuda)
             if not (ok_t and ok_c):
                 print(f"{n:7d}{seed:5d}  ORACLE MISMATCH triton={ok_t} cuda={ok_c} — skipping")
                 continue
-            gt, mt, _ = measure_gbps(nfa, batch, total, Backend.TRITON, tri)
-            gc, mc, _ = measure_gbps(nfa, batch, total, Backend.CUDA, cuda)
+            gt, mt = _measure(nfa, batch, total, Backend.TRITON, tri)
+            gc, mc = _measure(nfa, batch, total, Backend.CUDA, cuda)
             regret = gc / gt if gt > 0 else float("nan")
             print(f"{n:7d}{seed:5d}{gt:13.2f}{gc:11.2f}{regret:11.2f}{'  ok':>8}")
             rows.append((n, seed, round(gt, 3), round(gc, 3), round(regret, 3)))

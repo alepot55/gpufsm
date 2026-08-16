@@ -27,7 +27,6 @@ Usage:  .venv/bin/python experiments/cure/m2e_worklist_packed.py
 from __future__ import annotations
 
 import os
-import random
 import statistics
 import sys
 from pathlib import Path
@@ -39,7 +38,8 @@ import triton.language as tl
 from triton.language.extra import libdevice
 
 from gpufsm.api import run, run_batch
-from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.bench import random_batch_2d, random_nfa
+from gpufsm.core.nfa import ANY_SYMBOL
 from gpufsm.core.registry import Backend
 
 SLEN = 256
@@ -167,24 +167,6 @@ def _wl_packed(
     tl.store(out_lens + sidx, out_l, mask=valid)
 
 
-def random_nfa(n: int, seed: int):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice(ALPHABET)), rng.randrange(n))
-    return b.build()
-
-
-def make_batch(seed: int):
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(ord("a"), ord("a") + len(ALPHABET), size=N_STRINGS * SLEN, dtype=np.uint8)
-    return flat.reshape(N_STRINGS, SLEN)
-
-
 def to_device(nfa):
     dev = torch.device("cuda")
     acc = 0
@@ -278,7 +260,7 @@ def med_ms(kind, g, data2d):
 def profile_one(kind, ns):
     nfa = random_nfa(ns, seed=1000 + ns)
     g = to_device(nfa)
-    launch(kind, g, make_batch(0))
+    launch(kind, g, random_batch_2d(N_STRINGS, SLEN, 0))
     return 0
 
 
@@ -320,7 +302,7 @@ def main() -> int:
         for seed in (0, 1):
             nfa = random_nfa(ns, seed=1000 + ns + seed)
             g = to_device(nfa)
-            data = make_batch(seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
             batch_bytes = [data[i].tobytes() for i in range(data.shape[0])]
             if not (oracle_ok(nfa, data, "ws", g) and oracle_ok(nfa, data, "wp", g)):
                 print(f"{ns:4d}{seed:3d}  ORACLE FAIL")

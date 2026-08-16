@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -98,6 +99,12 @@ def random_nfa(num_states: int, seed: int, shape: NFAShape = DENSE) -> NFA:
     return b.build()
 
 
+def _draw_symbols(count: int, seed: int, alphabet: str) -> np.ndarray[Any, Any]:
+    """``count`` uniform symbols from ``alphabet``, as uint8 — the one draw all batches share."""
+    lo = ord(alphabet[0])
+    return np.random.default_rng(seed).integers(lo, lo + len(alphabet), size=count, dtype=np.uint8)
+
+
 def random_batch(
     num_strings: int,
     length: int,
@@ -109,12 +116,35 @@ def random_batch(
     Built as one numpy draw and sliced, which is what makes a 4096x256 batch cheap
     enough to rebuild per measurement instead of being cached and mutated.
     """
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(
-        ord(alphabet[0]),
-        ord(alphabet[0]) + len(alphabet),
-        size=num_strings * length,
-        dtype=np.uint8,
-    ).tobytes()
+    flat = _draw_symbols(num_strings * length, seed, alphabet).tobytes()
     batch = [flat[i * length : (i + 1) * length] for i in range(num_strings)]
     return batch, num_strings * length
+
+
+def random_batch_2d(
+    num_strings: int,
+    length: int,
+    seed: int = 0,
+    alphabet: str = DEFAULT_ALPHABET,
+) -> np.ndarray[Any, Any]:
+    """The same draw as :func:`random_batch`, kept as a ``(num_strings, length)`` array.
+
+    The hand-written CUDA and lane-packed Triton kernels take the batch as a 2-D uint8
+    array rather than a list of ``bytes``; this is the same random stream, only reshaped,
+    so a measurement can switch between the two views without changing its inputs.
+    """
+    return _draw_symbols(num_strings * length, seed, alphabet).reshape(num_strings, length)
+
+
+def random_bytes_2d(num_strings: int, length: int, seed: int = 0) -> np.ndarray[Any, Any]:
+    """Uniform over the **full** byte alphabet — for the DFA, whose table is 256 wide.
+
+    Distinct from :func:`random_batch_2d`: restricting a DFA's input to five symbols
+    would leave 98% of every transition row untouched and turn a memory-bound sweep
+    into a cache-resident one.
+    """
+    return (
+        np.random.default_rng(seed)
+        .integers(0, 256, size=num_strings * length, dtype=np.uint8)
+        .reshape(num_strings, length)
+    )

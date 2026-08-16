@@ -12,13 +12,11 @@ from __future__ import annotations
 
 import ctypes
 import statistics
-import subprocess
-import tempfile
-from pathlib import Path
 
 import numpy as np
 import torch
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 N = 1 << 20
 
@@ -45,28 +43,11 @@ extern "C" float launch(const int* trip, int* out, int n) {
   cudaEventRecord(s); k<<<bl, th>>>(trip, out, n); cudaEventRecord(e); cudaEventSynchronize(e);
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms; }
 """
-    cache = Path.home() / ".cache" / "f3_full_cure"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(dir=str(cache)))
-    cu, so = d / "k.cu", d / "k.so"
-    cu.write_text(src)
-    subprocess.run(
-        [
-            "/usr/local/cuda/bin/nvcc",
-            "-O3",
-            "-shared",
-            "-Xcompiler",
-            "-fPIC",
-            cuda_arch_flag(),
-            "-o",
-            str(so),
-            str(cu),
-        ],
-        check=True,
+    lib = load_library(
+        src,
+        "f3_full_cure",
+        {"launch": (ctypes.c_float, [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int])},
     )
-    lib = ctypes.CDLL(str(so))
-    lib.launch.restype = ctypes.c_float
-    lib.launch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
 
     def run():
         out = torch.zeros(N, dtype=torch.int32, device="cuda")

@@ -22,7 +22,14 @@ import statistics
 import sys
 from pathlib import Path
 
-from gpufsm import NFABuilder, run_batch
+from gpufsm import run_batch
+from gpufsm.bench import SPARSE_WORKLIST, random_nfa
+
+
+def _sparse_nfa(n: int, seed: int):
+    """The sparse-worklist family plus its alphabet, which the callers need for inputs."""
+    return random_nfa(n, seed, SPARSE_WORKLIST), [ord(c) for c in SPARSE_WORKLIST.alphabet]
+
 
 SYNTH_SIZES = [512, 2048, 8192]
 SAT_STRINGS = 4096  # GPU-saturating batch (>= ~46 SMs * warps): the fair comparison
@@ -31,21 +38,6 @@ STR_LEN = 256
 WARMUP = 3
 RUNS = 7
 GPU = "RTX4070"
-
-
-def _random_nfa(n: int, seed: int):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.02)
-    b.set_start(0)
-    alpha = [ord(c) for c in "abcde"]
-    for s in range(n):
-        for _ in range(2):
-            b.add_transition(s, rng.choice(alpha), rng.randrange(n))
-        if rng.random() < 0.3:
-            b.add_epsilon(s, rng.randrange(n))
-    return b.build(), alpha
 
 
 def _median_ms(nfa, batch, tech):
@@ -73,7 +65,7 @@ def main() -> int:
 
     # (1) batch sensitivity on one fixed automaton — documents the confound.
     batch_rows = []
-    nfa, alpha = _random_nfa(8192, seed=8192)
+    nfa, alpha = _sparse_nfa(8192, seed=8192)
     print("batch-sensitivity (8192-state synthetic, 128 words):")
     for nstr in BATCH_GRID:
         batch = [bytes(rng.choice(alpha) for _ in range(STR_LEN)) for _ in range(nstr)]
@@ -85,7 +77,7 @@ def main() -> int:
     rows = []
     print(f"\nsaturating batch ({SAT_STRINGS} strings) — fair speedup:")
     for n in SYNTH_SIZES:
-        nfa, alpha = _random_nfa(n, seed=n)
+        nfa, alpha = _sparse_nfa(n, seed=n)
         batch = [bytes(rng.choice(alpha) for _ in range(STR_LEN)) for _ in range(SAT_STRINGS)]
         g, w, _ = _speedup(nfa, batch)
         rows.append(("synthetic", n, (n + 63) // 64, round(g, 4), round(w, 4), round(w / g, 1)))

@@ -24,51 +24,26 @@ from __future__ import annotations
 
 import ctypes
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
-from experiments.cure._cuda_arch import cuda_arch_flag
-from experiments.cure.m2e_worklist_packed import (
+
+from experiments.cure.milestones.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
-    random_nfa,
     to_device,
 )
-from experiments.cure.m3_lite_scalarlane import launch_wp2, max_outdeg
-
+from experiments.cure.milestones.m3_lite_scalarlane import launch_wp2, max_outdeg
 from gpufsm.api import run, run_batch
-from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.bench import NO_ACCEPT, random_batch_2d, random_nfa
+from gpufsm.bench.nvcc import load_library
+from gpufsm.core.nfa import ANY_SYMBOL
 from gpufsm.core.registry import Backend
 
 N_STRINGS = int(__import__("os").environ.get("M2_N_STRINGS", "4096"))
-
-
-def make_batch_local(seed: int):
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(ord("a"), ord("a") + 5, size=N_STRINGS * SLEN, dtype=np.uint8)
-    return flat.reshape(N_STRINGS, SLEN)
-
-
-def random_nfa_noaccept(n: int, seed: int):
-    """Same structure as m2e.random_nfa but NO accept states, so strings never latch early -- the
-    kernels scan the full input and we measure SUSTAINED throughput (removes the early-termination
-    confound, and the per-lane early-exit asymmetry between thread kernels and the tile)."""
-    import random as _r
-
-    rng = _r.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=False)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice("abcde")), rng.randrange(n))
-    return b.build()
 
 
 def lower_scalar_program_to_cuda(uses_any: bool):
@@ -126,30 +101,20 @@ extern "C" float sp_launch(
   return ms;
 }}
 """
-    cache = Path.home() / ".cache" / "m10_scalar_program"  # home fs (tmpfs /tmp may be noexec)
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="sp_", dir=str(cache)))
-    cu, so = d / "sp.cu", d / "sp.so"
-    cu.write_text(src)
-    nvcc = (
-        "nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() is False else "/usr/local/cuda/bin/nvcc"
+    return load_library(
+        src,
+        "m10_scalar_program",
+        {
+            "sp_launch": (
+                ctypes.c_float,
+                [ctypes.c_void_p] * 3
+                + [ctypes.c_longlong]
+                + [ctypes.c_void_p] * 2
+                + [ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
+                + [ctypes.c_int] * 3,
+            )
+        },
     )
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    lib = ctypes.CDLL(str(so))
-    lib.sp_launch.restype = ctypes.c_float
-    lib.sp_launch.argtypes = (
-        [ctypes.c_void_p] * 3
-        + [ctypes.c_longlong]
-        + [ctypes.c_void_p] * 2
-        + [ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
-        + [ctypes.c_int] * 3
-    )
-    return lib
 
 
 ANY_SYMBOL_V = int(ANY_SYMBOL)
@@ -207,8 +172,8 @@ def main() -> int:
         return 0
     if len(sys.argv) >= 3 and sys.argv[1] == "profile":
         ns = int(sys.argv[2])
-        nfa = random_nfa_noaccept(ns, seed=1000 + ns)
-        sp_run(nfa, to_device(nfa), make_batch_local(0))  # one profiled SP launch
+        nfa = random_nfa(ns, seed=1000 + ns, shape=NO_ACCEPT)
+        sp_run(nfa, to_device(nfa), random_batch_2d(N_STRINGS, SLEN, 0))  # one profiled SP launch
         return 0
     total_bits = N_STRINGS * SLEN * 8
     print(
@@ -221,14 +186,14 @@ def main() -> int:
     rows = []
     for ns in (16, 32, 48, 64):
         for seed in (0, 1):
-            data = make_batch_local(seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
             # correctness on a WITH-accept NFA (real matches); throughput on a no-accept variant
             # (sustained full-length scan, no early-termination / per-lane early-exit confound).
             nfa_acc = random_nfa(ns, seed=1000 + ns + seed)
             if not oracle_ok(nfa_acc, data, to_device(nfa_acc)):
                 print(f"{ns:7d}{seed:5d}  ORACLE FAIL")
                 continue
-            nfa = random_nfa_noaccept(ns, seed=1000 + ns + seed)
+            nfa = random_nfa(ns, seed=1000 + ns + seed, shape=NO_ACCEPT)
             g = to_device(nfa)
             bb = [data[i].tobytes() for i in range(data.shape[0])]
 

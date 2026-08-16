@@ -14,14 +14,14 @@ Run on a GPU box:  python scripts/sweep_techniques.py [out.csv]
 from __future__ import annotations
 
 import csv
-import random
 import sys
 from pathlib import Path
 
 import numpy as np
 
 from gpufsm.api import run_batch
-from gpufsm.core.nfa import NFABuilder
+from gpufsm.bench import random_batch, random_nfa
+from gpufsm.bench.timing import bootstrap_ci95
 from gpufsm.core.registry import Backend, available_backends, list_techniques
 
 _MULTISTREAM = {
@@ -56,33 +56,6 @@ def env_info() -> dict[str, str]:
     return info
 
 
-def random_nfa(n: int, seed: int) -> NFABuilder:
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice("abcde")), rng.randrange(n))
-    return b.build()
-
-
-def make_batch() -> tuple[list[bytes], int]:
-    rng = np.random.default_rng(0)
-    flat = rng.integers(ord("a"), ord("a") + 5, size=_N_STRINGS * _SLEN, dtype=np.uint8).tobytes()
-    return [flat[i * _SLEN : (i + 1) * _SLEN] for i in range(_N_STRINGS)], _N_STRINGS * _SLEN
-
-
-def bootstrap_ci95(samples: list[float], iters: int = 2000, seed: int = 0) -> tuple[float, float]:
-    arr = np.asarray(samples, dtype=float)
-    if arr.size < 2:
-        return (float(arr[0]) if arr.size else 0.0, float(arr[0]) if arr.size else 0.0)
-    rng = np.random.default_rng(seed)
-    meds = np.median(rng.choice(arr, size=(iters, arr.size), replace=True), axis=1)
-    return float(np.percentile(meds, 2.5)), float(np.percentile(meds, 97.5))
-
-
 def measure(nfa, backend, technique, batch, total_bytes) -> dict | None:
     for _ in range(_WARMUP):
         run_batch(nfa, batch, backend=backend, technique=technique)
@@ -114,7 +87,7 @@ def main() -> None:
     if not backends:
         print("no GPU backend — run on a GPU box")
         return
-    batch, total_bytes = make_batch()
+    batch, total_bytes = random_batch(_N_STRINGS, _SLEN)
     rows = []
     for be in backends:
         for te in list_techniques(be):

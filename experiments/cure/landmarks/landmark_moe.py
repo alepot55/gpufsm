@@ -24,16 +24,15 @@ from __future__ import annotations
 import ctypes
 import os
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 A, B, SEED = 1640531527, 1013904223, 12345  # odd mixing constants < 2^31 (int32-literal safe)
 M24 = 0xFFFFFF
@@ -121,21 +120,11 @@ extern "C" float moe_launch(const int* pool, const long long* W, const int* star
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_moe"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="moe_", dir=str(cache)))
-    cu, so = d / "moe.cu", d / "moe.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    lib = load_library(
+        src,
+        "landmark_moe",
+        {"moe_launch": (ctypes.c_float, [ctypes.c_void_p] * 4 + [ctypes.c_int, ctypes.c_void_p])},
     )
-    lib = ctypes.CDLL(str(so))
-    lib.moe_launch.restype = ctypes.c_float
-    lib.moe_launch.argtypes = [ctypes.c_void_p] * 4 + [ctypes.c_int, ctypes.c_void_p]
     return lib
 
 

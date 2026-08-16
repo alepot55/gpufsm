@@ -29,6 +29,7 @@ import triton
 import triton.language as tl
 
 from gpufsm.api import run_batch
+from gpufsm.bench import random_bytes_2d
 from gpufsm.core.dfa import random_dfa
 from gpufsm.reference import simulate_dfa
 
@@ -77,12 +78,6 @@ def _dfa_packed_kernel(
     tl.store(out_lens + sidx, out_l, mask=valid)
 
 
-def make_batch(seed: int, n: int):
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(0, 256, size=n * SLEN, dtype=np.uint8)
-    return flat.reshape(n, SLEN)
-
-
 def launch_packed(dfa, data2d):
     dev = torch.device("cuda")
     n = data2d.shape[0]
@@ -129,7 +124,7 @@ def main() -> int:
     if len(sys.argv) >= 3 and sys.argv[1] == "profile":
         ns = int(sys.argv[2])
         dfa = random_dfa(ns, seed=0)
-        launch_packed(dfa, make_batch(0, N_STRINGS))
+        launch_packed(dfa, random_bytes_2d(N_STRINGS, SLEN, 0))
         return 0
 
     total_bits = N_STRINGS * SLEN * 8
@@ -142,7 +137,7 @@ def main() -> int:
     rows = []
     for ns in (64, 1024, 4096, 16384):
         dfa = random_dfa(ns, seed=0)
-        data = make_batch(0, N_STRINGS)
+        data = random_bytes_2d(N_STRINGS, SLEN, 0)
         if not oracle_ok_packed(dfa, data):
             print(f"{ns:7d}  ORACLE FAIL packed")
             continue

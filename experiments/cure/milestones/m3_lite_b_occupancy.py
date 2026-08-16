@@ -23,17 +23,16 @@ from pathlib import Path
 import numpy as np
 import torch
 import triton
-from experiments.cure.m2e_worklist_packed import (
+
+from experiments.cure.milestones.m2e_worklist_packed import (
     SAMPLES,
     SLEN,
     WARMUP,
-    make_batch,
-    random_nfa,
     to_device,
 )
-from experiments.cure.m3_lite_scalarlane import _wl_perlane, max_outdeg
-
+from experiments.cure.milestones.m3_lite_scalarlane import _wl_perlane, max_outdeg
 from gpufsm.api import run, run_batch
+from gpufsm.bench import DENSE, random_batch_2d, random_nfa
 from gpufsm.core.registry import Backend
 
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))
@@ -88,9 +87,9 @@ def main() -> int:
         return 0
     if len(sys.argv) >= 4 and sys.argv[1] == "profile":
         block, ns = int(sys.argv[2]), int(sys.argv[3])
-        nfa = random_nfa(ns, seed=1000 + ns)
+        nfa = random_nfa(ns, seed=1000 + ns, shape=DENSE)
         g = to_device(nfa)
-        launch_block(g, make_batch(0), max_outdeg(nfa), block)
+        launch_block(g, random_batch_2d(N_STRINGS, SLEN, 0), max_outdeg(nfa), block)
         return 0
 
     total_bits = N_STRINGS * SLEN * 8
@@ -119,9 +118,9 @@ def main() -> int:
 
     for ns in (16, 32):
         for seed in (0, 1):
-            nfa = random_nfa(ns, seed=1000 + ns + seed)
+            nfa = random_nfa(ns, seed=1000 + ns + seed, shape=DENSE)
             g = to_device(nfa)
-            data = make_batch(seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
             md = max_outdeg(nfa)
             if not all(oracle_ok(nfa, data, g, md, b) for b in BLOCKS):
                 print(f"{ns:4d}{seed:3d}  ORACLE FAIL")

@@ -1,6 +1,7 @@
 """M4c — generalize the built cure across trip distributions (de-risk one-kernel-trick).
 Same per-lane-while kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire).
 Oracle: acc[i]=trip[i]*(trip[i]-1)/2. Reports oracle + median time per (dist, mode)."""
+
 from __future__ import annotations
 
 import os
@@ -39,7 +40,8 @@ def trips(dist, n, rng):
 
 def main() -> int:
     if not torch.cuda.is_available():
-        print("SKIP: no CUDA"); return 0
+        print("SKIP: no CUDA")
+        return 0
     mode = os.environ.get("GPUFSM_THREAD_REGION", "off")
     n, BLOCK = 1 << 20, 32
     for dist in ("uniform", "geometric", "pareto"):
@@ -51,13 +53,18 @@ def main() -> int:
         def run():
             out = torch.zeros(n, dtype=torch.int32, device="cuda")
             e0, e1 = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-            e0.record(); _perlane_while[(triton.cdiv(n, BLOCK),)](d, out, n, BLOCK=BLOCK, num_warps=1); e1.record()
-            torch.cuda.synchronize(); return out.cpu().numpy(), float(e0.elapsed_time(e1))
+            e0.record()
+            _perlane_while[(triton.cdiv(n, BLOCK),)](d, out, n, BLOCK=BLOCK, num_warps=1)
+            e1.record()
+            torch.cuda.synchronize()
+            return out.cpu().numpy(), float(e0.elapsed_time(e1))
 
-        o, _ = run(); ok = np.array_equal(o, ref)
-        for _ in range(5): run()
+        o, _ = run()
+        ok = np.array_equal(o, ref)
+        for _ in range(5):
+            run()
         t = statistics.median([run()[1] for _ in range(15)])
-        print(f"dist={dist:9} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t*1e3:8.1f}us")
+        print(f"dist={dist:9} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t * 1e3:8.1f}us")
     return 0
 
 

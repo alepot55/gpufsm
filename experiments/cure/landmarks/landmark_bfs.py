@@ -24,16 +24,15 @@ from __future__ import annotations
 import ctypes
 import os
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 # odd mixing constants, both < 2^31 so int32 literals never overflow in Triton; products are
 # forced to int64 via .to(tl.int64) on the tensors (matches CUDA long long / numpy int64 wrap).
@@ -122,27 +121,22 @@ extern "C" float wk_launch(const int* rowptr, const int* colidx, int n, int step
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_bfs"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="wk_", dir=str(cache)))
-    cu, so = d / "wk.cu", d / "wk.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    lib = load_library(
+        src,
+        "landmark_bfs",
+        {
+            "wk_launch": (
+                ctypes.c_float,
+                [
+                    ctypes.c_void_p,
+                    ctypes.c_void_p,
+                    ctypes.c_int,
+                    ctypes.c_int,
+                    ctypes.c_void_p,
+                ],
+            )
+        },
     )
-    lib = ctypes.CDLL(str(so))
-    lib.wk_launch.restype = ctypes.c_float
-    lib.wk_launch.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_int,
-        ctypes.c_int,
-        ctypes.c_void_p,
-    ]
     return lib
 
 

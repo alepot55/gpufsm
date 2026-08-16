@@ -54,7 +54,7 @@ def make_trips(kind, rng):
     elif kind == "single_straggler":
         # exactly one lane per 32-lane warp is a 256-trip straggler, the rest trip=2
         t = np.full(N, 2)
-        t[:: BLOCK] = 256
+        t[::BLOCK] = 256
     elif kind == "spike":
         t = np.where(rng.random(N) < 0.05, 250, rng.integers(2, 7, N))
     else:
@@ -101,8 +101,20 @@ def main() -> int:
         for _ in range(3):
             run()
         t = statistics.median([run()[1] for _ in range(9)]) * 1e3
-        rows.append((kind, mode, f"{warpmax:.2f}", f"{mean:.2f}", f"{D:.3f}", "OK" if ok else "FAIL", f"{t:.1f}"))
-        print(f"dist={kind:16} D={D:7.2f} warpmax={warpmax:6.1f} mean={mean:6.1f} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us")
+        rows.append(
+            (
+                kind,
+                mode,
+                f"{warpmax:.2f}",
+                f"{mean:.2f}",
+                f"{D:.3f}",
+                "OK" if ok else "FAIL",
+                f"{t:.1f}",
+            )
+        )
+        print(
+            f"dist={kind:16} D={D:7.2f} warpmax={warpmax:6.1f} mean={mean:6.1f} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us"
+        )
 
     with CSV.open("a", newline="") as fh:
         wr = csv.writer(fh)

@@ -81,12 +81,8 @@ def _sh(cmd: str, cwd: str | None = None, env: dict[str, str] | None = None) -> 
 if modal is not None:
     volume = modal.Volume.from_name(VOLUME, create_if_missing=True)
     image = (
-        modal.Image.from_registry(
-            "nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12"
-        )
-        .apt_install(
-            "git", "cmake", "ninja-build", "ccache", "clang", "lld", "zlib1g-dev", "curl"
-        )
+        modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
+        .apt_install("git", "cmake", "ninja-build", "ccache", "clang", "lld", "zlib1g-dev", "curl")
         .pip_install("wheel", "setuptools", "pybind11", "ninja", "cmake")
     )
     app = modal.App("triton-upstream")
@@ -140,14 +136,13 @@ if modal is not None:
         _sh(f"{py} -m pip install -q torch numpy pytest")
 
         _sh(f"{py} -m pip install -e . --no-build-isolation -v", cwd=repo, env=env)
-        version = _sh(
-            f"{py} -c \"import triton;print(triton.__version__, triton.__file__)\""
-        ).strip()
+        version = _sh(f'{py} -c "import triton;print(triton.__version__, triton.__file__)"').strip()
         volume.commit()
         return {"head": head, "patch": applied, "triton": version, "tree": tree}
 
-    def _run_impl(cmds: list[str], upload: dict[str, str] | None = None,
-                  tree: str = "main") -> list[dict]:
+    def _run_impl(
+        cmds: list[str], upload: dict[str, str] | None = None, tree: str = "main"
+    ) -> list[dict]:
         """Run commands against the built Triton. Files in `upload` land in /work."""
         import subprocess
 
@@ -188,12 +183,20 @@ if modal is not None:
     # Two entry points over the same body: MLIR-level work (triton-opt, lit) needs no GPU
     # and renting one for it is pure waste; only running kernels does.
     run = app.function(
-        image=image, volumes={WORK: volume}, gpu=GPU_DEFAULT, timeout=RUN_TIMEOUT,
-        memory=BUILD_MEMORY_MB, name="run_gpu",
+        image=image,
+        volumes={WORK: volume},
+        gpu=GPU_DEFAULT,
+        timeout=RUN_TIMEOUT,
+        memory=BUILD_MEMORY_MB,
+        name="run_gpu",
     )(_run_impl)
     run_cpu = app.function(
-        image=image, volumes={WORK: volume}, cpu=8.0, timeout=RUN_TIMEOUT,
-        memory=BUILD_MEMORY_MB, name="run_cpu",
+        image=image,
+        volumes={WORK: volume},
+        cpu=8.0,
+        timeout=RUN_TIMEOUT,
+        memory=BUILD_MEMORY_MB,
+        name="run_cpu",
     )(_run_impl)
 
 

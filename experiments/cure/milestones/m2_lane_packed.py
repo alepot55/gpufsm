@@ -24,7 +24,6 @@ Usage:  .venv/bin/python experiments/cure/m2_lane_packed.py
 from __future__ import annotations
 
 import os
-import random
 import statistics
 import sys
 from pathlib import Path
@@ -35,7 +34,8 @@ import triton
 import triton.language as tl
 
 from gpufsm.api import run
-from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.bench import random_batch_2d, random_nfa
+from gpufsm.core.nfa import ANY_SYMBOL
 from gpufsm.core.registry import Backend
 
 SLEN = 256
@@ -210,24 +210,6 @@ def _dense_lane_packed_kernel(
     tl.store(out_lens + sidx, out_l, mask=valid)
 
 
-def random_nfa(n: int, seed: int):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice(ALPHABET)), rng.randrange(n))
-    return b.build()
-
-
-def make_batch(seed: int):
-    rng = np.random.default_rng(seed)
-    flat = rng.integers(ord("a"), ord("a") + len(ALPHABET), size=N_STRINGS * SLEN, dtype=np.uint8)
-    return flat.reshape(N_STRINGS, SLEN)
-
-
 def to_device(nfa):
     dev = torch.device("cuda")
     acc = 0
@@ -323,7 +305,7 @@ def profile_one(kind: str, ns: int) -> int:
     """Single-launch target for Nsight: `... profile <scalar|noskip|packed> <ns>`."""
     nfa = random_nfa(ns, seed=1000 + ns)
     g = to_device(nfa)
-    data = make_batch(0)
+    data = random_batch_2d(N_STRINGS, SLEN, 0)
     launch(kind, g, data)  # exactly one profiled launch
     return 0
 
@@ -348,7 +330,7 @@ def main() -> int:
         for seed in (0, 1):
             nfa = random_nfa(ns, seed=1000 + ns + seed)
             g = to_device(nfa)
-            data = make_batch(seed)
+            data = random_batch_2d(N_STRINGS, SLEN, seed)
             oks = all(oracle_ok(nfa, data, k, g) for k in ("scalar", "noskip", "packed"))
             if not oks:
                 print(f"{ns:7d}{seed:5d}  ORACLE FAIL")

@@ -23,16 +23,15 @@ from __future__ import annotations
 import ctypes
 import os
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 N = 1 << 16  # queries
 D = 8  # head dim (small but real; isolates the variable-context lock-step)
@@ -143,21 +142,16 @@ extern "C" float at_launch(const float* Q, const float* K, const float* V,
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_attention"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="at_", dir=str(cache)))
-    cu, so = d / "at.cu", d / "at.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    lib = load_library(
+        src,
+        "landmark_attention",
+        {
+            "at_launch": (
+                ctypes.c_float,
+                [ctypes.c_void_p] * 5 + [ctypes.c_int, ctypes.c_void_p, ctypes.c_int],
+            )
+        },
     )
-    lib = ctypes.CDLL(str(so))
-    lib.at_launch.restype = ctypes.c_float
-    lib.at_launch.argtypes = [ctypes.c_void_p] * 5 + [ctypes.c_int, ctypes.c_void_p, ctypes.c_int]
     return lib
 
 

@@ -22,16 +22,20 @@ REPO = "/root/gpufsm"
 app = modal.App("gpufsm-a100-validate")
 
 image = (
-    modal.Image.from_registry(
-        "nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12"
-    )
+    modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
     .pip_install("torch", "numpy", "scipy", "triton")
     .add_local_dir(
         str(LOCAL_REPO),
         remote_path=REPO,
         ignore=[
-            ".git", ".venv", "build", "**/__pycache__", "*.pdf", ".claude",
-            "paper2/*.aux", "paper2/*.log",
+            ".git",
+            ".venv",
+            "build",
+            "**/__pycache__",
+            "*.pdf",
+            ".claude",
+            "paper2/*.aux",
+            "paper2/*.log",
         ],
     )
 )
@@ -47,16 +51,25 @@ def validate() -> dict:
     os.chdir(REPO)
     out: dict = {}
     gpu = subprocess.run(
-        [sys.executable, "-c",
-         "import torch;print(torch.cuda.get_device_name(0).replace(' ','_'))"],
-        capture_output=True, text=True).stdout.strip()
+        [
+            sys.executable,
+            "-c",
+            "import torch;print(torch.cuda.get_device_name(0).replace(' ','_'))",
+        ],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     out["gpu"] = gpu
 
     env = os.environ.copy()
     env["PYTHONPATH"] = REPO
     r1 = subprocess.run(
         [sys.executable, "experiments/cure/p3_cross_arch.py"],
-        env=env, capture_output=True, text=True, timeout=2000)
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=2000,
+    )
     out["phase1_log"] = (r1.stdout + r1.stderr)[-16000:]
 
     files = {}

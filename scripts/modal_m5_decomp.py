@@ -22,20 +22,31 @@ app = modal.App("gpufsm-m5-decomp")
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
     .apt_install("build-essential", "g++", "gcc", "clang")
-    .pip_install("torch", "numpy", "scipy", "triton", "cmake", "ninja",
-                 "scikit-build-core", "pybind11")
+    .pip_install(
+        "torch", "numpy", "scipy", "triton", "cmake", "ninja", "scikit-build-core", "pybind11"
+    )
     .add_local_dir(
-        str(LOCAL_REPO), remote_path=REPO,
-        ignore=[".git", ".venv", "build", "**/__pycache__", "*.pdf", ".claude",
-                "paper2/*.aux", "paper2/*.log", "*.so"],
+        str(LOCAL_REPO),
+        remote_path=REPO,
+        ignore=[
+            ".git",
+            ".venv",
+            "build",
+            "**/__pycache__",
+            "*.pdf",
+            ".claude",
+            "paper2/*.aux",
+            "paper2/*.log",
+            "*.so",
+        ],
     )
 )
 
 SCRIPTS = [
-    "experiments.cure.m0_anchor",
-    "experiments.cure.m2f_numwarps",
-    "experiments.cure.m2_lane_packed",
-    "experiments.cure.m2e_worklist_packed",
+    "experiments.cure.milestones.m0_anchor",
+    "experiments.cure.milestones.m2f_numwarps",
+    "experiments.cure.milestones.m2_lane_packed",
+    "experiments.cure.milestones.m2e_worklist_packed",
 ]
 CSVS = [
     "paper2/data/m0_anchor_rtx4070.csv",
@@ -55,29 +66,45 @@ def run() -> dict:
     out: dict = {}
     gpu = subprocess.run(
         [sys.executable, "-c", "import torch;print(torch.cuda.get_device_name(0))"],
-        capture_output=True, text=True).stdout.strip()
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     out["gpu"] = gpu
 
     # Build gpufsm + its CUDA extension for the present arch (sm_80).
     build_env = {**os.environ, "CC": "gcc", "CXX": "g++"}
     b = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-e", ".[triton]",
-         "--config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON", "-q"],
-        capture_output=True, text=True, timeout=1800, env=build_env)
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-e",
+            ".[triton]",
+            "--config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        env=build_env,
+    )
     out["build_tail"] = (b.stdout + b.stderr)[-3000:]
     out["build_ok"] = b.returncode == 0
 
     # snapshot committed baselines, run each script, capture this GPU's CSV, restore
-    snap = {c: (pathlib.Path(REPO) / c).read_text() for c in CSVS
-            if (pathlib.Path(REPO) / c).exists()}
+    snap = {
+        c: (pathlib.Path(REPO) / c).read_text() for c in CSVS if (pathlib.Path(REPO) / c).exists()
+    }
     logs = {}
     files = {}
     env = {**os.environ, "PYTHONPATH": REPO}
     for mod, csv in zip(SCRIPTS, CSVS):
         p = pathlib.Path(REPO) / csv
         before = p.read_text() if p.exists() else None
-        r = subprocess.run([sys.executable, "-m", mod], env=env,
-                           capture_output=True, text=True, timeout=1800)
+        r = subprocess.run(
+            [sys.executable, "-m", mod], env=env, capture_output=True, text=True, timeout=1800
+        )
         logs[mod] = (r.stdout + r.stderr)[-2500:]
         # Only capture if the script SUCCEEDED and actually rewrote the file,
         # otherwise we would echo the committed baseline (fake cross-arch data).

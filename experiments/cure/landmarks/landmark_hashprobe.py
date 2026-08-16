@@ -20,16 +20,15 @@ from __future__ import annotations
 
 import ctypes
 import statistics
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 import torch
 import triton
 import triton.language as tl
-from experiments.cure._cuda_arch import cuda_arch_flag
+
+from gpufsm.bench.nvcc import load_library
 
 EMPTY = -1
 HASHMUL = 2654435761  # Knuth multiplicative
@@ -127,27 +126,22 @@ extern "C" float thr_launch(const int* table, int Tsize, const long long* querie
   float ms = 0; cudaEventElapsedTime(&ms, s, e); return ms;
 }
 """
-    cache = Path.home() / ".cache" / "landmark_hashprobe"
-    cache.mkdir(parents=True, exist_ok=True)
-    d = Path(tempfile.mkdtemp(prefix="hp_", dir=str(cache)))
-    cu, so = d / "hp.cu", d / "hp.so"
-    cu.write_text(src)
-    nvcc = "/usr/local/cuda/bin/nvcc" if Path("/usr/local/cuda/bin/nvcc").exists() else "nvcc"
-    subprocess.run(
-        [nvcc, "-O3", "-shared", "-Xcompiler", "-fPIC", cuda_arch_flag(), "-o", str(so), str(cu)],
-        check=True,
-        capture_output=True,
-        text=True,
+    lib = load_library(
+        src,
+        "landmark_hashprobe",
+        {
+            "thr_launch": (
+                ctypes.c_float,
+                [
+                    ctypes.c_void_p,
+                    ctypes.c_int,
+                    ctypes.c_void_p,
+                    ctypes.c_int,
+                    ctypes.c_void_p,
+                ],
+            )
+        },
     )
-    lib = ctypes.CDLL(str(so))
-    lib.thr_launch.restype = ctypes.c_float
-    lib.thr_launch.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_int,
-        ctypes.c_void_p,
-        ctypes.c_int,
-        ctypes.c_void_p,
-    ]
     return lib
 
 

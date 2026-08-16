@@ -31,21 +31,25 @@ OUTDIR = DATA / "cross_arch"
 # witness -> (module, csv path relative to repo, how to pull regret(s) from the csv)
 # each entry's parser returns a dict {sub_label: regret_float} read from the witness's own CSV.
 WITNESSES = [
-    ("spmv", "experiments.cure.landmark_spmv", "paper2/data/landmark/spmv_rtx4070.csv"),
+    ("spmv", "experiments.cure.landmarks.landmark_spmv", "paper2/data/landmark/spmv_rtx4070.csv"),
     (
         "rejection",
-        "experiments.cure.landmark_rejection",
+        "experiments.cure.landmarks.landmark_rejection",
         "paper2/data/landmark/rejection_rtx4070.csv",
     ),
-    ("pointer_chase", "experiments.cure.landmark_bfs", "paper2/data/landmark/bfs_rtx4070.csv"),
+    (
+        "pointer_chase",
+        "experiments.cure.landmarks.landmark_bfs",
+        "paper2/data/landmark/bfs_rtx4070.csv",
+    ),
     (
         "hashprobe",
-        "experiments.cure.landmark_hashprobe",
+        "experiments.cure.landmarks.landmark_hashprobe",
         "paper2/data/landmark/hashprobe_rtx4070.csv",
     ),
     (
         "automata_nfa",
-        "experiments.cure.m10_scalar_program",
+        "experiments.cure.milestones.m10_scalar_program",
         "paper2/data/m10_scalar_program_rtx4070.csv",
     ),
 ]
@@ -147,7 +151,7 @@ def main() -> int:
     sel_orig = sel_csv.read_text() if sel_csv.exists() else None
     try:
         ps = subprocess.run(
-            [sys.executable, "-m", "experiments.cure.p2_selector"],
+            [sys.executable, "-m", "experiments.cure.passes.p2_selector"],
             cwd=str(REPO),
             env={**os.environ, "PYTHONPATH": str(REPO)},
             capture_output=True,
