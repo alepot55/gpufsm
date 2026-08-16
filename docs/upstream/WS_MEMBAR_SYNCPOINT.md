@@ -180,3 +180,37 @@ CTA-wide, quindi un rendezvous fra i gruppi di warp. Il conteggio degli arrivi t
 ciascuna warp ne esegue esattamente tre.
 
 Lit: stesso identico set di 14 fallimenti pre-esistenti, nessuna regressione.
+
+## Misura di performance (16 ago 2026, H100 su Modal)
+
+Domanda: le barriere tolte da #11324 valgono tempo, o solo conteggio?
+
+Metodo: `matmul_tma_ws_kernel` (da `python/test/unit/language/test_warp_specialization.py`),
+4096x4096x4096 fp16, TMA su A e B, `num_warps=4` (su Hopper con 8 la warp specialization si
+disattiva), correttezza verificata contro cuBLAS prima di cronometrare. Le due build girano nello
+**stesso container** sulla stessa H100, per non confrontare affitti diversi.
+
+| BN/BK/stages | bar.sync base | bar.sync patch | ms base | ms patch | delta |
+|---|---|---|---|---|---|
+| 128/128/2 | 25 | 24 | 0.2790 | 0.2797 | +0.25% |
+| 128/128/3 | 25 | 24 | 0.2811 | 0.2810 | -0.04% |
+| 128/64/2  | 25 | 24 | 0.3546 | 0.3555 | +0.25% |
+| 128/64/3  | 25 | 24 | 0.2881 | 0.2870 | -0.38% |
+| 128/64/4  | 25 | 24 | 0.2718 | 0.2712 | -0.22% |
+| 256/64/2  | 25 | 24 | 0.2509 | 0.2510 | +0.04% |
+| 256/64/3  | 25 | 24 | 0.2161 | 0.2166 | +0.23% |
+
+**Esito: nessun guadagno misurabile.** Una barriera in meno per kernel, delta di tempo senza segno
+coerente (rumore). La barriera rimossa non sta nel ciclo caldo: sta sul percorso di uscita della
+regione warp-specialized, attraversato una volta per tile-loop e non per iterazione.
+
+Conseguenze da tenere presenti:
+- La PR **non rivendica** un guadagno di velocità, quindi non c'è nulla da correggere: dice
+  "2356 -> 2326 bar.sync su 75 kernel", che è vero e verificato.
+- Ma l'argomento a favore non e' la performance: e' che la membar analysis era **dimostrabilmente
+  troppo conservativa**, e la precisione di quell'analisi e' il punto. Da usare cosi' se un
+  maintainer chiede "a cosa serve".
+- ⚠️ Metodo: NON ricavare conteggi per-kernel dalle cache lasciate da run precedenti. Piu' varianti
+  compilate condividono lo stesso nome file (`matmul_tma_ws_kernel.ptx`) sotto hash diversi, e due
+  script che ne pescano una diversa danno numeri incoerenti (mi e' successo: 25->18 vs 15->18).
+  L'unico numero difendibile viene da una run controllata con cache pulita.
