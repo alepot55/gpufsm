@@ -85,7 +85,7 @@ ITS whitepaper; Linear Layouts (arXiv:2505.23819); Hidet (ASPLOS'23, 10.1145/357
   detect → route to the M10 thread lowering (3.9×), negative control left on the tile. Written up in
   `sec:compiler`. Sources preserved in `experiments/cure/triton_thread_region_pass/`.
 - **P3 — multi-GPU — HARNESS READY (✅ built + self-validated), cloud run hardware-gated on USER.**
-  `experiments/cure/p3_cross_arch.py` + `scripts/run_cross_arch.sh`: one command re-runs all witnesses +
+  `experiments/cure/validation/p3_cross_arch.py` + `scripts/run_cross_arch.sh`: one command re-runs all witnesses +
   M10 + the selector on any GPU, compares to the RTX4070 baseline, writes `cross_arch/regret_<gpu>.csv`,
   with the falsifiable paradigm-not-arch prediction baked in. Self-validated on the 4070 (reproduces its
   own baseline). Just needs the user to grant A100/H100 access.

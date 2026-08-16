@@ -3,6 +3,29 @@
 The project is designed to be re-run end-to-end by anyone, without privileged access.
 Every figure and headline number regenerates from committed code + versioned CSVs.
 
+## Running the paper-2 experiments
+
+`experiments/` is a package: run its measurements as modules, from the repo root, so the
+cross-imports resolve regardless of the working directory.
+
+```bash
+python -m experiments.cure.milestones.m0_anchor        # the regret anchor
+python -m experiments.cure.landmarks.landmark_spmv     # the negative control
+python -m experiments.cure.validation.p3_cross_arch    # cross-architecture re-validation
+bash   scripts/second_gpu.sh rich                      # second-GPU campaign (build + both profiles)
+```
+
+Every one of them gates on the CPU oracle before reporting a throughput; a mismatch aborts
+instead of printing a number.
+
+⚠️ **CSV filenames carry `rtx4070` even when the run happened elsewhere.** The paper-1
+scripts and most paper-2 experiments hardcode that suffix, so re-running on an A100 or H100
+overwrites the 4070 numbers under a filename that still claims 4070. Run them into a scratch
+checkout, or check the `gpu` column, before letting anything land in `paper*/data/`.
+`experiments/cure/validation/second_gpu.py` does derive the suffix from the live device
+(`gpufsm.bench.csvio.gpu_slug`), which is the pattern the others should follow.
+
+
 ## Environment
 
 CPU-only (reference + bit-packed spec, no GPU) installs cleanly:

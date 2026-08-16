@@ -50,7 +50,7 @@ The cure target is whichever of H1–H3 carries the regret (working hypothesis: 
 **M0 — Reproduce the anchor (this session).** Self-contained micro-benchmark (Triton scalar
 worklist vs hand-CUDA worklist via `torch.utils.cpp_extension.load_inline`) reproducing the
 ~6.5× on *this* machine. This is the number every later milestone must move. No gpufsm build
-dependency. → `experiments/cure/m0_anchor.py`.
+dependency. → `experiments/cure/milestones/m0_anchor.py`.
 
 **M1 — Decompose the regret (H1/H2/H3).** Attribute the 6.5× to its causes with controlled
 micro-kernels + Nsight (warp execution efficiency, occupancy, DRAM%, int op mix, spills). Output:

@@ -24,7 +24,7 @@ Diagnosed + fixed, in order (each was a hard failure):
    **bypass** by building libtriton directly: `cmake --build <builddir> -j 8` (ninja).
 5. Use it via `PYTHONPATH=$HOME/m3full_build/triton-src/python` (in-source build dir).
 
-Smoke-tested: `experiments/cure/p2_ttgir_probe.py` prints `triton 3.8.0` and a correct kernel result.
+Smoke-tested: `experiments/cure/passes/p2_ttgir_probe.py` prints `triton 3.8.0` and a correct kernel result.
 
 ## What the pass must MATCH (detection) — dumped from the live build
 `p2_ttgir_probe.py` compiles a minimal per-lane data-dependent `while tl.max(active) > 0` loop (the
@@ -87,7 +87,7 @@ engineering is making the compiler do automatically what M10 does by hand.
   (a TritonGPU `mlir::ModuleOp` pass) compiles into `libtriton.so`, runs in `make_ttgir` (env-gated by
   `GPUFSM_THREAD_REGION`), matches the lock-step signature (`scf.while` over `#blocked` tile iter-args
   whose `scf.condition` derives from a `tt.reduce`), tags each with `ttg.thread_region_candidate`, and
-  is a clean no-op when disabled. Verified by `experiments/cure/p2_pass_verify.py` (ON→present,
+  is a clean no-op when disabled. Verified by `experiments/cure/passes/p2_pass_verify.py` (ON→present,
   OFF→absent, kernel still correct). Sources version-controlled in
   `experiments/cure/triton_thread_region_pass/` (ThreadRegion.cpp + registration.patch + README).
 - RESOLVED (2026-06-29): **the in-IR lowering hits a STRUCTURAL WALL, demonstrated (not assumed).** The
@@ -98,13 +98,13 @@ engineering is making the compiler do automatically what M10 does by hand.
   is **rejected by the MLIR verifier** — captured verbatim by `triton-opt` on
   `triton_thread_region_pass/perlane_while_attempt.mlir`: *"use of value '%active' expects different
   type than prior uses: 'i1' vs 'tensor<8xi1, #blocked>'"*. Falsifiable probe:
-  `experiments/cure/p2_lowering_wall.py` (exit 0 = wall confirmed). ⇒ per-lane loop termination is
+  `experiments/cure/passes/p2_lowering_wall.py` (exit 0 = wall confirmed). ⇒ per-lane loop termination is
   inexpressible in TritonGPU's structured tile control flow; the cure must lower **below** TritonGPU to
   the thread model (ITS) — which is exactly what M10 does (nvcc, 4.2×). This is a STRONGER result than a
   hand-tuned in-IR rewrite: it proves the abstraction regret is structural in the loop construct, not a
   layout or tuning artifact. **This is the central NVIDIA/landmark point**: the missing IR primitive is a
   per-lane (sub-tile) loop/exit op; today's tile IR cannot express it.
-- DONE (2026-06-29): **the automatic SELECTOR — P2 endpoint reached.** `experiments/cure/p2_selector.py`
+- DONE (2026-06-29): **the automatic SELECTOR — P2 endpoint reached.** `experiments/cure/passes/p2_selector.py`
   closes the detect-and-lower loop automatically: it runs the in-libtriton detection pass (subprocess,
   from-source Triton, `GPUFSM_THREAD_REGION=1`) to check `ttg.thread_region_candidate`, then ROUTES —
   lock-step present → the M10 thread-model lowering (the realized cure); absent → the Triton tile path.
@@ -120,5 +120,5 @@ engineering is making the compiler do automatically what M10 does by hand.
   fallback (per LANDMARK_PLAN P2) is the **automatic selector over the M10 lowering** + this IR design —
   still a real automatic detect-and-lower result, just realized at the source/codegen boundary.
 
-Cross-refs: `experiments/cure/p2_ttgir_probe.py`, `paper2/data/landmark/p2_lockstep.ttgir`,
-`experiments/cure/m10_scalar_program.py` (the measured cure), `docs/LANDMARK_PLAN.md` (P2).
+Cross-refs: `experiments/cure/passes/p2_ttgir_probe.py`, `paper2/data/landmark/p2_lockstep.ttgir`,
+`experiments/cure/milestones/m10_scalar_program.py` (the measured cure), `docs/LANDMARK_PLAN.md` (P2).
