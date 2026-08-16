@@ -5,10 +5,10 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .api import benchmark
-from .core.nfa import NFA
-from .core.registry import Backend, available_backends, list_techniques
-from .core.result import BenchmarkStats
+from ..api import benchmark
+from ..core.nfa import NFA
+from ..core.registry import Backend, available_backends, list_techniques
+from ..core.result import BenchmarkStats
 
 CSV_FIELDS = ["backend", "technique", "accepted", "match_len", "n", "mean_ms", "std_ms", "ci95_ms"]
 
