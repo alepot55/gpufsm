@@ -13,9 +13,9 @@ from __future__ import annotations
 import random
 
 from gpufsm.api import run_batch
+from gpufsm.core.nfa import NFABuilder
+from gpufsm.core.registry import Backend, available_backends, list_techniques
 from gpufsm.costmodel import Measurement, calibrate, relative_error, traffic_per_symbol
-from gpufsm.nfa import NFABuilder
-from gpufsm.registry import Backend, available_backends, list_techniques
 
 # Calibrate on the *multi-stream* techniques: they are parallel (throughput-meaningful),
 # unlike the single-program dense/bitpacked kernels, which are one latency-bound GPU

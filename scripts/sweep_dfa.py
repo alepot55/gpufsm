@@ -20,10 +20,9 @@ import statistics
 import sys
 from pathlib import Path
 
-import numpy as np
-
-from gpufsm.dfa import random_dfa, simulate_dfa
+from gpufsm.core.dfa import random_dfa
 from gpufsm.dfa_api import run_dfa_batch
+from gpufsm.reference import simulate_dfa
 
 # 6 MB L2 on the RTX 4070; 1 KB/state means the table crosses L2 around ~6000 states.
 # Grid straddles the knee: below, around, and far above L2.

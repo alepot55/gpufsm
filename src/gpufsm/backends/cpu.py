@@ -5,11 +5,11 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from ..bitmap import simulate_bitmap
-from ..nfa import NFA
+from ..core.bitmap import simulate_bitmap
+from ..core.nfa import NFA
+from ..core.registry import Backend, register, register_availability
+from ..core.result import Result
 from ..reference import simulate
-from ..registry import Backend, register, register_availability
-from ..result import Result
 
 # technique -> (nfa, input) -> (accepted, match_len)
 _SIMULATORS: dict[str, Callable[[NFA, bytes], tuple[bool, int]]] = {

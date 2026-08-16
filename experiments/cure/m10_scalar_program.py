@@ -42,8 +42,8 @@ from experiments.cure.m2e_worklist_packed import (
 from experiments.cure.m3_lite_scalarlane import launch_wp2, max_outdeg
 
 from gpufsm.api import run, run_batch
-from gpufsm.nfa import ANY_SYMBOL, NFABuilder
-from gpufsm.registry import Backend
+from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.core.registry import Backend
 
 N_STRINGS = int(__import__("os").environ.get("M2_N_STRINGS", "4096"))
 

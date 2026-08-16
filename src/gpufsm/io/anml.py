@@ -29,7 +29,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ..nfa import ANY_SYMBOL, NFA, NFABuilder
+from ..core.nfa import ANY_SYMBOL, NFA, NFABuilder
 
 _ALL_BYTES = range(256)
 

@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import time
 
-from ..nfa import ANY_SYMBOL, NFA
-from ..registry import Backend, register, register_availability
-from ..result import Result
+from ..core.nfa import ANY_SYMBOL, NFA
+from ..core.registry import Backend, register, register_availability
+from ..core.result import Result
 
 
 def _triton_available() -> bool:

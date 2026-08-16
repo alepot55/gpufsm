@@ -1,6 +1,6 @@
-"""DFA representation + reference simulator — the *memory-bound* automata workload.
+"""DFA representation — the *memory-bound* automata workload.
 
-A DFA complements the NFA story (`gpufsm.nfa`/`reference`) for the "two faces of
+A DFA complements the NFA story (:mod:`gpufsm.core.nfa`) for the "two faces of
 abstraction regret" thesis. Where NFA simulation is control-flow/compute-bound (active-set
 traversal + epsilon-closure), DFA simulation is **memory-bound**: a single random lookup
 into a dense transition table ``T[state, symbol]`` per input byte. For a large DFA the
@@ -9,8 +9,8 @@ table does not fit cache, so throughput is set by the *table layout* and the mem
 coalescing-friendly layout) bites hardest.
 
 Semantics match the NFA reference: **latch-first-match** (report at the first accepting
-state reached, ``match_len`` = bytes consumed). ``simulate_dfa`` is the correctness oracle
-for the GPU DFA kernels.
+state reached, ``match_len`` = bytes consumed). The oracle itself is
+:func:`gpufsm.reference.simulate_dfa`, next to the NFA one.
 """
 
 from __future__ import annotations
@@ -39,19 +39,6 @@ class DFA:
     @property
     def table_bytes(self) -> int:
         return int(self.trans.size) * self.trans.itemsize
-
-
-def simulate_dfa(dfa: DFA, input_bytes: bytes) -> tuple[bool, int]:
-    """Reference DFA simulation (latch-first-match). Returns ``(accepted, match_len)``."""
-    cur = dfa.start_state
-    if dfa.accept[cur]:
-        return True, 0
-    trans = dfa.trans
-    for i, b in enumerate(input_bytes):
-        cur = int(trans[cur * ALPHABET + b])
-        if dfa.accept[cur]:
-            return True, i + 1
-    return False, 0
 
 
 def random_dfa(num_states: int, *, accept_prob: float = 0.05, seed: int = 0) -> DFA:

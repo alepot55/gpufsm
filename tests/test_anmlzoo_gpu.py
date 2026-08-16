@@ -11,7 +11,7 @@ import random
 
 import pytest
 
-from gpufsm.registry import Backend, available_backends, list_techniques
+from gpufsm.core.registry import Backend, available_backends, list_techniques
 
 pytestmark = pytest.mark.gpu
 

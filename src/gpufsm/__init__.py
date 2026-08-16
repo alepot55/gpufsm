@@ -16,10 +16,10 @@ Public API::
 from __future__ import annotations
 
 from .api import benchmark, run, run_batch
-from .nfa import ANY_SYMBOL, NFA, NFABuilder
+from .core.nfa import ANY_SYMBOL, NFA, NFABuilder
+from .core.registry import Backend, available_backends, is_available, list_techniques
+from .core.result import BenchmarkStats, Result
 from .reference import simulate
-from .registry import Backend, available_backends, is_available, list_techniques
-from .result import BenchmarkStats, Result
 
 __version__ = "0.1.0"
 

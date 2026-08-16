@@ -39,8 +39,8 @@ import triton.language as tl
 from triton.language.extra import libdevice
 
 from gpufsm.api import run, run_batch
-from gpufsm.nfa import ANY_SYMBOL, NFABuilder
-from gpufsm.registry import Backend
+from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.core.registry import Backend
 
 SLEN = 256
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))

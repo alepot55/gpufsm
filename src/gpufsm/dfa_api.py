@@ -6,8 +6,9 @@ import time
 
 import numpy as np
 
-from .dfa import DFA, simulate_dfa
-from .result import Result
+from .core.dfa import DFA
+from .core.result import Result
+from .reference import simulate_dfa
 
 
 def _pack(inputs: list[bytes]) -> tuple[np.ndarray, np.ndarray]:

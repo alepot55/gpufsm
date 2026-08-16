@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from . import backends as _backends  # noqa: F401  (triggers backend registration)
-from .nfa import NFA
-from .registry import Backend, get_factory
-from .result import BenchmarkStats, Result
+from .core.nfa import NFA
+from .core.registry import Backend, get_factory
+from .core.result import BenchmarkStats, Result
 
 
 def run(

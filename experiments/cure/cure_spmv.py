@@ -2,8 +2,14 @@
 Same _spmv_tile lock-step kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire).
 Oracle = numpy segmented sum (float32). Prints oracle + median tile time per mode."""
 from __future__ import annotations
-import os, statistics
-import numpy as np, torch, triton, triton.language as tl
+
+import os
+import statistics
+
+import numpy as np
+import torch
+import triton
+import triton.language as tl
 
 N_ROWS = 1 << 20
 NCOLS = 1 << 22

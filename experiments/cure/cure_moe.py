@@ -1,8 +1,14 @@
 """Harden the built cure on MoE top-k routing (control-bound ML workload), power-law expert counts.
 Same _moe_tile lock-step kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire). int64-exact oracle."""
 from __future__ import annotations
-import os, statistics
-import numpy as np, torch, triton, triton.language as tl
+
+import os
+import statistics
+
+import numpy as np
+import torch
+import triton
+import triton.language as tl
 
 A, B, SEED, M24 = 1640531527, 1013904223, 12345, 0xFFFFFF
 N, E, MEAN_K = 1 << 20, 64, 8

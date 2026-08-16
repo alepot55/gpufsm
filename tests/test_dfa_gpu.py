@@ -20,8 +20,9 @@ def _cuda_dfa_available() -> bool:
 
 @pytest.mark.skipif(not _cuda_dfa_available(), reason="needs CUDA _cuda.run_dfa")
 def test_cuda_dfa_matches_reference():
-    from gpufsm.dfa import random_dfa, simulate_dfa
+    from gpufsm.core.dfa import random_dfa
     from gpufsm.dfa_api import run_dfa_batch
+    from gpufsm.reference import simulate_dfa
 
     rng = random.Random(0)
     for n in (16, 256, 4096):

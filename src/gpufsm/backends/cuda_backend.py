@@ -15,9 +15,9 @@ from typing import Any
 
 import numpy as np
 
-from ..nfa import NFA
-from ..registry import Backend, register, register_availability
-from ..result import Result
+from ..core.nfa import NFA
+from ..core.registry import Backend, register, register_availability
+from ..core.result import Result
 
 _EXT_NAME = "gpufsm.backends.cuda._cuda"
 

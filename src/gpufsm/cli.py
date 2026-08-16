@@ -8,8 +8,8 @@ import sys
 
 from .api import benchmark, run
 from .bench import sweep, write_csv
+from .core.registry import Backend, available_backends, list_techniques
 from .examples import EXAMPLES
-from .registry import Backend, available_backends, list_techniques
 
 
 def _cmd_env(_: argparse.Namespace) -> int:

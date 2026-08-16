@@ -21,8 +21,8 @@ from pathlib import Path
 import numpy as np
 
 from gpufsm.api import run_batch
-from gpufsm.nfa import NFABuilder
-from gpufsm.registry import Backend, available_backends, list_techniques
+from gpufsm.core.nfa import NFABuilder
+from gpufsm.core.registry import Backend, available_backends, list_techniques
 
 _MULTISTREAM = {
     "multistream",

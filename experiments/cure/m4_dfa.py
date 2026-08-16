@@ -28,8 +28,9 @@ import torch
 import triton
 import triton.language as tl
 
-from gpufsm.dfa import random_dfa, simulate_dfa
+from gpufsm.core.dfa import random_dfa
 from gpufsm.dfa_api import run_dfa_batch
+from gpufsm.reference import simulate_dfa
 
 SLEN = 256
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))

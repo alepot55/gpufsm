@@ -1,7 +1,7 @@
 """Regenerate ``tests/data/golden.json`` — the refactor safety net.
 
 The golden file pins the *verdicts* of the correctness oracles
-(:func:`gpufsm.reference.simulate` for NFAs, :func:`gpufsm.dfa.simulate_dfa` for DFAs)
+(:func:`gpufsm.reference.simulate` for NFAs, :func:`gpufsm.reference.simulate_dfa` for DFAs)
 on a fixed corpus. :mod:`tests.test_golden` replays them; any refactor that changes a
 single ``(accepted, match_len)`` fails loudly.
 
@@ -25,10 +25,10 @@ from typing import Any
 
 import numpy as np
 
-from gpufsm.dfa import DFA, DFABuilder, simulate_dfa
+from gpufsm.core.dfa import DFA, DFABuilder
+from gpufsm.core.nfa import ANY_SYMBOL, NFA, NFABuilder
 from gpufsm.examples import EXAMPLES
-from gpufsm.nfa import ANY_SYMBOL, NFA, NFABuilder
-from gpufsm.reference import simulate
+from gpufsm.reference import simulate, simulate_dfa
 
 GOLDEN_PATH = Path(__file__).parent / "data" / "golden.json"
 FORMAT_VERSION = 1

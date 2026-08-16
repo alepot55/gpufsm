@@ -15,7 +15,7 @@ import sys
 import numpy as np
 
 from gpufsm.api import run_batch
-from gpufsm.nfa import NFABuilder
+from gpufsm.core.nfa import NFABuilder
 
 
 def random_nfa(n: int, seed: int = 1):

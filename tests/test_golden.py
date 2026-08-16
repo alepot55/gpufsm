@@ -14,9 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from gpufsm.bitmap import simulate_bitmap
-from gpufsm.dfa import simulate_dfa
-from gpufsm.reference import simulate
+from gpufsm.core.bitmap import simulate_bitmap
+from gpufsm.reference import simulate, simulate_dfa
 
 from .generate_golden import GOLDEN_PATH, dfa_from_json, nfa_from_json
 

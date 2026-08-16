@@ -35,8 +35,8 @@ import triton
 import triton.language as tl
 
 from gpufsm.api import run
-from gpufsm.nfa import ANY_SYMBOL, NFABuilder
-from gpufsm.registry import Backend
+from gpufsm.core.nfa import ANY_SYMBOL, NFABuilder
+from gpufsm.core.registry import Backend
 
 SLEN = 256
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "4096"))  # M2c sweeps batch to test occupancy

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import random
 
-from gpufsm.dfa import DFABuilder, random_dfa, simulate_dfa
-from gpufsm.nfa import NFABuilder
-from gpufsm.reference import simulate
+from gpufsm.core.dfa import DFABuilder, random_dfa
+from gpufsm.core.nfa import NFABuilder
+from gpufsm.reference import simulate, simulate_dfa
 
 A, B = ord("a"), ord("b")
 

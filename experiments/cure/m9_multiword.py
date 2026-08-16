@@ -38,7 +38,7 @@ from experiments.cure.m2e_worklist_packed import (
 from triton.language.extra import libdevice
 
 from gpufsm.api import run, run_batch
-from gpufsm.registry import Backend
+from gpufsm.core.registry import Backend
 
 N_STRINGS = 4096  # matches m2e.make_batch's batch size
 BLOCK = 32

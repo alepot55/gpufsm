@@ -2,8 +2,14 @@
 Same per-lane-while kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire).
 Oracle: acc[i]=trip[i]*(trip[i]-1)/2. Reports oracle + median time per (dist, mode)."""
 from __future__ import annotations
-import os, statistics
-import numpy as np, torch, triton, triton.language as tl
+
+import os
+import statistics
+
+import numpy as np
+import torch
+import triton
+import triton.language as tl
 
 
 @triton.jit

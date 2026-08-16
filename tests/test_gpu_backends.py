@@ -11,9 +11,9 @@ import random
 import pytest
 
 from gpufsm import ANY_SYMBOL, NFABuilder, available_backends, run, run_batch, simulate
+from gpufsm.core.registry import Backend as _B
+from gpufsm.core.registry import list_techniques
 from gpufsm.examples import EXAMPLES
-from gpufsm.registry import Backend as _B
-from gpufsm.registry import list_techniques
 
 _GPU_BACKENDS = [b for b in available_backends() if b in (_B.TRITON, _B.CUDA)]
 pytestmark = pytest.mark.gpu

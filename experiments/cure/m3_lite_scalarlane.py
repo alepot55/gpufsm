@@ -46,7 +46,7 @@ from experiments.cure.m2e_worklist_packed import (
 from triton.language.extra import libdevice
 
 from gpufsm.api import run, run_batch
-from gpufsm.registry import Backend
+from gpufsm.core.registry import Backend
 
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))
 BLOCK = 32

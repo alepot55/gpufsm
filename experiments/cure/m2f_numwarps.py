@@ -30,7 +30,7 @@ from experiments.cure.m2e_worklist_packed import (
 )
 
 from gpufsm.api import run
-from gpufsm.registry import Backend
+from gpufsm.core.registry import Backend
 
 BATCHES = [int(b) for b in os.environ.get("M2F_BATCHES", "4096,16384,65536").split(",")]
 NUM_WARPS = [1, 2, 4, 8]

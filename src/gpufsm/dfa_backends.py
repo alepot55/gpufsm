@@ -12,8 +12,8 @@ import time
 
 import numpy as np
 
-from .dfa import DFA
-from .result import Result
+from .core.dfa import DFA
+from .core.result import Result
 
 
 def _pack(inputs: list[bytes]) -> tuple[np.ndarray, np.ndarray]:

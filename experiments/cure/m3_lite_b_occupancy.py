@@ -34,7 +34,7 @@ from experiments.cure.m2e_worklist_packed import (
 from experiments.cure.m3_lite_scalarlane import _wl_perlane, max_outdeg
 
 from gpufsm.api import run, run_batch
-from gpufsm.registry import Backend
+from gpufsm.core.registry import Backend
 
 N_STRINGS = int(os.environ.get("M2_N_STRINGS", "16384"))
 BLOCKS = [int(b) for b in os.environ.get("M3B_BLOCKS", "32,64,128,256").split(",")]

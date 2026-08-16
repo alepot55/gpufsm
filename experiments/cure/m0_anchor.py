@@ -19,8 +19,8 @@ from pathlib import Path
 import numpy as np
 
 from gpufsm.api import run, run_batch
-from gpufsm.nfa import NFABuilder
-from gpufsm.registry import Backend, available_backends, list_techniques
+from gpufsm.core.nfa import NFABuilder
+from gpufsm.core.registry import Backend, available_backends, list_techniques
 
 SLEN = 256
 N_STRINGS = 4096  # GPU-saturating batch (the honest regime; small batch inflates the ratio)
