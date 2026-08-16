@@ -31,11 +31,14 @@ poi la pagina pubblica della PR per lo stato esatto.
 
 ## A. Upstream `triton-lang/triton` — l'unico contributo esterno che conta
 
-Score: **1 mergiata, 3 aperte (#10766, #11323, #11324), 4 chiuse + 1 RFC chiusa.**
+Score: **1 mergiata, 4 aperte (#10766, #11323, #11324, #11325), 4 chiuse + 1 RFC chiusa**, piu' 2 issue
+aperte da noi (#11326, #11328). Ri-verificato il 16 ago ore 09:42: nessuna reazione di maintainer su
+nessuna delle tre PR nuove; #11325 `mergeable_state: blocked` come le altre (CI da approvare a mano).
 
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
-| [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | **APERTA** — −30 barriere nel PTX generato, misurate su H100 | in attesa |
+| [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Do not compare subslice offsets across different shapes` | 16 ago | **APERTA** — barriera **mancante** (bug di correttezza), test che fallisce senza patch, 0 regressioni | in attesa |
+| [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | **APERTA** — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | in attesa |
 | [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **APERTA**, CI da approvare, review chiesta a Jokeren+ptillet | in attesa |
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
 | [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
@@ -44,6 +47,18 @@ Score: **1 mergiata, 3 aperte (#10766, #11323, #11324), 4 chiuse + 1 RFC chiusa.
 | [#10785](https://github.com/triton-lang/triton/pull/10785) | `[TritonGPU] Fail cleanly when lowering global_scratch_alloc without an offset` | 3 lug | CHIUSA 3 lug | ThomasRaoux |
 | [#10774](https://github.com/triton-lang/triton/pull/10774) | `[NVIDIA] Add verified opt-in per-lane loop retirement pass (RFC #10773)` | 1 lug | CHIUSA (era draft) | ritirata da noi |
 | [#10773](https://github.com/triton-lang/triton/issues/10773) *(issue)* | `[RFC] Per-lane retirement for divergent while-loops` | 1 lug | CHIUSA "completed" 3 lug | — |
+
+
+### Le tre nuove del 16 ago — la differenza che conta
+
+#11323 e #11324 tolgono barriere **di troppo**; #11325 ne aggiunge una **mancante**. Solo la terza e'
+un bug di correttezza, ed e' l'unica che non rischia il verdetto "trivial"
+([[triton-rejects-trivial-prs]]). Dettagli e riproduzioni:
+`docs/upstream/MEMBAR_SUBSLICE_COORDS.md`, `MEMBAR_CALL_BOUNDARY.md`, `CLUSTER_BARRIER_VIEW.md`.
+
+Le due issue (#11326 confine di chiamata, #11328 vista multicast) sono aperte **come issue e non come
+PR** di proposito: in un caso la correzione e' una scelta di disegno interprocedurale, nell'altro la
+correzione ovvia fa abortire la compilazione. In entrambe e' offerta l'implementazione.
 
 ### #11311 — la mergiata (quella che "vale poco", e perché va comunque tenuta)
 `c346e50c7bb102f35f04d7200a3bc6194bec4c33`, un solo file (`examples/plugins/README.md`), **+9/-5**,
