@@ -20,8 +20,8 @@ import statistics
 import sys
 from pathlib import Path
 
+from gpufsm.api import run_batch
 from gpufsm.core.dfa import random_dfa
-from gpufsm.dfa_api import run_dfa_batch
 from gpufsm.reference import simulate_dfa
 
 # 6 MB L2 on the RTX 4070; 1 KB/state means the table crosses L2 around ~6000 states.
@@ -46,7 +46,7 @@ def _validate(dfa, rng: random.Random) -> bool:
     batch = [bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 48))) for _ in range(32)]
     refs = [simulate_dfa(dfa, b) for b in batch]
     for be in BACKENDS:
-        got = [(r.accepted, r.match_len) for r in run_dfa_batch(dfa, batch, backend=be)]
+        got = [(r.accepted, r.match_len) for r in run_batch(dfa, batch, backend=be)]
         if got != refs:
             print(f"  VALIDATION FAIL backend={be}: GPU != oracle")
             return False
@@ -56,10 +56,10 @@ def _validate(dfa, rng: random.Random) -> bool:
 def _measure(dfa, batch: list[bytes], backend: str) -> float:
     total = sum(len(b) for b in batch)
     for _ in range(WARMUP):
-        run_dfa_batch(dfa, batch, backend=backend)
+        run_batch(dfa, batch, backend=backend)
     samples = []
     for _ in range(RUNS):
-        res = run_dfa_batch(dfa, batch, backend=backend)
+        res = run_batch(dfa, batch, backend=backend)
         samples.append(_throughput_gbps(total, res[0].kernel_ms))
     return statistics.median(samples)
 

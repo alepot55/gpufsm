@@ -20,8 +20,8 @@ def _cuda_dfa_available() -> bool:
 
 @pytest.mark.skipif(not _cuda_dfa_available(), reason="needs CUDA _cuda.run_dfa")
 def test_cuda_dfa_matches_reference():
+    from gpufsm.api import run_batch
     from gpufsm.core.dfa import random_dfa
-    from gpufsm.dfa_api import run_dfa_batch
     from gpufsm.reference import simulate_dfa
 
     rng = random.Random(0)
@@ -29,5 +29,5 @@ def test_cuda_dfa_matches_reference():
         dfa = random_dfa(n, accept_prob=0.02, seed=n)
         batch = [bytes(rng.randint(0, 255) for _ in range(rng.randint(0, 40))) for _ in range(48)]
         refs = [simulate_dfa(dfa, b) for b in batch]
-        got = [(r.accepted, r.match_len) for r in run_dfa_batch(dfa, batch, backend="cuda")]
+        got = [(r.accepted, r.match_len) for r in run_batch(dfa, batch, backend="cuda")]
         assert got == refs, f"DFA mismatch at n={n}"

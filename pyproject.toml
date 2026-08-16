@@ -55,8 +55,10 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # Warp kernels are a DSL: `int(0)` declares a mutable wp.int32 local — a bare
 # literal makes Warp miscompile later conditional reassignments. Keep the casts.
-"src/gpufsm/backends/warp_backend.py" = ["UP018"]
-"src/gpufsm/dfa_backends.py" = ["UP018"]
+# This glob MUST cover every module holding a @wp.kernel: while it pointed at the
+# pre-refactor filenames, `ruff --fix` rewrote `int(0)` to `0` inside the kernels —
+# a wrong-results bug that no CPU-only machine can observe.
+"src/gpufsm/backends/warp/*.py" = ["UP018"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -64,14 +66,11 @@ ignore_missing_imports = true
 files = ["src/gpufsm"]
 
 # Warp kernels are a DSL compiled by warp-lang, not ordinary Python: warp's typed
-# stubs flag bitwise ops on wp.uint64 inside @wp.kernel bodies. Don't type-check it.
+# stubs flag bitwise ops on wp.uint64 inside @wp.kernel bodies. Don't type-check the
+# modules that contain them. (Only visible on a machine with warp installed — with
+# warp absent the import is Any and these overrides are inert.)
 [[tool.mypy.overrides]]
-module = "gpufsm.backends.warp_backend"
-ignore_errors = true
-
-# dfa_backends.py also contains Warp/Triton DSL kernels (typed-stub false positives).
-[[tool.mypy.overrides]]
-module = "gpufsm.dfa_backends"
+module = "gpufsm.backends.warp.*"
 ignore_errors = true
 
 [tool.pytest.ini_options]

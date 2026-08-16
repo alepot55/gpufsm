@@ -1,6 +1,12 @@
-"""Backend registration. The CPU reference is always available; Triton and CUDA
-register themselves only if their dependencies (and, for CUDA, the compiled
-extension) are importable — keeping the core installable on CPU-only machines.
+"""Backend registration.
+
+Importing this package is what populates :mod:`gpufsm.core.registry`. The CPU
+reference is always available; each GPU backend is a subpackage that probes its own
+dependencies and registers techniques only if they are present, so the core stays
+installable and testable on CPU-only machines.
+
+Every backend registers its availability probe unconditionally, so ``gpufsm env``
+can report a backend as *unavailable* instead of pretending it does not exist.
 """
 
 from __future__ import annotations
@@ -9,14 +15,15 @@ import importlib
 
 from . import cpu  # noqa: F401  (always available)
 
-# Optional backends: import by name so a missing module/dependency is a no-op
-# rather than a hard failure (and mypy doesn't require them to exist yet).
-for _optional in (
-    "gpufsm.backends.triton_backend",
-    "gpufsm.backends.cuda_backend",
-    "gpufsm.backends.warp_backend",
+# Import by name so a missing optional dependency is a no-op rather than a hard
+# failure. Each subpackage keeps its own guard; this loop only tolerates the case
+# where the subpackage itself cannot be imported at all.
+for _backend in (
+    "gpufsm.backends.triton",
+    "gpufsm.backends.cuda",
+    "gpufsm.backends.warp",
 ):
     try:
-        importlib.import_module(_optional)
+        importlib.import_module(_backend)
     except Exception:  # pragma: no cover - depends on environment
         pass

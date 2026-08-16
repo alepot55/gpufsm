@@ -28,8 +28,8 @@ import torch
 import triton
 import triton.language as tl
 
+from gpufsm.api import run_batch
 from gpufsm.core.dfa import random_dfa
-from gpufsm.dfa_api import run_dfa_batch
 from gpufsm.reference import simulate_dfa
 
 SLEN = 256
@@ -150,9 +150,9 @@ def main() -> int:
 
         def cu_tr(backend, dfa=dfa, bb=batch_bytes):
             for _ in range(WARMUP):
-                run_dfa_batch(dfa, bb, backend=backend)
+                run_batch(dfa, bb, backend=backend)
             return statistics.median(
-                [run_dfa_batch(dfa, bb, backend=backend)[0].kernel_ms for _ in range(SAMPLES)]
+                [run_batch(dfa, bb, backend=backend)[0].kernel_ms for _ in range(SAMPLES)]
             )
 
         def pk(dfa=dfa, data=data):

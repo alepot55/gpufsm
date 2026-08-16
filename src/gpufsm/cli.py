@@ -8,8 +8,12 @@ import sys
 
 from .api import benchmark, run
 from .bench import sweep, write_csv
-from .core.registry import Backend, available_backends, list_techniques
+from .core.registry import Backend, Kind, available_backends, list_kinds, list_techniques
 from .examples import EXAMPLES
+
+
+def _techniques_line(backend: Backend, kind: Kind) -> str:
+    return ", ".join(list_techniques(backend, kind)) or "-"
 
 
 def _cmd_env(_: argparse.Namespace) -> int:
@@ -23,15 +27,20 @@ def _cmd_env(_: argparse.Namespace) -> int:
     avail = available_backends()
     print(f"backends : {', '.join(b.value for b in avail) or '(none)'}")
     for b in avail:
-        print(f"  {b.value:7s}: {', '.join(list_techniques(b))}")
+        for k in list_kinds(b):
+            print(f"  {b.value:7s} {k.value}: {_techniques_line(b, k)}")
     return 0
 
 
 def _cmd_list(_: argparse.Namespace) -> int:
     for b in Backend:
-        techs = list_techniques(b)
         status = "available" if b in available_backends() else "unavailable"
-        print(f"{b.value:7s} [{status}]: {', '.join(techs) or '-'}")
+        kinds = list_kinds(b)
+        if not kinds:
+            print(f"{b.value:7s} [{status}]: -")
+            continue
+        for k in kinds:
+            print(f"{b.value:7s} [{status}] {k.value}: {_techniques_line(b, k)}")
     return 0
 
 
