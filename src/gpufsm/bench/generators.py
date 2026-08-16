@@ -136,6 +136,17 @@ def random_batch_2d(
     return _draw_symbols(num_strings * length, seed, alphabet).reshape(num_strings, length)
 
 
+def random_byte_batch(num_strings: int, length: int, seed: int = 0) -> tuple[list[bytes], int]:
+    """``random_batch`` over the **full** byte alphabet — the DFA's input distribution."""
+    flat = (
+        np.random.default_rng(seed)
+        .integers(0, 256, size=num_strings * length, dtype=np.uint8)
+        .tobytes()
+    )
+    batch = [flat[i * length : (i + 1) * length] for i in range(num_strings)]
+    return batch, num_strings * length
+
+
 def random_bytes_2d(num_strings: int, length: int, seed: int = 0) -> np.ndarray[Any, Any]:
     """Uniform over the **full** byte alphabet — for the DFA, whose table is 256 wide.
 

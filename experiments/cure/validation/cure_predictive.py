@@ -93,7 +93,7 @@ def main() -> int:
         d = torch.as_tensor(trip, device="cuda")
         ref = (trip.astype(np.int64) * (trip.astype(np.int64) - 1) // 2).astype(np.int32)
 
-        def run():
+        def run(d=d):
             o = torch.zeros(N, dtype=torch.int32, device="cuda")
             e0, e1 = (
                 torch.cuda.Event(enable_timing=True),
@@ -122,7 +122,8 @@ def main() -> int:
             )
         )
         print(
-            f"dist={kind:10} D={D:6.2f} warpmax={warpmax:6.1f} mean={mean:5.1f} mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us"
+            f"dist={kind:10} D={D:6.2f} warpmax={warpmax:6.1f} mean={mean:5.1f} "
+            f"mode={mode:6} oracle={'OK' if ok else 'FAIL'} time={t:8.1f}us"
         )
 
     with CSV.open("a", newline="") as fh:

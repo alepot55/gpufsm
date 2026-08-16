@@ -50,7 +50,7 @@ def main() -> int:
         d = torch.as_tensor(tr, device="cuda")
         ref = (tr.astype(np.int64) * (tr.astype(np.int64) - 1) // 2).astype(np.int32)
 
-        def run():
+        def run(d=d):
             out = torch.zeros(n, dtype=torch.int32, device="cuda")
             e0, e1 = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             e0.record()

@@ -14,8 +14,8 @@ Two matrices, same kernels (isolates divergence like SpMV uniform-vs-powerlaw):
   POWER-LAW seqlen -> divergent contexts (adds a divergence increment).
 Writes paper2/data/landmark/attention_rtx4070.csv.
 
-Usage:  .venv/bin/python experiments/cure/landmark_attention.py
-        .venv/bin/python experiments/cure/landmark_attention.py profile <uniform|powerlaw> <tile|thr>
+Usage:  python -m experiments.cure.landmarks.landmark_attention
+        python -m experiments.cure.landmarks.landmark_attention profile <kind> <mode>
 """
 
 from __future__ import annotations

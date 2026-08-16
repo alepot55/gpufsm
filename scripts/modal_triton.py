@@ -8,7 +8,7 @@ incremental.
 
     python scripts/modal_triton.py build                      # main, no patch
     python scripts/modal_triton.py build --ref <sha> --patch p.patch
-    python scripts/modal_triton.py run --cmd "pytest -q python/test/unit/language/test_core.py -k histogram"
+    python scripts/modal_triton.py run --cmd "pytest -q python/test/unit/language/test_core.py"
     python scripts/modal_triton.py opt --file case.mlir --args "--test-print-membar"
 
 The build runs on CPU only (a GPU is not needed to compile, and CPU minutes are much

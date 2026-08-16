@@ -22,6 +22,9 @@ from .generators import (
     WITH_WILDCARDS,
     NFAShape,
     random_batch,
+    random_batch_2d,
+    random_byte_batch,
+    random_bytes_2d,
     random_nfa,
 )
 from .oracle import OracleMismatch, matches, require
@@ -36,6 +39,9 @@ __all__ = [
     "WITH_WILDCARDS",
     "random_nfa",
     "random_batch",
+    "random_batch_2d",
+    "random_byte_batch",
+    "random_bytes_2d",
     "sweep",
     "write_csv",
     "CSV_FIELDS",

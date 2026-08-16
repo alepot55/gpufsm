@@ -38,7 +38,7 @@ def main() -> None:
     refs = [simulate(nfa, d) for d in batch]
     res = run_batch(nfa, batch, backend="cuda", technique="worklist_global")
     got = [(r.accepted, r.match_len) for r in res]
-    mismatches = sum(1 for a, b in zip(got, refs) if a != b)
+    mismatches = sum(1 for a, b in zip(got, refs, strict=True) if a != b)
     total_bytes = sum(len(d) for d in batch)
     kernel_ms = res[0].kernel_ms if res else 0.0
     gbps = (total_bytes * 8.0) / (kernel_ms * 1e-3) / 1e9 if kernel_ms > 0 else 0.0

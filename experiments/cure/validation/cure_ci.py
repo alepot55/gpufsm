@@ -30,7 +30,8 @@ def main() -> int:
     med = statistics.median(sp)
     q1, q3 = np.percentile(sp, [25, 75])
     print(
-        f"speedup median={med:.2f}x IQR=[{q1:.2f},{q3:.2f}] range=[{min(sp):.2f},{max(sp):.2f}] n={len(sp)}"
+        f"speedup median={med:.2f}x IQR=[{q1:.2f},{q3:.2f}] "
+        f"range=[{min(sp):.2f},{max(sp):.2f}] n={len(sp)}"
     )
     return 0
 

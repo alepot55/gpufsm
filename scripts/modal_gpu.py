@@ -6,8 +6,11 @@ only cost is the seconds actually spent on the GPU (Modal's free tier is $30/mon
 
     python scripts/modal_gpu.py --preflight
     python scripts/modal_gpu.py --gpu H100 \
-        --cmd "python experiments/cure/p3_cross_arch.py" \
+        --cmd "python -m experiments.cure.validation.p3_cross_arch" \
         --fetch "paper2/data/cross_arch/*"
+    python scripts/modal_gpu.py --apt g++ \
+        --cmd 'pip install -e "." --config-settings=cmake.define.GPUFSM_BUILD_CUDA=ON' \
+        --cmd "pytest -m gpu -q"
 
 Requires `api.modal.com` to be reachable. Inside a Claude cloud session the default
 **Trusted** network policy blocks it (403 on CONNECT); see `docs/MODAL_FROM_CLOUD.md` for the
@@ -31,6 +34,9 @@ MAX_FETCH_BYTES = 8 * 1024 * 1024
 GPU = os.environ.get("GPUFSM_MODAL_GPU", "A100")
 TIMEOUT = int(os.environ.get("GPUFSM_MODAL_TIMEOUT", "1800"))
 PIP = os.environ.get("GPUFSM_MODAL_PIP", "torch numpy triton").split()
+# The CUDA base image ships nvcc but no host C++ compiler, and CMake refuses to configure
+# without one, so building the gpufsm extension needs g++ from apt.
+APT = os.environ.get("GPUFSM_MODAL_APT", "").split()
 CMDS: list[str] = json.loads(
     os.environ.get(
         "GPUFSM_MODAL_CMDS",
@@ -117,11 +123,10 @@ except ImportError:  # --preflight must still work without modal installed
 
 if modal is not None:
     app = modal.App("gpufsm-modal-gpu")
-    image = (
-        modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
-        .pip_install(*PIP)
-        .add_local_dir(str(LOCAL_REPO), remote_path=REPO, ignore=IGNORE)
-    )
+    image = modal.Image.from_registry("nvidia/cuda:12.8.1-devel-ubuntu24.04", add_python="3.12")
+    if APT:
+        image = image.apt_install(*APT)
+    image = image.pip_install(*PIP).add_local_dir(str(LOCAL_REPO), remote_path=REPO, ignore=IGNORE)
 
     remote_run = app.function(image=image, gpu=GPU, timeout=TIMEOUT + 300)(_run_remote)
 
@@ -278,6 +283,11 @@ def cli() -> int:
     ap.add_argument("--cmd", action="append", default=[], help="command to run (repeatable)")
     ap.add_argument("--fetch", action="append", default=[], help="glob of files to bring back")
     ap.add_argument("--pip", default="torch numpy triton", help="packages for the container image")
+    ap.add_argument(
+        "--apt",
+        default="",
+        help="apt packages for the image (e.g. 'g++' — needed to build the CUDA extension)",
+    )
     ap.add_argument("--timeout", type=int, default=1800, help="per-command timeout, seconds")
     ap.add_argument("--dry-run", action="store_true", help="print the modal command and exit")
     args = ap.parse_args()
@@ -291,6 +301,7 @@ def cli() -> int:
         "GPUFSM_MODAL_GPU": args.gpu,
         "GPUFSM_MODAL_TIMEOUT": str(args.timeout),
         "GPUFSM_MODAL_PIP": args.pip,
+        "GPUFSM_MODAL_APT": args.apt,
         "GPUFSM_MODAL_FETCH": json.dumps(args.fetch),
     }
     if args.cmd:

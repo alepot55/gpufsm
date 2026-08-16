@@ -24,6 +24,7 @@ Usage:  .venv/bin/python experiments/cure/landmark_spmv.py
 from __future__ import annotations
 
 import ctypes
+import os
 import statistics
 import sys
 from pathlib import Path
@@ -33,13 +34,12 @@ import torch
 import triton
 import triton.language as tl
 
+from gpufsm.bench.nvcc import load_library
+
 N_ROWS = 1 << 20  # 1M rows
 NCOLS = 1 << 22  # x has 4M float32 = 16 MB -> DRAM-resident (gather pays memory latency)
 K_UNIFORM = 16  # uniform nnz/row
 WARMUP, SAMPLES = 3, 9
-import os  # noqa: E402
-
-from gpufsm.bench.nvcc import load_library
 
 BLOCK = int(
     os.environ.get("SPMV_BLOCK", "32")

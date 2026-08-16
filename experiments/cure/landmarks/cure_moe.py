@@ -1,5 +1,6 @@
 """Harden the built cure on MoE top-k routing (control-bound ML workload), power-law expert counts.
-Same _moe_tile lock-step kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire). int64-exact oracle."""
+Same _moe_tile lock-step kernel; masked (GPUFSM_THREAD_REGION unset) vs cured (=retire).
+int64-exact oracle."""
 
 from __future__ import annotations
 
