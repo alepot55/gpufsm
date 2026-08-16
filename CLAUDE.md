@@ -536,7 +536,9 @@ validazione. Pubblicazione solo (no lab). Direzione decisa dalla deep-research (
   a batch piccolo sotto-utilizzato (occ 16.6%, 2 blocchi) → motiva block-parallel. Dati: `paper/data/nsight_rtx4070.csv`,
   interpretazione in `docs/PROFILING.md`. Tesi compute-bound ora **misurata**, non solo inferita.
 - ✅ **ANML loader FATTO** (task #8, parser): `io/anml.py` parsa il sottoinsieme ANML (homogeneous→edge-labelled,
-  symbol-set classes/ranges/negation/wildcard) + exporter `to_anml`; validato con fixture + round-trip (4 test).
+  symbol-set classes/ranges/negation/wildcard); validato con fixture (4 test). Un exporter `to_anml` esisteva
+  ma era **morto e rotto** (non faceva round-trip nemmeno sui suoi output: `symbol-set="[]"` e start state perso,
+  nessun test lo copriva malgrado questa nota lo affermasse) — rimosso il 2026-08-16.
   ⚠️ Manca solo il **download dei dati ANMLZoo reali** (DATASETS vuoto, serve SHA pinnato da mirror fidato — non
   bypassare la safety). Con i dati → numeri su automi reali (forte per i reviewer).
 - ✅ **Worklist Triton FATTO** (≤64 stati): Triton **PUÒ** esprimere il kernel work-efficient via `libdevice.ffs`
