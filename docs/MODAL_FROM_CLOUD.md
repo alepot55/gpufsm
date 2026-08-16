@@ -88,7 +88,7 @@ python scripts/modal_gpu.py --gpu A100
 
 # la validazione cross-arch, su H100 invece che A100
 python scripts/modal_gpu.py --gpu H100 \
-    --cmd "python experiments/cure/p3_cross_arch.py" \
+    --cmd "python -m experiments.cure.validation.p3_cross_arch" \
     --fetch "paper2/data/cross_arch/*"
 
 # più comandi in un solo affitto di GPU (paghi un solo avvio)
@@ -98,13 +98,18 @@ python scripts/modal_gpu.py --gpu A100-80GB \
     --fetch "paper/data/*.csv"
 ```
 
-Opzioni: `--pip` (pacchetti dell'immagine, default `torch numpy triton`), `--timeout` (per comando,
-default 1800 s), `--dry-run`. I file tornano scritti al loro path relativo nel repo, pronti da committare.
-I file >8 MB non vengono riportati: sono elencati come `NOT fetched` invece di far fallire il job.
+Opzioni: `--pip` (pacchetti pip dell'immagine, default `torch numpy triton`), `--apt` (pacchetti apt),
+`--timeout` (per comando, default 1800 s), `--dry-run`. I file tornano scritti al loro path relativo nel
+repo, pronti da committare. I file >8 MB non vengono riportati: sono elencati come `NOT fetched` invece
+di far fallire il job.
 
-I job one-off già esistenti (`modal_a100.py`, `modal_cure_a100.py`, `modal_m5_decomp.py`) continuano a
-funzionare senza modifiche una volta aperto l'egress; `modal_gpu.py` serve a non doverne scrivere un
-quarto per ogni esperimento nuovo.
+⚠️ **`--apt g++` serve per costruire l'estensione CUDA.** L'immagine `nvidia/cuda:*-devel` ha `nvcc` ma
+non un compilatore host, e CMake si rifiuta di configurare senza: senza `--apt g++` la build fallisce e
+i backend CUDA restano "non disponibili".
+
+I job one-off `modal_a100.py`, `modal_cure_a100.py` e `modal_m5_decomp.py` sono stati rimossi:
+`modal_gpu.py` (con `--apt`) copre i primi due e `modal_triton.py` copre il terzo (build di Triton da
+sorgente in un Volume, con alberi paralleli).
 
 ## 4. Costi
 

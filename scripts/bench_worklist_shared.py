@@ -16,7 +16,14 @@ import statistics
 import sys
 from pathlib import Path
 
-from gpufsm import NFABuilder, run_batch
+from gpufsm import run_batch
+from gpufsm.bench import SPARSE_WORKLIST, random_nfa
+
+
+def _sparse_nfa(n: int, seed: int):
+    """The sparse-worklist family plus its alphabet, which the callers need for inputs."""
+    return random_nfa(n, seed, SPARSE_WORKLIST), [ord(c) for c in SPARSE_WORKLIST.alphabet]
+
 
 SIZES = [256, 512, 1024, 1536]  # all fit 48 KB shared (4*words*8 bytes)
 N_STRINGS = 256
@@ -24,21 +31,6 @@ STR_LEN = 256
 WARMUP = 3
 RUNS = 7
 GPU = "RTX4070"
-
-
-def _random_nfa(n: int, seed: int):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.02)
-    b.set_start(0)
-    alpha = [ord(c) for c in "abcde"]
-    for s in range(n):
-        for _ in range(2):
-            b.add_transition(s, rng.choice(alpha), rng.randrange(n))
-        if rng.random() < 0.3:
-            b.add_epsilon(s, rng.randrange(n))
-    return b.build(), alpha
 
 
 def _median_ms(nfa, batch, tech):
@@ -53,7 +45,7 @@ def main() -> int:
     rng = random.Random(0)
     rows = []
     for n in SIZES:
-        nfa, alpha = _random_nfa(n, seed=n)
+        nfa, alpha = _sparse_nfa(n, seed=n)
         batch = [bytes(rng.choice(alpha) for _ in range(STR_LEN)) for _ in range(N_STRINGS)]
         ww = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_warp")]
         ss = [(r.accepted, r.match_len) for r in run_batch(nfa, batch, "cuda", "worklist_shared")]

@@ -29,7 +29,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ..nfa import ANY_SYMBOL, NFA, NFABuilder
+from ..core.nfa import ANY_SYMBOL, NFA, NFABuilder
 
 _ALL_BYTES = range(256)
 
@@ -166,48 +166,3 @@ def load_anml(path: str | Path) -> NFA:
             elif t == "report-on-match":
                 b.set_accept(st, True)
     return b.build()
-
-
-def to_anml(nfa: NFA, path: str | Path) -> Path:
-    """Export an edge-labelled NFA to ANML (homogeneous) — inverse of load_anml.
-
-    Each non-start state becomes an STE whose symbol-set is the labels of edges
-    entering it (consistent for automata produced by :func:`load_anml`).
-    """
-    in_labels: dict[int, set[int]] = {s: set() for s in range(nfa.num_states)}
-    edges: set[tuple[int, int]] = set()
-    sp, st, ss = nfa.sym_row_ptr, nfa.sym_targets, nfa.sym_symbols
-    for u in range(nfa.num_states):
-        for k in range(int(sp[u]), int(sp[u + 1])):
-            v = int(st[k])
-            in_labels[v].add(int(ss[k]))
-            edges.add((u, v))
-
-    def symset_str(syms: set[int]) -> str:
-        if ANY_SYMBOL in syms:
-            return "*"
-        return "[" + "".join(f"0x{c:02x}" for c in sorted(syms)) + "]"
-
-    accept = {s for s in range(nfa.num_states) if nfa.accept[s]}
-    net = ET.Element("automata-network", {"id": "gpufsm"})
-    ste_ids = {s: f"s{s}" for s in range(nfa.num_states) if s != nfa.start_state}
-    elems: dict[int, ET.Element] = {}
-    for s, sid in ste_ids.items():
-        e = ET.SubElement(
-            net, "state-transition-element", {"id": sid, "symbol-set": symset_str(in_labels[s])}
-        )
-        if s in accept:
-            ET.SubElement(e, "report-on-match", {"reportcode": "1"})
-        elems[s] = e
-    for u, v in edges:
-        if u == nfa.start_state and v in elems:
-            elems[v].set("start", "start-of-data")
-    for u, v in sorted(edges):
-        if u == nfa.start_state or u not in elems or v not in ste_ids:
-            continue
-        ET.SubElement(elems[u], "activate-on-match", {"element": ste_ids[v]})
-
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    ET.ElementTree(net).write(path, encoding="utf-8", xml_declaration=True)
-    return path

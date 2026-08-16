@@ -9,25 +9,12 @@ so ncu can profile that kernel cleanly. CUDA kernels have stable names
 
 from __future__ import annotations
 
-import random
 import sys
 
 import numpy as np
 
 from gpufsm.api import run_batch
-from gpufsm.nfa import NFABuilder
-
-
-def random_nfa(n: int, seed: int = 1):
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice("abcde")), rng.randrange(n))
-    return b.build()
+from gpufsm.bench import random_nfa
 
 
 def main() -> None:

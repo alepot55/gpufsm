@@ -9,7 +9,7 @@ from __future__ import annotations
 import random
 
 from gpufsm import ANY_SYMBOL, Backend, NFABuilder, run, simulate
-from gpufsm.bitmap import simulate_bitmap
+from gpufsm.core.bitmap import simulate_bitmap
 from gpufsm.examples import EXAMPLES
 
 

@@ -1,32 +1,36 @@
-"""The one public API: ``run`` (single execution) and ``benchmark`` (timed)."""
+"""The one public API: ``run`` (single execution) and ``benchmark`` (timed).
+
+Both automaton kinds go through here. ``run(nfa, ...)`` simulates an NFA and
+``run(dfa, ...)`` a DFA; the kind is derived from the object, so there is no second
+entry point to keep in sync and no backend string parsed by hand.
+"""
 
 from __future__ import annotations
 
 from . import backends as _backends  # noqa: F401  (triggers backend registration)
-from .nfa import NFA
-from .registry import Backend, get_factory
-from .result import BenchmarkStats, Result
+from .core.registry import Automaton, Backend, Kind, get_factory
+from .core.result import BenchmarkStats, Result
 
 
 def run(
-    nfa: NFA,
+    automaton: Automaton,
     input_bytes: bytes,
     backend: Backend | str = Backend.CPU,
     technique: str | None = None,
 ) -> Result:
-    """Run ``nfa`` over ``input_bytes`` on the chosen backend/technique."""
+    """Run ``automaton`` over ``input_bytes`` on the chosen backend/technique."""
     backend = Backend(backend)
-    technique, factory = get_factory(backend, technique)
-    return factory(nfa, technique).run(input_bytes)
+    technique, factory = get_factory(Kind.of(automaton), backend, technique)
+    return factory(automaton, technique).run(input_bytes)
 
 
 def run_batch(
-    nfa: NFA,
+    automaton: Automaton,
     inputs: list[bytes],
     backend: Backend | str = Backend.CPU,
     technique: str | None = None,
 ) -> list[Result]:
-    """Run ``nfa`` over a batch of inputs (one :class:`Result` per input).
+    """Run ``automaton`` over a batch of inputs (one :class:`Result` per input).
 
     Backends/techniques that expose a native ``run_batch`` (e.g. the multi-stream
     GPU kernels, one program/block per string) handle the whole batch in a single
@@ -34,8 +38,8 @@ def run_batch(
     supports batching transparently.
     """
     backend = Backend(backend)
-    technique, factory = get_factory(backend, technique)
-    executor = factory(nfa, technique)
+    technique, factory = get_factory(Kind.of(automaton), backend, technique)
+    executor = factory(automaton, technique)
     batch = getattr(executor, "run_batch", None)
     if callable(batch):
         return batch(inputs)
@@ -43,7 +47,7 @@ def run_batch(
 
 
 def benchmark(
-    nfa: NFA,
+    automaton: Automaton,
     input_bytes: bytes,
     backend: Backend | str = Backend.CPU,
     technique: str | None = None,
@@ -54,8 +58,8 @@ def benchmark(
     if repeats < 1:
         raise ValueError("repeats must be >= 1")
     backend = Backend(backend)
-    technique, factory = get_factory(backend, technique)
-    executor = factory(nfa, technique)
+    technique, factory = get_factory(Kind.of(automaton), backend, technique)
+    executor = factory(automaton, technique)
 
     last: Result | None = None
     for _ in range(max(0, warmup)):

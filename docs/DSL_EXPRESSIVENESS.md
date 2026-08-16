@@ -88,6 +88,6 @@ written at all.
 
 ## Reproduce
 
-`backends/warp_backend.py` (Warp, works) and `scripts/gluon_probe.py` (Gluon, fails to
+`backends/warp/nfa.py` (Warp, works) and `scripts/gluon_probe.py` (Gluon, fails to
 compile with the captured root cause) are both runnable on this machine. The CUDA/Triton
 techniques are validated by `pytest -m gpu`.

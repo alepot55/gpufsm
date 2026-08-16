@@ -1,18 +1,20 @@
-"""CPU NFA simulator — the single source of truth for correctness.
+"""CPU simulators — the single source of truth for correctness.
 
-Every GPU backend (Triton, CUDA) must reproduce :func:`simulate` exactly
-(``accepted`` and ``match_len``) on every benchmark. Semantics are
+Every backend must reproduce :func:`simulate` (NFA) or :func:`simulate_dfa` (DFA)
+exactly — ``accepted`` and ``match_len`` — on every benchmark. Semantics are
 *latch-first-match*: report as soon as any accepting state is active, returning
 the length of the matched prefix (0 for a zero-length / start-state match).
 
-Clarity over speed: this is the oracle, not a performance path.
+Both oracles live here, next to each other, so the two faces of the study share one
+definition of "correct". Clarity over speed: this is the oracle, not a performance path.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from .nfa import ANY_SYMBOL, NFA
+from .core.dfa import ALPHABET, DFA
+from .core.nfa import ANY_SYMBOL, NFA
 
 
 def epsilon_closure(states: set[int], nfa: NFA) -> set[int]:
@@ -60,4 +62,20 @@ def simulate(nfa: NFA, input_bytes: bytes) -> tuple[bool, int]:
         if any(accept[s] for s in active):
             return True, i + 1
 
+    return False, 0
+
+
+def simulate_dfa(dfa: DFA, input_bytes: bytes) -> tuple[bool, int]:
+    """Simulate ``dfa`` over ``input_bytes`` with latch-first-match semantics.
+
+    Returns ``(accepted, match_len)`` — the oracle for the GPU DFA kernels.
+    """
+    cur = dfa.start_state
+    if dfa.accept[cur]:
+        return True, 0
+    trans = dfa.trans
+    for i, b in enumerate(input_bytes):
+        cur = int(trans[cur * ALPHABET + b])
+        if dfa.accept[cur]:
+            return True, i + 1
     return False, 0

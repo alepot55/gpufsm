@@ -6,6 +6,7 @@ import math
 
 import pytest
 
+from gpufsm.core.nfa import NFABuilder
 from gpufsm.costmodel import (
     CostModel,
     Measurement,
@@ -16,7 +17,6 @@ from gpufsm.costmodel import (
     traffic_per_symbol,
     working_set_bytes,
 )
-from gpufsm.nfa import NFABuilder
 
 
 def _chain(n: int):

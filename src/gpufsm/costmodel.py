@@ -35,7 +35,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from .nfa import NFA
+from .core.nfa import NFA
 
 WORD_BITS = 64
 _INT = 4  # bytes per int32 CSR element

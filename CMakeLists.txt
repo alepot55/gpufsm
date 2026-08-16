@@ -43,9 +43,12 @@ set(CMAKE_CUDA_STANDARD 17)
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
 
+# One translation unit per kernel family under native/, plus bindings.cu. They are
+# compiled WITHOUT relocatable device code, so each __device__ helper must live in the
+# same .cu as its callers; shared declarations go in native/include/.
 file(GLOB_RECURSE GPUFSM_CUDA_SOURCES CONFIGURE_DEPENDS
-    "src/gpufsm/backends/cuda/*.cu"
-    "src/gpufsm/backends/cuda/*.cpp")
+    "src/gpufsm/backends/cuda/native/*.cu"
+    "src/gpufsm/backends/cuda/native/*.cpp")
 
 if(NOT GPUFSM_CUDA_SOURCES)
     message(WARNING "gpufsm: no CUDA sources found yet under src/gpufsm/backends/cuda -> skipping.")
@@ -53,7 +56,7 @@ if(NOT GPUFSM_CUDA_SOURCES)
 endif()
 
 pybind11_add_module(_cuda ${GPUFSM_CUDA_SOURCES})
-target_include_directories(_cuda PRIVATE src/gpufsm/backends/cuda/include)
+target_include_directories(_cuda PRIVATE src/gpufsm/backends/cuda/native)
 target_compile_options(_cuda PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-O3 --extended-lambda --expt-relaxed-constexpr>)
 install(TARGETS _cuda DESTINATION gpufsm/backends/cuda)

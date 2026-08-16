@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from gpufsm.core.nfa import ANY_SYMBOL
 from gpufsm.io.anml import load_anml, parse_symbol_set
-from gpufsm.nfa import ANY_SYMBOL
 from gpufsm.reference import simulate
 
 # Homogeneous ANML for the pattern "ab": s0 (start, matches 'a') -> s1 (matches 'b', report).

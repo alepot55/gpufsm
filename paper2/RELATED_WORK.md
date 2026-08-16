@@ -7,7 +7,7 @@ latency-hiding, tile-DSL design space, and the venue/threat strategy.
 
 > UPDATE (M10): the cure is no longer just a design proposal — its lowering is IMPLEMENTED and
 > measured (the same per-lane source → thread-model CUDA runs 4.2× the tile lowering, matches/exceeds
-> hand-CUDA; `experiments/cure/m10_scalar_program.py`). This moves the contribution from
+> hand-CUDA; `experiments/cure/milestones/m10_scalar_program.py`). This moves the contribution from
 > "characterization + design" toward "characterization + diagnosis + demonstrated cure", which raises
 > the strongest desk-reject risk's bar (the cure is shown to work, not just argued). The two
 > distinctions below (layout≠control-flow; not-just-autotuning) still anchor the novelty.

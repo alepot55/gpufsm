@@ -10,12 +10,10 @@ Requires: gpufsm installed with a working Triton and/or CUDA backend.
 
 from __future__ import annotations
 
-import random
-
 from gpufsm.api import run_batch
+from gpufsm.bench import random_batch, random_nfa
+from gpufsm.core.registry import Backend, available_backends, list_techniques
 from gpufsm.costmodel import Measurement, calibrate, relative_error, traffic_per_symbol
-from gpufsm.nfa import NFABuilder
-from gpufsm.registry import Backend, available_backends, list_techniques
 
 # Calibrate on the *multi-stream* techniques: they are parallel (throughput-meaningful),
 # unlike the single-program dense/bitpacked kernels, which are one latency-bound GPU
@@ -23,29 +21,6 @@ from gpufsm.registry import Backend, available_backends, list_techniques
 # across these (cuda=register, triton=global words, *_shared=shared CSR), giving the
 # traffic spread the fit needs.
 _MULTISTREAM = {"multistream", "multistream_shared", "multistream_async"}
-
-
-def random_nfa(n: int, seed: int) -> NFABuilder:
-    rng = random.Random(seed)
-    b = NFABuilder()
-    for _ in range(n):
-        b.add_state(accept=rng.random() < 0.1)
-    b.set_start(rng.randrange(n))
-    for s in range(n):
-        for _ in range(rng.randint(1, 3)):
-            b.add_transition(s, ord(rng.choice("abcde")), rng.randrange(n))
-    return b.build()
-
-
-def make_batch(n_strings=4096, slen=256) -> tuple[list[bytes], int]:
-    """Build the input batch ONCE (numpy-fast) and reuse for every measurement."""
-    import numpy as np
-
-    rng = np.random.default_rng(0)
-    raw = rng.integers(ord("a"), ord("a") + 5, size=n_strings * slen, dtype=np.uint8)
-    flat = raw.tobytes()
-    batch = [flat[i * slen : (i + 1) * slen] for i in range(n_strings)]
-    return batch, n_strings * slen
 
 
 def throughput_gbps(nfa, backend, technique, batch, total_bytes, repeats=10) -> float:
@@ -72,7 +47,7 @@ def main() -> None:
         return
 
     sizes = [32, 64, 128, 256]
-    batch, total_bytes = make_batch()
+    batch, total_bytes = random_batch(4096, 256)
     measurements: list[Measurement] = []
     for be in backends:
         for te in list_techniques(be):

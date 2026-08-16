@@ -6,7 +6,7 @@ correctness oracle and every backend are exercised on known cases.
 
 from __future__ import annotations
 
-from .nfa import NFA, NFABuilder
+from .core.nfa import NFA, NFABuilder
 
 # (input, expected_accepted) pairs, latch-first-match semantics.
 LabeledInputs = list[tuple[bytes, bool]]
