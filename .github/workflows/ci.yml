@@ -27,8 +27,8 @@ jobs:
       # and zip() calls that silently truncate on a length mismatch.
       - name: Ruff (lint + format check)
         run: |
-          ruff check src tests scripts experiments paper2/figures.py
-          ruff format --check src tests scripts experiments paper2/figures.py
+          ruff check src tests scripts experiments paper/figures.py paper2/figures.py
+          ruff format --check src tests scripts experiments paper/figures.py paper2/figures.py
 
       - name: Mypy
         run: mypy src/gpufsm
