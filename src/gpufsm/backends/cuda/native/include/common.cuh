@@ -38,20 +38,42 @@ static constexpr int BITPACKED_MAX_WORDS = 8;
         }                                                                     \
     } while (0)
 
-// Copies a numpy array to the device; the pointer is owned by the caller's `frees`
-// list, which every entry point drains before returning.
+// Frees every device allocation registered with it when it goes out of scope.
 //
-// KNOWN ISSUE: `frees` is drained only on the happy path, so a CUDA_CHECK throw between
-// the allocation and the drain leaks every buffer allocated so far. Replacing it with an
-// RAII owner is a mechanical change but needs a CUDA toolchain to verify, so it is
-// deliberately not bundled with the file split.
+// The entry points used to collect pointers in a `std::vector<void*>` and drain it by hand
+// at the end of the happy path. CUDA_CHECK throws, so any error after the first allocation
+// — a launch failure, an out-of-memory on a later buffer — skipped the drain and leaked
+// everything allocated so far. A destructor cannot be skipped by a throw.
+//
+// Only *device* memory. The async path additionally registers host pages and creates
+// streams; those still unwind by hand.
+class DeviceScope {
+public:
+    DeviceScope() = default;
+    DeviceScope(const DeviceScope&) = delete;
+    DeviceScope& operator=(const DeviceScope&) = delete;
+    ~DeviceScope() {
+        for (void* p : ptrs) cudaFree(p);
+    }
+
+    // Adopt an already-allocated pointer.
+    template <typename T>
+    T* own(T* p) {
+        ptrs.push_back(static_cast<void*>(p));
+        return p;
+    }
+
+    std::vector<void*> ptrs;
+};
+
+// Copies a numpy array to the device; the allocation is owned by `scope`.
 template <typename T>
-static const T* dev_copy(const py::array_t<T>& a, std::vector<void*>& frees) {
+static const T* dev_copy(const py::array_t<T>& a, DeviceScope& scope) {
     auto buf = a.request();
     T* d = nullptr;
     size_t bytes = static_cast<size_t>(buf.size) * sizeof(T);
-    cudaMalloc(&d, bytes ? bytes : 1);
-    if (bytes) cudaMemcpy(d, buf.ptr, bytes, cudaMemcpyHostToDevice);
-    frees.push_back(d);
+    CUDA_CHECK(cudaMalloc(&d, bytes ? bytes : 1));
+    scope.own(d);
+    if (bytes) CUDA_CHECK(cudaMemcpy(d, buf.ptr, bytes, cudaMemcpyHostToDevice));
     return d;
 }

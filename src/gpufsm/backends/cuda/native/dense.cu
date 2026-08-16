@@ -77,20 +77,26 @@ std::tuple<bool, int, float> run_dense(
     py::array_t<int> input_symbols,
     int num_states, int start_state, int uses_any) {
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const signed char* d_acc = dev_copy(accept, frees);
-    const int* d_in = dev_copy(input_symbols, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const signed char* d_acc = dev_copy(accept, scope);
+    const int* d_in = dev_copy(input_symbols, scope);
     int input_len = static_cast<int>(input_symbols.request().size);
 
     signed char *d_cur, *d_nxt;
     int *d_flag, *d_len;
-    CUDA_CHECK(cudaMalloc(&d_cur, num_states)); CUDA_CHECK(cudaMalloc(&d_nxt, num_states));
-    CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int))); CUDA_CHECK(cudaMalloc(&d_len, sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&d_cur, num_states));
+    scope.own(d_cur);
+    CUDA_CHECK(cudaMalloc(&d_nxt, num_states));
+    scope.own(d_nxt);
+    CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int)));
+    scope.own(d_flag);
+    CUDA_CHECK(cudaMalloc(&d_len, sizeof(int)));
+    scope.own(d_len);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -105,9 +111,6 @@ std::tuple<bool, int, float> run_dense(
     int h_flag = 0, h_len = 0;
     cudaMemcpy(&h_flag, d_flag, sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_len, d_len, sizeof(int), cudaMemcpyDeviceToHost);
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_flag); cudaFree(d_len);
     cudaEventDestroy(start); cudaEventDestroy(stop);
 
     return {h_flag != 0, h_len, kernel_ms};

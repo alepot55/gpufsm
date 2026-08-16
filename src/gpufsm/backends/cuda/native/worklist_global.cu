@@ -362,23 +362,31 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global(
     int nwords = (num_states + 63) / 64;
     int num_strings = static_cast<int>(input_offsets.request().size) - 1;
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
     unsigned long long *d_cur, *d_nxt, *d_fr, *d_nb;
     size_t ws = sizeof(unsigned long long) * (size_t)(num_strings ? num_strings : 1) * nwords;
-    CUDA_CHECK(cudaMalloc(&d_cur, ws)); CUDA_CHECK(cudaMalloc(&d_nxt, ws));
-    CUDA_CHECK(cudaMalloc(&d_fr, ws)); CUDA_CHECK(cudaMalloc(&d_nb, ws));
+    CUDA_CHECK(cudaMalloc(&d_cur, ws));
+    scope.own(d_cur);
+    CUDA_CHECK(cudaMalloc(&d_nxt, ws));
+    scope.own(d_nxt);
+    CUDA_CHECK(cudaMalloc(&d_fr, ws));
+    scope.own(d_fr);
+    CUDA_CHECK(cudaMalloc(&d_nb, ws));
+    scope.own(d_nb);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -400,10 +408,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_global(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
-    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_fr); cudaFree(d_nb);
     cudaEventDestroy(start); cudaEventDestroy(stop);
     return {flags, lens, kernel_ms};
 }
@@ -420,23 +424,31 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_warp(
     int nwords = (num_states + 63) / 64;
     int num_strings = static_cast<int>(input_offsets.request().size) - 1;
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
     unsigned long long *d_cur, *d_nxt, *d_fr, *d_nb;
     size_t ws = sizeof(unsigned long long) * (size_t)(num_strings ? num_strings : 1) * nwords;
-    CUDA_CHECK(cudaMalloc(&d_cur, ws)); CUDA_CHECK(cudaMalloc(&d_nxt, ws));
-    CUDA_CHECK(cudaMalloc(&d_fr, ws)); CUDA_CHECK(cudaMalloc(&d_nb, ws));
+    CUDA_CHECK(cudaMalloc(&d_cur, ws));
+    scope.own(d_cur);
+    CUDA_CHECK(cudaMalloc(&d_nxt, ws));
+    scope.own(d_nxt);
+    CUDA_CHECK(cudaMalloc(&d_fr, ws));
+    scope.own(d_fr);
+    CUDA_CHECK(cudaMalloc(&d_nb, ws));
+    scope.own(d_nb);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -459,10 +471,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_warp(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
-    cudaFree(d_cur); cudaFree(d_nxt); cudaFree(d_fr); cudaFree(d_nb);
     cudaEventDestroy(start); cudaEventDestroy(stop);
     return {flags, lens, kernel_ms};
 }
@@ -479,24 +487,29 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_compact(
     int nwords = (num_states + 63) / 64;
     int num_strings = static_cast<int>(input_offsets.request().size) - 1;
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens, *d_fa, *d_fb;
     unsigned long long* d_vis;
     int ns1 = num_strings ? num_strings : 1;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * ns1));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * ns1));
+    scope.own(d_lens);
     CUDA_CHECK(cudaMalloc(&d_fa, sizeof(int) * (size_t)ns1 * num_states));
+    scope.own(d_fa);
     CUDA_CHECK(cudaMalloc(&d_fb, sizeof(int) * (size_t)ns1 * num_states));
+    scope.own(d_fb);
     CUDA_CHECK(cudaMalloc(&d_vis, sizeof(unsigned long long) * (size_t)ns1 * nwords));
+    scope.own(d_vis);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -518,9 +531,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_compact(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens); cudaFree(d_fa); cudaFree(d_fb); cudaFree(d_vis);
     cudaEventDestroy(start); cudaEventDestroy(stop);
     return {flags, lens, kernel_ms};
 }
@@ -550,19 +560,21 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_shared(
     int threads = warps_per_block * 32;
     size_t shared_bytes = (size_t)warps_per_block * per_warp;
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -584,9 +596,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_worklist_shared(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
     cudaEventDestroy(start); cudaEventDestroy(stop);
     return {flags, lens, kernel_ms};
 }

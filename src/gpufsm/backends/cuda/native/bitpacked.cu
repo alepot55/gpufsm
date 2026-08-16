@@ -188,18 +188,21 @@ std::tuple<bool, int, float> run_bitpacked(
     int num_states, int start_state, int uses_any) {
 
     int nwords = (num_states + 63) / 64;
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_symbols, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_symbols, scope);
     int input_len = static_cast<int>(input_symbols.request().size);
 
     int *d_flag, *d_len;
-    CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int))); CUDA_CHECK(cudaMalloc(&d_len, sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&d_flag, sizeof(int)));
+    scope.own(d_flag);
+    CUDA_CHECK(cudaMalloc(&d_len, sizeof(int)));
+    scope.own(d_len);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -214,9 +217,6 @@ std::tuple<bool, int, float> run_bitpacked(
     int h_flag = 0, h_len = 0;
     cudaMemcpy(&h_flag, d_flag, sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(&h_len, d_len, sizeof(int), cudaMemcpyDeviceToHost);
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flag); cudaFree(d_len);
     cudaEventDestroy(start); cudaEventDestroy(stop);
 
     return {h_flag != 0, h_len, kernel_ms};
@@ -259,19 +259,21 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream(
     int nwords = (num_states + 63) / 64;
     int num_strings = static_cast<int>(input_offsets.request().size) - 1;
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -291,9 +293,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
     cudaEventDestroy(start); cudaEventDestroy(stop);
 
     return {flags, lens, kernel_ms};
@@ -363,19 +362,21 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_shared(
             " B shared mem > device opt-in max " + std::to_string(max_optin) + " B");
     }
 
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -396,9 +397,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_shared(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
     cudaEventDestroy(start); cudaEventDestroy(stop);
 
     return {flags, lens, kernel_ms};
@@ -428,13 +426,13 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_async(
     if (num_strings <= 0) return {flags, lens, 0.0f};
 
     // CSR copied once (small, read-only).
-    std::vector<void*> frees;
-    const int* d_srp = dev_copy(sym_row_ptr, frees);
-    const int* d_st = dev_copy(sym_targets, frees);
-    const int* d_ss = dev_copy(sym_symbols, frees);
-    const int* d_erp = dev_copy(eps_row_ptr, frees);
-    const int* d_et = dev_copy(eps_targets, frees);
-    const unsigned long long* d_acc = dev_copy(accept_words, frees);
+    DeviceScope scope;
+    const int* d_srp = dev_copy(sym_row_ptr, scope);
+    const int* d_st = dev_copy(sym_targets, scope);
+    const int* d_ss = dev_copy(sym_symbols, scope);
+    const int* d_erp = dev_copy(eps_row_ptr, scope);
+    const int* d_et = dev_copy(eps_targets, scope);
+    const unsigned long long* d_acc = dev_copy(accept_words, scope);
 
     // Pin the caller's host buffers IN PLACE (cudaHostRegister) instead of allocating
     // a second pinned buffer and copying into it — that extra full-input host memcpy
@@ -449,9 +447,13 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_async(
 
     int *d_in, *d_off, *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_in, sizeof(int) * (in_len ? in_len : 1)));
+    scope.own(d_in);
     CUDA_CHECK(cudaMalloc(&d_off, sizeof(int) * (num_strings + 1)));
+    scope.own(d_off);
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * num_strings));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * num_strings));
+    scope.own(d_lens);
 
     cudaStream_t streams[N_STREAMS];
     for (int s = 0; s < N_STREAMS; ++s) CUDA_CHECK(cudaStreamCreate(&streams[s]));
@@ -506,8 +508,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_multistream_async(
 
     // h_flags/h_lens ARE the numpy output buffers — async D2H already wrote them.
     for (int s = 0; s < N_STREAMS; ++s) cudaStreamDestroy(streams[s]);
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_in); cudaFree(d_off); cudaFree(d_flags); cudaFree(d_lens);
     if (in_len) cudaHostUnregister(h_in);
     cudaHostUnregister(h_flags); cudaHostUnregister(h_lens);
     cudaEventDestroy(start); cudaEventDestroy(stop);

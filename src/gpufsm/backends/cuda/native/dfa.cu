@@ -35,15 +35,17 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_dfa(
     int num_states, int start_state) {
 
     int num_strings = static_cast<int>(input_offsets.request().size) - 1;
-    std::vector<void*> frees;
-    const int* d_trans = dev_copy(trans, frees);
-    const signed char* d_acc = dev_copy(accept, frees);
-    const int* d_in = dev_copy(input_data, frees);
-    const int* d_off = dev_copy(input_offsets, frees);
+    DeviceScope scope;
+    const int* d_trans = dev_copy(trans, scope);
+    const signed char* d_acc = dev_copy(accept, scope);
+    const int* d_in = dev_copy(input_data, scope);
+    const int* d_off = dev_copy(input_offsets, scope);
 
     int *d_flags, *d_lens;
     CUDA_CHECK(cudaMalloc(&d_flags, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_flags);
     CUDA_CHECK(cudaMalloc(&d_lens, sizeof(int) * (num_strings ? num_strings : 1)));
+    scope.own(d_lens);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start); cudaEventCreate(&stop);
@@ -64,8 +66,6 @@ std::tuple<py::array_t<int>, py::array_t<int>, float> run_dfa(
         cudaMemcpy(flags.request().ptr, d_flags, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
         cudaMemcpy(lens.request().ptr, d_lens, sizeof(int) * num_strings, cudaMemcpyDeviceToHost);
     }
-    for (void* p : frees) cudaFree(p);
-    cudaFree(d_flags); cudaFree(d_lens);
     cudaEventDestroy(start); cudaEventDestroy(stop);
     return {flags, lens, kernel_ms};
 }
