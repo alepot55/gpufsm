@@ -80,9 +80,7 @@ def fig_occupancy_gating() -> None:
     ax.plot(n, cb, "o-", color="#2980b9", label="pure lane-packing (work held equal)")
     ax.plot(n, ca, "s--", color="#8e44ad", label="realistic (vs work-efficient scalar)")
     ax.axhline(32, color="gray", ls=":", lw=1)
-    ax.text(
-        n[-1], 31.2, "ideal 32× (warp width)", fontsize=8, color="gray", ha="right", va="top"
-    )
+    ax.text(n[-1], 31.2, "ideal 32× (warp width)", fontsize=8, color="gray", ha="right", va="top")
     ax.set_ylim(0, 35.5)
     ax.set_xscale("log", base=2)
     ax.set_xticks(n)
@@ -145,9 +143,7 @@ def fig_dfa_crossover() -> None:
     ax1.plot(tkb, pk, "o-", color="#2980b9", label="lane-packed Triton")
     ax1.plot(tkb, cu, "s-", color="#27ae60", label="CUDA")
     ax1.axvline(6144, color="gray", ls=":", lw=1)
-    ax1.text(
-        6144 * 1.12, max(cu), "L2 (~6 MB)", fontsize=8, color="gray", ha="left", va="top"
-    )
+    ax1.text(6144 * 1.12, max(cu), "L2 (~6 MB)", fontsize=8, color="gray", ha="left", va="top")
     ax1.set_xscale("log", base=2)
     ax1.set_xlabel("DFA table size (KB)")
     ax1.set_ylabel("Throughput (Gbps)")
@@ -323,6 +319,7 @@ def fig_selector() -> None:
     ax.axis("off")
 
     PAD = 0.10  # boxstyle pad in data units (mutation_scale=1 so pad is NOT rescaled)
+    ROUNDING = 0.18
 
     def box(x, y, w, h, text, fc):
         # visual edges = (x - PAD, y - PAD) .. (x + w + PAD, y + h + PAD)
@@ -331,7 +328,7 @@ def fig_selector() -> None:
                 (x, y),
                 w,
                 h,
-                boxstyle="round,pad=0.10,rounding_size=0.18",
+                boxstyle=f"round,pad={PAD},rounding_size={ROUNDING}",
                 fc=fc,
                 ec="#333",
                 lw=1.1,
