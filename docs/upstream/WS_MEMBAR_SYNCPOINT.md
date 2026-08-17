@@ -236,3 +236,40 @@ regala terreno, e il costo reale e' stato una riga di risposta.
 indirizzato l'attenzione su #11324 (che il codice lo cambia) e soprattutto su #11325 (barriera
 **mancante**, cioe' correttezza e non ottimizzazione), dicendo esplicitamente che se considera #11324
 della stessa classe non discutiamo. Onesti sul debole, precisi sul forte.
+
+## #11324: prima review evasa (17 ago)
+
+Jokeren, commento inline su `Membar.cpp:184`:
+
+> You can just include `triton::gpu::WarpYieldOp` and `triton::gpu::WarpReturnOp` in
+> `containsLocalBarrier` and remove comments
+
+**La sua versione era migliore, e la nostra patch era incompleta.** Verificato prima di eseguire:
+`WarpReturnOp` emette la stessa `createAllBarrier` di `WarpYieldOp`
+(`WarpSpecializeUtility.cpp:420-422` contro `:555-559`), e noi la ignoravamo. Includerla **raddoppia**
+l'effetto. Codice: −9 righe, +2, il caso speciale in `getLocalBarrierStages` sparisce.
+
+| build | bar.sync (75 kernel, cache pulita per build) |
+|---|---|
+| `main` | 2016 |
+| solo `warp_yield` (v1, quella pubblicata) | 1986 |
+| entrambi i terminatori (v2, come chiesto) | **1956** |
+
+145 passed / 1432 skipped in tutte e tre. Nessuna regressione lit.
+
+### ⚠️ Errore nostro, corretto pubblicamente
+
+La descrizione originale della PR diceva **2356 → 2326**. I numeri **assoluti erano sbagliati**:
+venivano da un conteggio fatto in modo diverso (stessa suite, stessi 75 kernel, metodo di conteggio
+differente). Il **delta di 30 era giusto**. Descrizione della PR corretta a 2016 → 1956, e l'errore
+**dichiarato nel commento** invece di sostituire i numeri in silenzio.
+
+⇒ Regola: quando si ri-misura, ri-misurare **tutte** le build con lo stesso comando nella stessa run.
+Confrontare un numero di oggi con uno di ieri prodotto da un altro script e' come non misurare.
+
+### Cosa non siamo riusciti a fare, detto in chiaro
+
+Tre forme di test minimale per isolare `warp_return` (partizione che scrive + lettura del chiamante;
+il contrario; due partizioni sullo stesso buffer) → **nessuna** mostra differenza tra `main` e la
+patch. Quel mezzo cambiamento si vede solo nella suite completa. Nella risposta e' offerta la
+riduzione di un kernel vero a test, invece di aggiungere un test che non dimostra nulla.
