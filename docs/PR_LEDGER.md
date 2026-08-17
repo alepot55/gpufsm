@@ -31,15 +31,17 @@ poi la pagina pubblica della PR per lo stato esatto.
 
 ## A. Upstream `triton-lang/triton` — l'unico contributo esterno che conta
 
-Score: **1 mergiata, 4 aperte (#10766, #11323, #11324, #11325), 4 chiuse + 1 RFC chiusa**, piu' 2 issue
-aperte da noi (#11326, #11328). Ri-verificato il 16 ago ore 09:42: nessuna reazione di maintainer su
-nessuna delle tre PR nuove; #11325 `mergeable_state: blocked` come le altre (CI da approvare a mano).
+Score: **1 mergiata, 3 aperte (#10766, #11324, #11325), 5 chiuse + 1 RFC chiusa**, piu' 2 issue
+aperte da noi (#11326, #11328). **17 ago 10:21: primo scambio tecnico con un maintainer.** Jokeren ha chiuso #11323 come
+"micro optimization" dopo averne discusso con @jeffniu-openai. La patch era corretta (verificato in
+`WarpSpecializeUtility.cpp:555-559`: le due barriere sono incondizionate), il valore no — e lo
+dicevamo noi stessi nella PR. #11324 e #11325 restano aperte e `blocked`.
 
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
 | [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Do not compare subslice offsets across different shapes` | 16 ago | **APERTA** — barriera **mancante** (bug di correttezza), test che fallisce senza patch, 0 regressioni | in attesa |
 | [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | **APERTA** — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | in attesa |
-| [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **APERTA**, CI da approvare, review chiesta a Jokeren+ptillet | in attesa |
+| [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **CHIUSA** 17 ago — "micro optimization" (Jokeren + jeffniu-openai). Patch corretta, valore marginale: non cambiava il codice generato, e lo dicevamo noi | Jokeren |
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
 | [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
 | [#10780](https://github.com/triton-lang/triton/pull/10780) | `[DOCS] Precompute the stages-inspection key/hash in the plugin examples` | 2 lug | **APERTA**, contestata, CI da approvare | CRobeck ha obiettato |

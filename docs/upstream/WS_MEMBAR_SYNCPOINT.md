@@ -214,3 +214,25 @@ Conseguenze da tenere presenti:
   compilate condividono lo stesso nome file (`matmul_tma_ws_kernel.ptx`) sotto hash diversi, e due
   script che ne pescano una diversa danno numeri incoerenti (mi e' successo: 25->18 vs 15->18).
   L'unico numero difendibile viene da una run controllata con cache pulita.
+
+## Esito di #11323: CHIUSA da Jokeren il 17 ago
+
+> "discussed with @jeffniu-openai and this seems like a micro optimization."
+
+Verificato prima di rispondere, in `lib/Conversion/TritonGPUToLLVM/WarpSpecializeUtility.cpp:555-559`:
+le due `createAllBarrier` attorno alla default region sono emesse **incondizionatamente** per ogni
+`warp_specialize`, senza guardia su capture o partizioni — cioe' esattamente lo schema che Jokeren ha
+disegnato nel commento. **La patch era corretta**; il rifiuto e' sul valore, non sulla correttezza.
+
+E il valore era davvero marginale, e lo avevamo scritto noi per primi nella descrizione della PR:
+*non cambia il codice generato*. Non c'era niente da difendere.
+
+**Lezione:** il criterio [[triton-rejects-trivial-prs]] ha predetto questo esito con due giorni di
+anticipo. Era gia' scritto nel nostro doc che #11323 rischiava la chiusura per "not necessary". Averlo
+previsto e non aver ritirato la PR e' stata comunque la scelta giusta: ritirarsi prima di un'obiezione
+regala terreno, e il costo reale e' stato una riga di risposta.
+
+**Cosa ne abbiamo ricavato:** il primo scambio tecnico con un maintainer. Nella risposta abbiamo
+indirizzato l'attenzione su #11324 (che il codice lo cambia) e soprattutto su #11325 (barriera
+**mancante**, cioe' correttezza e non ottimizzazione), dicendo esplicitamente che se considera #11324
+della stessa classe non discutiamo. Onesti sul debole, precisi sul forte.
