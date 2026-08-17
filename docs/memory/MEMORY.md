@@ -17,3 +17,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Triton chiude le PR "trivial"](triton-rejects-trivial-prs.md) — conta l'impatto misurato, non la dimensione; la coda issue è satura.
 - [Scegliere bug non contesi](pick-uncontested-bugs-not-design-changes.md) — il collo di bottiglia upstream e' il filtro di valore, non l'attenzione: preferire i bug a cui risponde il verificatore.
 - [LLVM obbliga a dichiarare l'AI](llvm-requires-ai-disclosure.md) — policy di ammissibilita': dichiarazione nella PR + un umano che sappia difendere la patch.
+- [Mai aspettare un lavoro che non vedi](never-poll-a-job-you-cant-see.md) — git su volume di rete striscia, e il ciclo di attesa su un file mai scritto brucia ore in silenzio.
+- [Verificare eseguendo, non col timbro dell'agente](verify-by-running-not-by-agent-verdict.md) — il revisore avversariale ne ha confermati 10 su 11; eseguendoli, 2 su 7 erano falsi.

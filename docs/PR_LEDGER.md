@@ -198,6 +198,40 @@ periodo nelle PR non lo trova: sta in `git log`, in `docs/TACO_*`, `docs/PPOPP_P
 
 ---
 
+## B-bis. Upstream `llvm/llvm-project` — 5 PR aperte (17 ago 2026)
+
+Bersaglio scelto col criterio di `docs/memory/pick-uncontested-bugs-not-design-changes.md`: solo
+bug a cui risponde una macchina (crash, verificatore, output sbagliato), mai modifiche di disegno.
+
+| PR | cosa | giudice | stato |
+|---|---|---|---|
+| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora i valori catturati dalle regioni | verificatore di dominanza | aperta dal 16 ago, CI in attesa di approvazione |
+| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg va in crash su `memref<0xf32>` | assert in `VectorType::get` | aperta |
+| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` fra i dialetti dipendenti (1 riga) | `LLVM ERROR` su IR valido | aperta |
+| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde gli iter_arg di cicli diversi | output sbagliato | aperta, `Fixes #216289` |
+| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `vector.multi_reduction` non valida `reduction_dims` | verificatore + scrittura fuori array | aperta |
+
+**Come sono state trovate e verificate.** Workflow `wf_f8e41f40-1d9` (16 agenti: 5 cercatori su
+modalita' diverse + un revisore avversariale per candidato), poi **esecuzione dei repro su
+`mlir-opt` vero**. Il revisore ne aveva confermati 10 su 11; eseguendoli, 2 su 7 erano falsi —
+vedi `docs/memory/verify-by-running-not-by-agent-verdict.md`. Ogni patch e' provata nei due versi
+(fallisce senza, passa con), 368 test verdi nei direttori toccati, `clang-format` pulito.
+
+**Persa per due ore:** `index.cmp` con canonicalizzazione non valida. Patch pronta, ma
+[#216831](https://github.com/llvm/llvm-project/pull/216831) di `at0m741` era gia' aperta. Il nostro
+controllo doppioni cercava `"index.cmp"`, stringa assente dal titolo e dal corpo di quella PR.
+**Regola:** cercare per concetto e per simbolo, e rifare il controllo *subito prima* di pubblicare —
+l'indice di ricerca di GitHub e' in ritardo di ore sulle PR del giorno stesso, per quelle va elencato
+e filtrato per percorso di file.
+
+**Concorrenza:** `hamzaqureshi5` sta lavorando la stessa lista di bug MLIR, in fretta (#216494,
+#216799 aperte lo stesso giorno). Non e' una miniera tranquilla.
+
+Monitor: `~/.cache/watch_upstream.sh` sorveglia tutte e 5 (commenti di terzi, review via GraphQL,
+commenti inline, stato, CI per ramo). Stato in `~/.cache/upstream_state`.
+
+---
+
 ## C. Dove sta il valore, onestamente
 
 1. **Paper** — pacchetto ASPLOS 2027 (ciclo Fall, **9 set 2026 AoE**) pronto e committato
