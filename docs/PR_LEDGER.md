@@ -248,6 +248,19 @@ Fatto in risposta (18 ago, ~01:00):
 ⚠️ **Non aprire la sesta PR** finche' queste cinque non sono pulite e risposte: il collo di
 bottiglia e' la capacita' di revisione, non la nostra produzione.
 
+### 18 ago: primo LGTM (#216851)
+
+`FedericoBruzzone`: *"Thanks for the fix @alepot55! LGTM % nits, but please wait for
+@Jianhui-Li @gysit"*. Due `suggestion` inline, **entrambi per accorciare un commento**: il
+secondo revisore su due che apre chiedendo meno prosa. Applicati, piu' il test del ramo
+scalabile (`vscale * 0`, la baseline asserisce) che chiude la lacuna dichiarata. Commit
+`cc5b83092`. Manca la risposta a parole, che scrive l'utente.
+
+Pronti in locale e **non spinti** (aggiungere commit non richiesti a PR in coda e' rumore):
+- `wt-coalesce` `48097f51b` — guardiano allargato al nido imperfetto. Il buco era reale:
+  `transform.loop.coalesce_nested` fondeva ancora un nido con un'operazione fra i due cicli che
+  legge l'iter_arg esterno. Provato eseguendo, non dedotto. 368 test verdi.
+
 ### Riserva: 2 bug verificati e non pubblicati
 
 Trovati nella stessa caccia, riprodotti eseguendo (`rc=134`, alle righe previste), issue aperte e
