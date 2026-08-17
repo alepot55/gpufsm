@@ -227,8 +227,41 @@ e filtrato per percorso di file.
 **Concorrenza:** `hamzaqureshi5` sta lavorando la stessa lista di bug MLIR, in fretta (#216494,
 #216799 aperte lo stesso giorno). Non e' una miniera tranquilla.
 
+### Prima revisione ricevuta: 19 minuti (#216852)
+
+Il 17 ago alle 22:09, 19 minuti dopo l'apertura, **Mehdi Amini (`joker-eph`)** risponde: *"Can we
+start by please pruning the description from the slop? Second can the test be included in the
+existing canonicalize.mlir file?"*, piu' un commento inline che chiede un `CHECK` sul `cf.br`.
+Sette minuti dopo `Hardcode84` obietta sul **disegno**: le canonicalizzazioni di `scf` non
+dovrebbero creare `cf` dal nulla, servirebbe un pass dedicato.
+
+Fatto in risposta (18 ago, ~01:00):
+1. **Descrizioni tagliate su tutte e quattro**, da 2.300-4.500 caratteri a 544-1.119. Vedi
+   `docs/memory/llvm-pr-register-short-and-staggered.md`.
+2. **`CHECK` sui due `cf.br`** aggiunti dall'output reale del binario patchato, non indovinati
+   (commit `4f4b21e43`).
+3. **Risposta sul file di test misurata, non asserita:** eseguita la pipeline di `canonicalize.mlir`
+   (`builtin.module(func.func(canonicalize{test-convergence}))`) sul nostro caso → `scf.execute_region`
+   esce intatta, perche' il repro vive in `llvm.func`. Offerto di spostarlo o rinominarlo.
+4. **Concesso sull'obiezione di disegno** invece di difenderla.
+
+⚠️ **Non aprire la sesta PR** finche' queste cinque non sono pulite e risposte: il collo di
+bottiglia e' la capacita' di revisione, non la nostra produzione.
+
+### Riserva: 2 bug verificati e non pubblicati
+
+Trovati nella stessa caccia, riprodotti eseguendo (`rc=134`, alle righe previste), issue aperte e
+**non assegnate**, nessuna PR le cita:
+
+- [#203858](https://github.com/llvm/llvm-project/issues/203858) — `scf::loopUnrollByFactor` asserisce
+  `expected constant loop bound`: un trip count statico non implica bound costanti (`Utils.cpp:404`).
+- [#216225](https://github.com/llvm/llvm-project/issues/216225) — `VectorToSCF` asserisce invece di
+  rinunciare quando non c'e' un `AutomaticAllocationScope` intorno (`VectorToSCF.cpp:290`).
+
 Monitor: `~/.cache/watch_upstream.sh` sorveglia tutte e 5 (commenti di terzi, review via GraphQL,
-commenti inline, stato, CI per ramo). Stato in `~/.cache/upstream_state`.
+commenti inline, stato, CI per ramo). Stato in `~/.cache/upstream_state`. Il log va collegato al
+tool `Monitor` con `tail -F`, altrimenti gli eventi restano in un file che nessuno legge: e'
+successo, vedi `docs/memory/never-poll-a-job-you-cant-see.md`.
 
 ---
 

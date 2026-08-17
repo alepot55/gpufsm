@@ -19,3 +19,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [LLVM obbliga a dichiarare l'AI](llvm-requires-ai-disclosure.md) — policy di ammissibilita': dichiarazione nella PR + un umano che sappia difendere la patch.
 - [Mai aspettare un lavoro che non vedi](never-poll-a-job-you-cant-see.md) — git su volume di rete striscia, e il ciclo di attesa su un file mai scritto brucia ore in silenzio.
 - [Verificare eseguendo, non col timbro dell'agente](verify-by-running-not-by-agent-verdict.md) — il revisore avversariale ne ha confermati 10 su 11; eseguendoli, 2 su 7 erano falsi.
+- [PR LLVM: corte e distanziate](llvm-pr-register-short-and-staggered.md) — la prima parola di un maintainer sulla nostra prima PR revisionata è stata "slop"; 4 PR in 29 secondi è la firma di chi scarica volume.
+- [Progetti OSS misurati (ago 2026)](oss-targets-measured-2026-08.md) — sette progetti sugli stessi numeri: restare su LLVM, riserva wasmtime, e il numero che squalifica ciascun altro.

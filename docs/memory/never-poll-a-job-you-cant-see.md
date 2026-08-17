@@ -19,9 +19,18 @@ background su `run3.log` e poi aspettava con
 fallita (`git checkout -f <sha>` -> rc 128, il commit non c'era nel clone parziale), quindi il file
 restava vuoto e ogni chiamata bruciava 9 minuti. Ripetuta quattro volte.
 
+**3. L'allarme che scrive dove nessuno legge.** La stessa sera, il watcher delle PR ha **funzionato
+benissimo**: ha registrato il commento del maintainer, la review, il commento inline e la replica
+del secondo revisore. Nessuno se ne e' accorto, perche' era stato lanciato con
+`nohup ... > watch_upstream.log 2>&1 & disown`, cioe' staccato cosi' bene che il suo output finiva
+in un file che nessuno apriva. La notizia piu' importante della sessione e' rimasta ferma li' per
+ore, e io ho continuato a dire che il monitor era armato. Era vero, e non serviva a niente.
+
 **Why:** e' la stessa famiglia dei 42 shell `sleep 3500` orfani del giorno prima. Un osservatore che
 fallisce in silenzio e' peggio di nessun osservatore: e' indistinguibile dalla calma, e nessuno va a
-controllare una cosa che sembra star lavorando.
+controllare una cosa che sembra star lavorando. Il caso 3 e' il piu' insidioso dei tre, perche' li'
+il rilevatore era corretto: mancava solo l'ultimo pezzo di filo, quello che porta il segnale a un
+essere umano. **Un rilevatore senza destinatario non e' un allarme, e' un registro.**
 
 **How to apply:**
 
@@ -36,6 +45,15 @@ controllare una cosa che sembra star lavorando.
   ucciderlo: gli si dice cosa e' successo e conclude con la confidenza giusta.
 - Diagnosi rapida di un workflow fermo: `comm -23` tra gli `agentId` con evento `started` e quelli
   con qualsiasi altro evento nel `journal.jsonl` da' subito chi non ha mai chiuso.
+- **Un osservatore va collegato al tool `Monitor`, non a `nohup`.** Ogni riga di stdout diventa una
+  notifica in conversazione. La forma che funziona: il watcher continua a girare per conto suo e
+  scrive nel log, e `Monitor` fa `tail -n 0 -F` su quel log.
+- **Mettere una guardia sulla guardia.** Il watcher riscrive `~/.cache/upstream_state` a ogni giro;
+  il monitor controlla l'eta' di quel file e urla se supera ~25 minuti. Cosi' distingue "nessuna
+  novita'" da "sorveglianza morta", che e' l'ambiguita' che ci e' costata la serata.
+- ⚠️ `pkill -f <pattern>` **uccide anche la shell che lo esegue**, perche' il pattern compare nella
+  sua stessa riga di comando: sintomo, exit code 144 e comando che sembra fallire senza motivo.
+  Trovare prima i PID con `pgrep`, poi uccidere per numero.
 
 Vedi [[modal-gpu-harness-gotchas]] per le altre trappole dell'harness e
 [[verify-by-running-not-by-agent-verdict]] per perche' l'esecuzione resta l'unico giudice.
