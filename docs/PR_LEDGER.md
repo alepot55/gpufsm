@@ -31,15 +31,17 @@ poi la pagina pubblica della PR per lo stato esatto.
 
 ## A. Upstream `triton-lang/triton` — l'unico contributo esterno che conta
 
-Score: **1 mergiata, 4 aperte (#10766, #11323, #11324, #11325), 4 chiuse + 1 RFC chiusa**, piu' 2 issue
-aperte da noi (#11326, #11328). Ri-verificato il 16 ago ore 09:42: nessuna reazione di maintainer su
-nessuna delle tre PR nuove; #11325 `mergeable_state: blocked` come le altre (CI da approvare a mano).
+Score: **1 mergiata, 3 aperte (#10766, #11324, #11325), 5 chiuse + 1 RFC chiusa**, piu' 2 issue
+aperte da noi (#11326, #11328). **17 ago 10:21: primo scambio tecnico con un maintainer.** Jokeren ha chiuso #11323 come
+"micro optimization" dopo averne discusso con @jeffniu-openai. La patch era corretta (verificato in
+`WarpSpecializeUtility.cpp:555-559`: le due barriere sono incondizionate), il valore no — e lo
+dicevamo noi stessi nella PR. #11324 e #11325 restano aperte e `blocked`.
 
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
 | [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Do not compare subslice offsets across different shapes` | 16 ago | **APERTA** — barriera **mancante** (bug di correttezza), test che fallisce senza patch, 0 regressioni | in attesa |
 | [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | **APERTA** — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | in attesa |
-| [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **APERTA**, CI da approvare, review chiesta a Jokeren+ptillet | in attesa |
+| [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **CHIUSA** 17 ago — "micro optimization" (Jokeren + jeffniu-openai). Patch corretta, valore marginale: non cambiava il codice generato, e lo dicevamo noi | Jokeren |
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
 | [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
 | [#10780](https://github.com/triton-lang/triton/pull/10780) | `[DOCS] Precompute the stages-inspection key/hash in the plugin examples` | 2 lug | **APERTA**, contestata, CI da approvare | CRobeck ha obiettato |
@@ -266,3 +268,53 @@ Il collo di bottiglia e' l'attenzione dei revisori, non la nostra produzione.
    (cliff 16×), la capability→cost map con la primitiva mancante nominata (scalar-gather-in-tile), la
    validazione cross-arch su A100 e i risultati negativi tenuti (worklist compatto, shared-mem inerte,
    cost model non predittivo per Triton).
+
+---
+
+## 17-18 ago 2026 — la review si apre
+
+Verificato con `gh api` il 18 ago 08:00 CEST.
+
+| PR | diff | stato | ultima mossa |
+|---|---|---|---|
+| [#11324](https://github.com/triton-lang/triton/pull/11324) | +22/-1 | aperta, CI da approvare sull'ultimo commit | 4 richieste di Jokeren evase |
+| [#11325](https://github.com/triton-lang/triton/pull/11325) | +115/-3 | aperta | riscritta sull'obiezione di Jokeren |
+| [#10766](https://github.com/triton-lang/triton/pull/10766) | +75/-1 | aperta, sbloccata | test di #9147 ripristinato |
+| [#11323](https://github.com/triton-lang/triton/pull/11323) | — | **chiusa** | "this seems like a micro optimization" |
+| [#11326](https://github.com/triton-lang/triton/issues/11326), [#11328](https://github.com/triton-lang/triton/issues/11328) | — | issue aperte | nessun triage |
+
+### #11324 — quattro giri di review
+
+Da +81/-4 a **+2/-1** di codice (+22/-1 col test). Ogni giro ha tolto qualcosa:
+
+1. *"You can just include `WarpYieldOp` and `WarpReturnOp` in `containsLocalBarrier` and remove
+   comments"* → la sua versione era **migliore e la nostra incompleta**: `WarpReturnOp` emette la
+   stessa barriera e non la coprivamo. Effetto **raddoppiato**: 2016 → 1956 bar.sync (era 1986).
+2. *"Why adding an empty new line?"* → rimossa, il secondo hunk sparisce.
+3. *"Remove this test as well"* → rimosso, segnalando cosa restava scoperto.
+4. *"your test checks nothing"* → **aveva torto**: mostrato l'IR prima/dopo dove la barriera sparisce.
+   Ha risposto *"OK, let's add back the test ... and leave a comment before the test"*. Rimesso.
+
+**Numeri corretti in pubblico**: i 2356/2326 pubblicati su #11323 erano mal contati. E il benchmark
+era sul kernel sbagliato (`matmul_tma_ws_kernel`, dove la WS gira una volta per programma);
+rifatto su `matmul_tma_persistent_ws_kernel`: sempre rumore (−0.48%..+0.26%).
+
+### #11325 — riscritta tre volte
+
+1. confronto di **forme** → mezza correzione: un `reinterpret` che cambia solo il tipo elemento
+   lascia la forma uguale (trovato da un red-team, **verificato**: 0 barriere prima e dopo).
+2. identita' del **valore** sorgente → Jokeren: *"I don't think this is the right fix"*, due
+   `reinterpret` identici sono valori diversi → **falso positivo** su zone disgiunte. Confermato.
+3. **tipo** della sorgente → corregge entrambi i bug **e** tiene la precisione nel suo caso, che e'
+   ora un test. Costo: **0 barriere aggiunte** su 107 kernel (2203 = 2203).
+
+### #10766 — perche' era ferma sei settimane
+
+Due difetti nostri, non loro: la PR aveva **svuotato** il test di regressione di #9147 (4 `CHECK`
+sostituite da `CHECK-NOT`), e il thread di review di peterbell10 era stato **chiuso da noi** senza
+mai rispondergli — dal suo lato risultava sistemato.
+
+Il 17 ago avevo anche scritto che *non era possibile* salvare il test. Falso: nome SSA invalido nel
+mio IR di prova (`%0b`), errore su stderr soppresso. Il 18 ago, con un nome valido, funziona:
+`arith.addf` fra `join` e `split` blocca il fold, le 4 verifiche tornano, passa con e senza la PR.
+Vedi `docs/memory/empty-output-is-not-a-result.md`.
