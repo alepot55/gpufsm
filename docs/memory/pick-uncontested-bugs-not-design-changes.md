@@ -29,6 +29,13 @@ la cosa sbagliata: la perseveranza invece della selezione del bersaglio. Il dato
 4. **Controllare che il residuo esista davvero** prima di innamorarsi della descrizione: su IREE
    #20602 due terzi del lavoro erano gia' fatti upstream e il resto si mergiava in un altro repo.
 
+**Controprova del 18 ago 2026, nello stesso giorno e sugli stessi due progetti.** Su LLVM abbiamo
+6 PR aperte, tutte da crash/miscompile/violazioni del verificatore: **14 rilievi ricevuti, ZERO
+sulla sostanza**, una gia' con 2 approvazioni e CI verde. Su Triton, nello stesso giorno, la PR
+#11323 e' stata chiusa da un maintainer con *"discussed with @jeffniu-openai and this seems like a
+micro optimization"* — era un'**ottimizzazione**, cioe' proprio la categoria in cui serve che un
+umano sia d'accordo. Il criterio non e' una teoria: e' la differenza fra le due colonne.
+
 Corollario sul CV: il conteggio delle PR e' la metrica sbagliata. Una cosa sostanziale verificabile
 vale piu' di dieci aperte. Vedi [[upstream-contribution-method]] per il metodo di verifica, e
 [[triton-rejects-trivial-prs]] per la soglia di questi maintainer.
