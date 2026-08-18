@@ -1,0 +1,18 @@
+[Unit]
+Description=gpufsm: watcher reattivo sulle PR upstream (Triton + LLVM)
+Documentation=file:///home/alepot55/Desktop/projects/gpufsm/docs/memory/scheduled-watchers.md
+After=network-online.target
+
+[Service]
+Type=simple
+# Shell di LOGIN apposta: e' cosi' che GITHUB_TOKEN entra nel processo senza copiarlo in un file.
+ExecStart=/bin/bash -lc 'exec bash /home/alepot55/Desktop/projects/gpufsm/tools/watch/upstream.sh'
+StandardOutput=append:%h/.claude/gpufsm-watch/events.log
+StandardError=append:%h/.claude/gpufsm-watch/events.log
+Restart=always
+RestartSec=30
+# Se l'API GitHub e' giu' per un'ora, non deve entrare in restart-loop stretto.
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=default.target
