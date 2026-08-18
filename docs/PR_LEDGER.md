@@ -209,7 +209,7 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 
 | PR | cosa | stato al 18 ago |
 |---|---|---|
-| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | **2 APPROVAZIONI** (FedericoBruzzone, **gysit**), **CI VERDE**, `MERGEABLE`. Attende `Jianhui-Li`. head `25bc85138` |
+| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | **3 APPROVAZIONI** (FedericoBruzzone, gysit, **Jianhui-Li** il 18 ago). Ultimo nit (`c` -> `multiple`) applicato, head `ab541fe1e`. **Nessun revisore mancante: chiesto il landing**, non abbiamo commit access |
 | [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | LGTM % nits; 6 suggerimenti applicati e spinti, head `5a4138d5a` |
 | [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
 | [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
