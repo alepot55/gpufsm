@@ -26,4 +26,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Un output vuoto non e' un risultato](empty-output-is-not-a-result.md) — controllare stderr prima di concludere "non si puo' fare".
 - [I watcher upstream, fuori dalla repo](scheduled-watchers.md) — due livelli su 11 thread Triton+LLVM: il Monitor muore con la sessione, il cron no.
 - [L'ultimo che ha parlato non e' un criterio](last-speaker-is-not-a-criterion.md) — usato per capire di chi fosse la palla: tre falsi positivi su tre.
+- [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
 
