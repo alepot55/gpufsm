@@ -24,5 +24,7 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Rispondere ai revisori subito](answer-reviewers-immediately.md) — tenere ferme le repliche in attesa di un ok e' costato 7 ore; la policy chiede un umano responsabile, non che digiti lui.
 - [Dinamica di review upstream](upstream-review-dynamics.md) — cosa sblocca una PR ferma, e quando contraddire un maintainer.
 - [Un output vuoto non e' un risultato](empty-output-is-not-a-result.md) — controllare stderr prima di concludere "non si puo' fare".
-- [Tre watcher schedulati, fuori dalla repo](scheduled-watchers.md) — review upstream, deadline ASPLOS, gate notturno: dove vivono e perché sono report-only.
+- [I watcher upstream, fuori dalla repo](scheduled-watchers.md) — due livelli su 11 thread Triton+LLVM: il Monitor muore con la sessione, il cron no.
+- [L'ultimo che ha parlato non e' un criterio](last-speaker-is-not-a-criterion.md) — usato per capire di chi fosse la palla: tre falsi positivi su tre.
+- [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
 
