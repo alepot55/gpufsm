@@ -1,34 +1,23 @@
 # I watcher upstream, e perché stanno fuori dalla repo
 
-Dal 18 ago 2026 la sorveglianza delle PR upstream è automatica, su **tre livelli**. Niente di tutto
+Dal 18 ago 2026 la sorveglianza delle PR upstream è automatica, su **due livelli**. Niente di tutto
 questo sta nella repo: vive sotto `~/.claude/`, quindi è **per-macchina** e su un altro PC non
 esiste (come tutto ciò che sta lì — vedi [[memory-lives-in-the-repo]]). Questa nota esiste perché
 altrimenti in una sessione futura i watcher sono invisibili: te ne accorgi solo quando arriva una
 notifica, o peggio quando *non* arriva.
 
-## Livello 0 — il daemon: `gpufsm-watch.service`
+## Il lock: un solo poller alla volta
 
-Lo script gira come **servizio utente systemd**, non come processo della sessione:
-unit versionata in `tools/watch/gpufsm-watch.service`, installata in
-`~/.config/systemd/user/`, `Restart=always`, output in append su
-`~/.claude/gpufsm-watch/events.log`. `loginctl enable-linger alepot55` è attivo, quindi sopravvive
-anche al logout.
+`Monitor` e cron eseguono lo **stesso** script e condividono `since`. Se pollano insieme se lo
+sovrascrivono a vicenda e gli eventi in mezzo spariscono senza traccia. Un `flock` non bloccante su
+`~/.claude/gpufsm-watch/.poller.lock` risolve: chi arriva secondo stampa `[SKIP]` ed esce con
+`rc=0`, che e' la cosa giusta perche' significa che qualcun altro sta gia' guardando.
 
-Esiste per una ragione misurata: **il `Monitor` muore con la sessione, ed è morto tre volte in un
-pomeriggio** (18 ago 2026). Finché il polling stava dentro il `Monitor`, ogni chiusura apriva un buco
-cieco di durata arbitraria. Ora il daemon polla sempre e il `Monitor` si limita a
-`tail -n 0 -F events.log`: riarmarlo costa nulla e **gli eventi arrivati fra una sessione e l'altra
-restano nel log**, non si perdono.
-
-Corollario operativo: **non lanciare mai lo script a mano mentre il servizio gira.** Condividono
-`since`, e due poller se lo sovrascrivono a vicenda perdendo eventi. Per un giro manuale:
-`systemctl --user stop gpufsm-watch` prima.
-
-Il token: l'unit usa `ExecStart=/bin/bash -lc ...` di proposito. Una shell di login legge
-`GITHUB_TOKEN` dall'ambiente dell'utente, così il segreto **non viene copiato** in un
-`EnvironmentFile` né nell'unit ([[laptop-tokens-in-env]]).
-
-Comandi: `systemctl --user {status,restart,stop} gpufsm-watch` · log: `tail -f ~/.claude/gpufsm-watch/events.log`
+Provato anche un **servizio systemd utente** che facesse da poller permanente (18 ago 2026):
+funzionava, ma e' stato smontato per scelta esplicita di tenere Claude Desktop aperto e restare su
+`Monitor` semplici. Se un giorno il buco fra le sessioni tornasse a dare fastidio, la strada era
+quella: unit con `Restart=always`, `ExecStart=/bin/bash -lc` (una shell di login eredita
+`GITHUB_TOKEN` senza copiarlo in un `EnvironmentFile`) e `loginctl enable-linger`.
 
 ## Livello 1 — lo script: `tools/watch/upstream.sh`
 
@@ -88,6 +77,23 @@ l'idea del push.
 Nessun livello posta, pusha, apre PR o sottomette. È deliberato: rispondere a un revisore e premere
 SUBMIT sono **decisioni**, non passi operativi, e [[be-autonomous-no-confirmations]] copre i secondi,
 non le prime.
+
+## ⚠️ Esiste una seconda famiglia di watcher, in `~/.cache/`
+
+`watch_asplos.sh`, `watch_triton.sh`, `watch_llvm.sh`, `watch_upstream.sh`: scritti da **sessioni
+parallele**, non da questa. `~/.cache/watch_upstream.sh` è nato alle 11:42 del 18 ago, sei minuti
+prima di quello in `tools/watch/`, e fa in gran parte la stessa cosa. Nessuno di loro era vivo al
+controllo delle 15:30 (log a 0 byte, nessun processo, nessun crontab): erano processi di sessione,
+morti con la sessione che li aveva lanciati.
+
+Prima di scrivere un watcher nuovo, **guardare lì**. `watch_asplos.sh` in particolare è migliore di
+quanto scriverei da zero: sorveglia la pagina del CFP invece di indovinare l'URL HotCRP, tiene un
+elenco dei link già visti, ha un secondo segnale testuale indipendente dai link, e un file di
+heartbeat perché "il silenzio del log è indistinguibile dalla morte dello script" — un guasto che
+era già costato una serata. È quello armato oggi per ASPLOS.
+
+Da consolidare: o si portano in `tools/watch/` come si è fatto con `upstream.sh`, o si cancellano.
+Due stack che sorvegliano le stesse cose sono il modo di credersi coperti mentre nessuno guarda.
 
 ## Dettagli che si pagano se si dimenticano
 

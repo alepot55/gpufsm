@@ -31,6 +31,16 @@ llvm/llvm-project:216854
 llvm/llvm-project:216852
 "
 
+# Un solo poller alla volta. Monitor e cron condividono "since": se pollano insieme se lo
+# sovrascrivono a vicenda e gli eventi in mezzo spariscono. Chi arriva secondo non fa niente --
+# e va bene cosi', perche' vuol dire che qualcun altro sta gia' guardando.
+LOCK="$STATE/.poller.lock"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "[SKIP] un altro poller ha gia' il lock: questo giro non serve" >&2
+  exit 0
+fi
+
 [ -f "$SINCE_FILE" ] || date -u +%Y-%m-%dT%H:%M:%SZ >"$SINCE_FILE"
 [ -f "$CI_FILE" ] || : >"$CI_FILE"
 if [ ! -f "$OPEN_FILE" ]; then
