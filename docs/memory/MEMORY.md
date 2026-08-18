@@ -28,5 +28,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [L'ultimo che ha parlato non e' un criterio](last-speaker-is-not-a-criterion.md) — usato per capire di chi fosse la palla: tre falsi positivi su tre.
 - [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
 - [Autorizzazione permanente ad agire upstream](standing-authorization-to-act-upstream.md) — rispondere e pushare senza chiedere; il SUBMIT del paper resta suo.
-- [Niente em dash, e il registro di chi legge](no-em-dash-match-their-register.md): corretto a mano un mio commento upstream: l'em dash e' una firma, e a chi scrive sei parole non si risponde con un paragrafo.
+- [Verso l esterno: em dash e registro](no-em-dash-match-their-register.md) — em dash vietato solo fuori, e a chi scrive nove parole non si risponde con sessanta.
 
