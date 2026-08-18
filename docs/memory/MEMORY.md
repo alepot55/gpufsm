@@ -21,3 +21,4 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Verificare eseguendo, non col timbro dell'agente](verify-by-running-not-by-agent-verdict.md) — il revisore avversariale ne ha confermati 10 su 11; eseguendoli, 2 su 7 erano falsi.
 - [PR LLVM: corte e distanziate](llvm-pr-register-short-and-staggered.md) — la prima parola di un maintainer sulla nostra prima PR revisionata è stata "slop"; 4 PR in 29 secondi è la firma di chi scarica volume.
 - [Progetti OSS misurati (ago 2026)](oss-targets-measured-2026-08.md) — sette progetti sugli stessi numeri: restare su LLVM, riserva wasmtime, e il numero che squalifica ciascun altro.
+- [Rispondere ai revisori subito](answer-reviewers-immediately.md) — tenere ferme le repliche in attesa di un ok e' costato 7 ore; la policy chiede un umano responsabile, non che digiti lui.
