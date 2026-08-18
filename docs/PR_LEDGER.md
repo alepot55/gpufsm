@@ -248,6 +248,17 @@ Fatto in risposta (18 ago, ~01:00):
 ⚠️ **Non aprire la sesta PR** finche' queste cinque non sono pulite e risposte: il collo di
 bottiglia e' la capacita' di revisione, non la nostra produzione.
 
+### 18 ago: #216851 a due approvazioni e CI sbloccata
+
+`gysit` (Tobias Gysi, manutentore MLIR) ha approvato: *"Thanks for the fix. LGTM"*. E' uno dei due
+nomi che `FedericoBruzzone` aveva chiesto di attendere. Stato: **2 approvazioni**, `mergeable=MERGEABLE`,
+e la CI e' stata **sbloccata a mano**: `Check code formatting` e `Check LLVM ABI annotations` passate,
+`CI Checks` in coda. Manca `Jianhui-Li`.
+
+Nota metodologica: il conteggio dei run per ramo NON dice se la CI e' sbloccata, perche' ogni push ne
+crea di nuovi in `action_required` e la finestra ne mostra 8. Guardare i NOMI dei workflow e il loro
+esito, non i conteggi. Mi ci sono sbagliato una volta in entrambe le direzioni.
+
 ### 18 ago: prima APPROVAZIONE su LLVM (#216851)
 
 `FedericoBruzzone` (**MEMBER** dell'org LLVM, 18 PR mergiate) ha approvato dopo tre giri di
