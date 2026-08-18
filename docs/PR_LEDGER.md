@@ -214,10 +214,30 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 | [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
 | [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | appena aperta, `Fixes #216225` |
 
-**In riserva, verificato ma NON implementato:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
-`scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`): un trip count
-statico non implica estremi costanti. Riprodotto (`rc=134`). Issue aperta, non assegnata.
+**In riserva, IMPLEMENTATA E VERIFICATA, non ancora aperta:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
+`scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'
+piu' largo di come lo descrive la segnalazione: `constantTripCount` risponde su **tre** strade in cui
+gli estremi NON sono costanti, e la funzione le legge tutte come costanti.
+
+1. `lb == ub` (stesso Value) -> 0 iterazioni;
+2. `lb == 0` e `ub == step` -> 1 iterazione;
+3. `ub` offset costante da un `lb` non costante (via `computeUbMinusLb`, richiede `nsw`).
+
+Fix (10 righe): si imbocca il ramo costante solo se **tutti e tre** gli estremi lo sono, altrimenti si
+cade sul percorso dinamico gia' esistente, che li gestisce correttamente. Gli altri due chiamanti di
+`getStaticTripCount` in quel file usano solo il conteggio, mai gli estremi: il difetto e' confinato.
+
+- Worktree `~/.cache/llvmwt/wt-unroll`, ramo `scf-unroll-nonconstant-bounds`, commit `2d8ed2135`,
+  base `da1fb5cf9`. Test: 3 casi in `mlir/test/Dialect/SCF/loop-unroll.mlir`, uno per strada.
+- Verificato ai due estremi **allo stesso ref**: baseline `rc=134` su tutti e tre i repro; con la patch
+  `rc=0` e IR dinamico corretto (conteggi 0, 1, 4 con fattore 2, controllati a mano). Il file di test
+  **fallisce** sull'albero baseline e **passa** su quello patchato.
+- Regressione: 343 test scoperti (SCF 45, Affine 72, Vector 101, MemRef 33, Transforms 92), tutti verdi.
+  L'unico XFAIL (`parallel-loop-invalid.mlir`) e' identico sul baseline, quindi preesistente.
+- `clang-format` pulito sul file intero. Nessuna PR duplicata (ricontrollare comunque prima di aprire).
+
 Regola: **non aprire la settima finche' una delle sei non atterra** ([[llvm-pr-register-short-and-staggered]]).
+Il collo di bottiglia e' l'attenzione dei revisori, non la nostra produzione.
 
 ### Infrastruttura, per non ricostruirla
 
