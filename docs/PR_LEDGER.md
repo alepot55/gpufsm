@@ -212,3 +212,53 @@ periodo nelle PR non lo trova: sta in `git log`, in `docs/TACO_*`, `docs/PPOPP_P
    (cliff 16×), la capability→cost map con la primitiva mancante nominata (scalar-gather-in-tile), la
    validazione cross-arch su A100 e i risultati negativi tenuti (worklist compatto, shared-mem inerte,
    cost model non predittivo per Triton).
+
+---
+
+## 17-18 ago 2026 — la review si apre
+
+Verificato con `gh api` il 18 ago 08:00 CEST.
+
+| PR | diff | stato | ultima mossa |
+|---|---|---|---|
+| [#11324](https://github.com/triton-lang/triton/pull/11324) | +22/-1 | aperta, CI da approvare sull'ultimo commit | 4 richieste di Jokeren evase |
+| [#11325](https://github.com/triton-lang/triton/pull/11325) | +115/-3 | aperta | riscritta sull'obiezione di Jokeren |
+| [#10766](https://github.com/triton-lang/triton/pull/10766) | +75/-1 | aperta, sbloccata | test di #9147 ripristinato |
+| [#11323](https://github.com/triton-lang/triton/pull/11323) | — | **chiusa** | "this seems like a micro optimization" |
+| [#11326](https://github.com/triton-lang/triton/issues/11326), [#11328](https://github.com/triton-lang/triton/issues/11328) | — | issue aperte | nessun triage |
+
+### #11324 — quattro giri di review
+
+Da +81/-4 a **+2/-1** di codice (+22/-1 col test). Ogni giro ha tolto qualcosa:
+
+1. *"You can just include `WarpYieldOp` and `WarpReturnOp` in `containsLocalBarrier` and remove
+   comments"* → la sua versione era **migliore e la nostra incompleta**: `WarpReturnOp` emette la
+   stessa barriera e non la coprivamo. Effetto **raddoppiato**: 2016 → 1956 bar.sync (era 1986).
+2. *"Why adding an empty new line?"* → rimossa, il secondo hunk sparisce.
+3. *"Remove this test as well"* → rimosso, segnalando cosa restava scoperto.
+4. *"your test checks nothing"* → **aveva torto**: mostrato l'IR prima/dopo dove la barriera sparisce.
+   Ha risposto *"OK, let's add back the test ... and leave a comment before the test"*. Rimesso.
+
+**Numeri corretti in pubblico**: i 2356/2326 pubblicati su #11323 erano mal contati. E il benchmark
+era sul kernel sbagliato (`matmul_tma_ws_kernel`, dove la WS gira una volta per programma);
+rifatto su `matmul_tma_persistent_ws_kernel`: sempre rumore (−0.48%..+0.26%).
+
+### #11325 — riscritta tre volte
+
+1. confronto di **forme** → mezza correzione: un `reinterpret` che cambia solo il tipo elemento
+   lascia la forma uguale (trovato da un red-team, **verificato**: 0 barriere prima e dopo).
+2. identita' del **valore** sorgente → Jokeren: *"I don't think this is the right fix"*, due
+   `reinterpret` identici sono valori diversi → **falso positivo** su zone disgiunte. Confermato.
+3. **tipo** della sorgente → corregge entrambi i bug **e** tiene la precisione nel suo caso, che e'
+   ora un test. Costo: **0 barriere aggiunte** su 107 kernel (2203 = 2203).
+
+### #10766 — perche' era ferma sei settimane
+
+Due difetti nostri, non loro: la PR aveva **svuotato** il test di regressione di #9147 (4 `CHECK`
+sostituite da `CHECK-NOT`), e il thread di review di peterbell10 era stato **chiuso da noi** senza
+mai rispondergli — dal suo lato risultava sistemato.
+
+Il 17 ago avevo anche scritto che *non era possibile* salvare il test. Falso: nome SSA invalido nel
+mio IR di prova (`%0b`), errore su stderr soppresso. Il 18 ago, con un nome valido, funziona:
+`arith.addf` fra `join` e `split` blocca il fold, le 4 verifiche tornano, passa con e senza la PR.
+Vedi `docs/memory/empty-output-is-not-a-result.md`.

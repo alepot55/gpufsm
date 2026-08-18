@@ -110,9 +110,20 @@ un draft salvato non conta.
 
 ### Upstream Triton
 
-1 PR mergiata (#11311), 4 aperte (#11325, #11324, #11323, #10766), 2 issue (#11326, #11328).
-Il merge dipende da un maintainer che approvi la CI. Non pushare; rispondere in fretta ai
-commenti. Dettagli e metodo: `docs/PR_LEDGER.md`, `docs/memory/upstream-contribution-method.md`.
+**Stato 18 ago 2026:** 1 mergiata (#11311), 3 aperte, 1 chiusa (#11323, "micro optimization"),
+2 issue. **La review si e' aperta il 17 ago**: Jokeren ha lasciato 4 richieste su #11324, tutte
+evase, e una obiezione su #11325 che ha portato a riscrivere il criterio.
+
+| | cosa | stato |
+|---|---|---|
+| #11324 | i terminatori di `warp_specialize` come sync point | +22/-1, 4 richieste evase, CI verde sulla sostanza |
+| #11325 | barriera **mancante**: offset di subslice fra frame diversi | riscritta 3 volte, ultima sul **tipo** della sorgente |
+| #10766 | fold split/join, da luglio | **sbloccata il 18 ago**: il test svuotato e' stato ripristinato |
+| #11326, #11328 | barriere mancanti (chiamata, cluster multicast) | issue con riproduttori, nessun triage |
+
+⚠️ **Non pushare senza motivo** (azzera la coda di approvazione CI), ma **una richiesta del
+maintainer e' un motivo**: risponde in ore, non in giorni. Rispondere **dentro** il thread inline.
+Metodo: `docs/memory/upstream-review-dynamics.md`, `docs/PR_LEDGER.md`.
 
 ### Storico
 
