@@ -16,3 +16,4 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Trappole dell'harness Modal](modal-gpu-harness-gotchas.md) — rc=0 non vuol dire che abbia eseguito i tuoi comandi.
 - [Triton chiude le PR "trivial"](triton-rejects-trivial-prs.md) — conta l'impatto misurato, non la dimensione; la coda issue è satura.
 - [Dinamica di review upstream](upstream-review-dynamics.md) — cosa sblocca una PR ferma, e quando contraddire un maintainer.
+- [Un output vuoto non e' un risultato](empty-output-is-not-a-result.md) — controllare stderr prima di concludere "non si puo' fare".
