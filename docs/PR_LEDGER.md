@@ -248,6 +248,16 @@ Fatto in risposta (18 ago, ~01:00):
 ⚠️ **Non aprire la sesta PR** finche' queste cinque non sono pulite e risposte: il collo di
 bottiglia e' la capacita' di revisione, non la nostra produzione.
 
+### 18 ago: prima APPROVAZIONE su LLVM (#216851)
+
+`FedericoBruzzone` (**MEMBER** dell'org LLVM, 18 PR mergiate) ha approvato dopo tre giri di
+`suggestion`, **tutti e tre per accorciare un commento**. Nessuna obiezione tecnica alla correzione
+in nessun giro. Applicati verbatim, piu' il test del ramo scalabile. Head `25bc85138`.
+
+⚠️ **Non e' mergiabile ancora**: lui stesso ha chiesto di aspettare `@Jianhui-Li` e `@gysit`, e la
+CI resta in `action_required` (sblocco manuale, fuori dal nostro controllo). Lo stato
+`CHANGES_REQUESTED` intermedio aveva corpo vuoto: era solo il veicolo di un nit, non un'obiezione.
+
 ### 18 ago: primo LGTM (#216851)
 
 `FedericoBruzzone`: *"Thanks for the fix @alepot55! LGTM % nits, but please wait for
