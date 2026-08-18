@@ -198,106 +198,41 @@ periodo nelle PR non lo trova: sta in `git log`, in `docs/TACO_*`, `docs/PPOPP_P
 
 ---
 
-## B-bis. Upstream `llvm/llvm-project` — 5 PR aperte (17 ago 2026)
+## B-bis. Upstream `llvm/llvm-project` — 6 PR aperte (stato: 18 ago 2026, mattina)
 
-Bersaglio scelto col criterio di `docs/memory/pick-uncontested-bugs-not-design-changes.md`: solo
-bug a cui risponde una macchina (crash, verificatore, output sbagliato), mai modifiche di disegno.
+Bersagli scelti col criterio di [[pick-uncontested-bugs-not-design-changes]]: **solo** bug a cui
+risponde una macchina. Su **14 rilievi ricevuti, ZERO toccano la sostanza** di una correzione: sono
+tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Triton la PR #11323
+(un'*ottimizzazione*) e' stata chiusa con "this seems like a micro optimization".
 
-| PR | cosa | giudice | stato |
-|---|---|---|---|
-| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora i valori catturati dalle regioni | verificatore di dominanza | aperta dal 16 ago, CI in attesa di approvazione |
-| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg va in crash su `memref<0xf32>` | assert in `VectorType::get` | aperta |
-| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` fra i dialetti dipendenti (1 riga) | `LLVM ERROR` su IR valido | aperta |
-| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde gli iter_arg di cicli diversi | output sbagliato | aperta, `Fixes #216289` |
-| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `vector.multi_reduction` non valida `reduction_dims` | verificatore + scrittura fuori array | aperta |
+| PR | cosa | stato al 18 ago |
+|---|---|---|
+| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | **2 APPROVAZIONI** (FedericoBruzzone, **gysit**), **CI VERDE**, `MERGEABLE`. Attende `Jianhui-Li`. head `25bc85138` |
+| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | LGTM % nits; 6 suggerimenti applicati e spinti, head `5a4138d5a` |
+| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
+| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
+| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
+| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | appena aperta, `Fixes #216225` |
 
-**Come sono state trovate e verificate.** Workflow `wf_f8e41f40-1d9` (16 agenti: 5 cercatori su
-modalita' diverse + un revisore avversariale per candidato), poi **esecuzione dei repro su
-`mlir-opt` vero**. Il revisore ne aveva confermati 10 su 11; eseguendoli, 2 su 7 erano falsi —
-vedi `docs/memory/verify-by-running-not-by-agent-verdict.md`. Ogni patch e' provata nei due versi
-(fallisce senza, passa con), 368 test verdi nei direttori toccati, `clang-format` pulito.
+**In riserva, verificato ma NON implementato:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
+`scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`): un trip count
+statico non implica estremi costanti. Riprodotto (`rc=134`). Issue aperta, non assegnata.
+Regola: **non aprire la settima finche' una delle sei non atterra** ([[llvm-pr-register-short-and-staggered]]).
 
-**Persa per due ore:** `index.cmp` con canonicalizzazione non valida. Patch pronta, ma
-[#216831](https://github.com/llvm/llvm-project/pull/216831) di `at0m741` era gia' aperta. Il nostro
-controllo doppioni cercava `"index.cmp"`, stringa assente dal titolo e dal corpo di quella PR.
-**Regola:** cercare per concetto e per simbolo, e rifare il controllo *subito prima* di pubblicare —
-l'indice di ricerca di GitHub e' in ritardo di ore sulle PR del giorno stesso, per quelle va elencato
-e filtrato per percorso di file.
+### Infrastruttura, per non ricostruirla
 
-**Concorrenza:** `hamzaqureshi5` sta lavorando la stessa lista di bug MLIR, in fretta (#216494,
-#216799 aperte lo stesso giorno). Non e' una miniera tranquilla.
-
-### Prima revisione ricevuta: 19 minuti (#216852)
-
-Il 17 ago alle 22:09, 19 minuti dopo l'apertura, **Mehdi Amini (`joker-eph`)** risponde: *"Can we
-start by please pruning the description from the slop? Second can the test be included in the
-existing canonicalize.mlir file?"*, piu' un commento inline che chiede un `CHECK` sul `cf.br`.
-Sette minuti dopo `Hardcode84` obietta sul **disegno**: le canonicalizzazioni di `scf` non
-dovrebbero creare `cf` dal nulla, servirebbe un pass dedicato.
-
-Fatto in risposta (18 ago, ~01:00):
-1. **Descrizioni tagliate su tutte e quattro**, da 2.300-4.500 caratteri a 544-1.119. Vedi
-   `docs/memory/llvm-pr-register-short-and-staggered.md`.
-2. **`CHECK` sui due `cf.br`** aggiunti dall'output reale del binario patchato, non indovinati
-   (commit `4f4b21e43`).
-3. **Risposta sul file di test misurata, non asserita:** eseguita la pipeline di `canonicalize.mlir`
-   (`builtin.module(func.func(canonicalize{test-convergence}))`) sul nostro caso → `scf.execute_region`
-   esce intatta, perche' il repro vive in `llvm.func`. Offerto di spostarlo o rinominarlo.
-4. **Concesso sull'obiezione di disegno** invece di difenderla.
-
-⚠️ **Non aprire la sesta PR** finche' queste cinque non sono pulite e risposte: il collo di
-bottiglia e' la capacita' di revisione, non la nostra produzione.
-
-### 18 ago: #216851 a due approvazioni e CI sbloccata
-
-`gysit` (Tobias Gysi, manutentore MLIR) ha approvato: *"Thanks for the fix. LGTM"*. E' uno dei due
-nomi che `FedericoBruzzone` aveva chiesto di attendere. Stato: **2 approvazioni**, `mergeable=MERGEABLE`,
-e la CI e' stata **sbloccata a mano**: `Check code formatting` e `Check LLVM ABI annotations` passate,
-`CI Checks` in coda. Manca `Jianhui-Li`.
-
-Nota metodologica: il conteggio dei run per ramo NON dice se la CI e' sbloccata, perche' ogni push ne
-crea di nuovi in `action_required` e la finestra ne mostra 8. Guardare i NOMI dei workflow e il loro
-esito, non i conteggi. Mi ci sono sbagliato una volta in entrambe le direzioni.
-
-### 18 ago: prima APPROVAZIONE su LLVM (#216851)
-
-`FedericoBruzzone` (**MEMBER** dell'org LLVM, 18 PR mergiate) ha approvato dopo tre giri di
-`suggestion`, **tutti e tre per accorciare un commento**. Nessuna obiezione tecnica alla correzione
-in nessun giro. Applicati verbatim, piu' il test del ramo scalabile. Head `25bc85138`.
-
-⚠️ **Non e' mergiabile ancora**: lui stesso ha chiesto di aspettare `@Jianhui-Li` e `@gysit`, e la
-CI resta in `action_required` (sblocco manuale, fuori dal nostro controllo). Lo stato
-`CHANGES_REQUESTED` intermedio aveva corpo vuoto: era solo il veicolo di un nit, non un'obiezione.
-
-### 18 ago: primo LGTM (#216851)
-
-`FedericoBruzzone`: *"Thanks for the fix @alepot55! LGTM % nits, but please wait for
-@Jianhui-Li @gysit"*. Due `suggestion` inline, **entrambi per accorciare un commento**: il
-secondo revisore su due che apre chiedendo meno prosa. Applicati, piu' il test del ramo
-scalabile (`vscale * 0`, la baseline asserisce) che chiude la lacuna dichiarata. Commit
-`cc5b83092`. Manca la risposta a parole, che scrive l'utente.
-
-Pronti in locale e **non spinti** (aggiungere commit non richiesti a PR in coda e' rumore):
-- `wt-coalesce` `48097f51b` — guardiano allargato al nido imperfetto. Il buco era reale:
-  `transform.loop.coalesce_nested` fondeva ancora un nido con un'operazione fra i due cicli che
-  legge l'iter_arg esterno. Provato eseguendo, non dedotto. 368 test verdi.
-
-### Riserva: 2 bug verificati e non pubblicati
-
-Trovati nella stessa caccia, riprodotti eseguendo (`rc=134`, alle righe previste), issue aperte e
-**non assegnate**, nessuna PR le cita:
-
-- [#203858](https://github.com/llvm/llvm-project/issues/203858) — `scf::loopUnrollByFactor` asserisce
-  `expected constant loop bound`: un trip count statico non implica bound costanti (`Utils.cpp:404`).
-- [#216225](https://github.com/llvm/llvm-project/issues/216225) — `VectorToSCF` asserisce invece di
-  rinunciare quando non c'e' un `AutomaticAllocationScope` intorno (`VectorToSCF.cpp:290`).
-
-Monitor: `~/.cache/watch_upstream.sh` sorveglia tutte e 5 (commenti di terzi, review via GraphQL,
-commenti inline, stato, CI per ramo). Stato in `~/.cache/upstream_state`. Il log va collegato al
-tool `Monitor` con `tail -F`, altrimenti gli eventi restano in un file che nessuno legge: e'
-successo, vedi `docs/memory/never-poll-a-job-you-cant-see.md`.
-
----
+- Worktree locali: `/home/alepot55/.cache/llvmwt/wt-{mem2reg,scfdialect,coalesce,multired,vecscf}`,
+  piu' `llvmsrc` stesso sul ramo `affine-licm-region-capture` (#216605). Base comune `d4e78d7f5`.
+  ⚠️ `llvmsrc` e i worktree sono **sparse checkout**: `git apply --check` fallisce li' per file
+  assenti, non per la patch.
+- Modal: albero `main` = baseline pulita (`7cb5d8961`), albero `fix` = tutte le patch insieme
+  (`$SCRATCH/combined4.patch`). Build: `scripts/modal_llvm.py build --tree fix --ref d4e78d7f5 --patch <p>`.
+  `python3` del venv `gpufsm`, non quello di sistema.
+- `clang-format` **c'e'**, in `~/Desktop/projects/gpufsm/.venv/bin/` (gli agenti non lo trovano).
+  Uso: `git-clang-format --diff d4e78d7f5`.
+- Monitor: `~/.cache/watch_upstream.sh` (6 PR) + tool `Monitor` che ne fa `tail -F` sul log, con
+  guardia sull'eta' di `~/.cache/upstream_state`. Vedi [[never-poll-a-job-you-cant-see]].
+- Triton **non e' nostra**: la segue un altro agente.
 
 ## C. Dove sta il valore, onestamente
 
