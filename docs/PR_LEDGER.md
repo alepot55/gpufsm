@@ -200,6 +200,62 @@ periodo nelle PR non lo trova: sta in `git log`, in `docs/TACO_*`, `docs/PPOPP_P
 
 ---
 
+## B-bis. Upstream `llvm/llvm-project` — 6 PR aperte (stato: 18 ago 2026, mattina)
+
+Bersagli scelti col criterio di [[pick-uncontested-bugs-not-design-changes]]: **solo** bug a cui
+risponde una macchina. Su **14 rilievi ricevuti, ZERO toccano la sostanza** di una correzione: sono
+tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Triton la PR #11323
+(un'*ottimizzazione*) e' stata chiusa con "this seems like a micro optimization".
+
+| PR | cosa | stato al 18 ago |
+|---|---|---|
+| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | **2 APPROVAZIONI** (FedericoBruzzone, **gysit**), **CI VERDE**, `MERGEABLE`. Attende `Jianhui-Li`. head `25bc85138` |
+| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | LGTM % nits; 6 suggerimenti applicati e spinti, head `5a4138d5a` |
+| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
+| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
+| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
+| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | appena aperta, `Fixes #216225` |
+
+**In riserva, IMPLEMENTATA E VERIFICATA, non ancora aperta:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
+`scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'
+piu' largo di come lo descrive la segnalazione: `constantTripCount` risponde su **tre** strade in cui
+gli estremi NON sono costanti, e la funzione le legge tutte come costanti.
+
+1. `lb == ub` (stesso Value) -> 0 iterazioni;
+2. `lb == 0` e `ub == step` -> 1 iterazione;
+3. `ub` offset costante da un `lb` non costante (via `computeUbMinusLb`, richiede `nsw`).
+
+Fix (10 righe): si imbocca il ramo costante solo se **tutti e tre** gli estremi lo sono, altrimenti si
+cade sul percorso dinamico gia' esistente, che li gestisce correttamente. Gli altri due chiamanti di
+`getStaticTripCount` in quel file usano solo il conteggio, mai gli estremi: il difetto e' confinato.
+
+- Worktree `~/.cache/llvmwt/wt-unroll`, ramo `scf-unroll-nonconstant-bounds`, commit `2d8ed2135`,
+  base `da1fb5cf9`. Test: 3 casi in `mlir/test/Dialect/SCF/loop-unroll.mlir`, uno per strada.
+- Verificato ai due estremi **allo stesso ref**: baseline `rc=134` su tutti e tre i repro; con la patch
+  `rc=0` e IR dinamico corretto (conteggi 0, 1, 4 con fattore 2, controllati a mano). Il file di test
+  **fallisce** sull'albero baseline e **passa** su quello patchato.
+- Regressione: 343 test scoperti (SCF 45, Affine 72, Vector 101, MemRef 33, Transforms 92), tutti verdi.
+  L'unico XFAIL (`parallel-loop-invalid.mlir`) e' identico sul baseline, quindi preesistente.
+- `clang-format` pulito sul file intero. Nessuna PR duplicata (ricontrollare comunque prima di aprire).
+
+Regola: **non aprire la settima finche' una delle sei non atterra** ([[llvm-pr-register-short-and-staggered]]).
+Il collo di bottiglia e' l'attenzione dei revisori, non la nostra produzione.
+
+### Infrastruttura, per non ricostruirla
+
+- Worktree locali: `/home/alepot55/.cache/llvmwt/wt-{mem2reg,scfdialect,coalesce,multired,vecscf}`,
+  piu' `llvmsrc` stesso sul ramo `affine-licm-region-capture` (#216605). Base comune `d4e78d7f5`.
+  ⚠️ `llvmsrc` e i worktree sono **sparse checkout**: `git apply --check` fallisce li' per file
+  assenti, non per la patch.
+- Modal: albero `main` = baseline pulita (`7cb5d8961`), albero `fix` = tutte le patch insieme
+  (`$SCRATCH/combined4.patch`). Build: `scripts/modal_llvm.py build --tree fix --ref d4e78d7f5 --patch <p>`.
+  `python3` del venv `gpufsm`, non quello di sistema.
+- `clang-format` **c'e'**, in `~/Desktop/projects/gpufsm/.venv/bin/` (gli agenti non lo trovano).
+  Uso: `git-clang-format --diff d4e78d7f5`.
+- Monitor: `~/.cache/watch_upstream.sh` (6 PR) + tool `Monitor` che ne fa `tail -F` sul log, con
+  guardia sull'eta' di `~/.cache/upstream_state`. Vedi [[never-poll-a-job-you-cant-see]].
+- Triton **non e' nostra**: la segue un altro agente.
+
 ## C. Dove sta il valore, onestamente
 
 1. **Paper** — pacchetto ASPLOS 2027 (ciclo Fall, **9 set 2026 AoE**) pronto e committato

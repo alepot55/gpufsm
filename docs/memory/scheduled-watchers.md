@@ -27,10 +27,11 @@ Il watcher Triton è quello che paga: il maintainer risponde in ore, non in gior
 ([[triton-ci-needs-maintainer-approval]]), quindi sapere *subito* cosa è arrivato decide se si pusha
 una volta sola o due.
 
-## Il livello reattivo: `~/.claude/gpufsm-watch/watch-triton.sh`
+## Il livello reattivo: `~/.cache/watch_triton.sh`
 
 12 ore di latenza sono troppe per una review che si muove in ore, quindi sopra il cron c'è un
-secondo livello: lo script qui sopra, armato con il tool `Monitor` (`persistent: true`). Fa polling
+secondo livello: lo script qui sopra (`~/.claude/gpufsm-watch/` tiene invece lo stato del
+cron), armato con il tool `Monitor` (`persistent: true`). Fa polling
 ogni 120s e **ogni riga di stdout diventa una notifica dentro la sessione in corso** — non un digest
 da leggere dopo, ma un risveglio con tutto il contesto della conversazione ancora caricato.
 

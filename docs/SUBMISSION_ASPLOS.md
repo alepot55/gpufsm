@@ -1,8 +1,17 @@
 # ASPLOS 2027 (September cycle) — submission packet
 
-**Status (14 Aug 2026, verified in a browser against the live CFP):** the paper and
-every required attachment are ready. **The submission site does not exist yet**, so
-the submission cannot be made today. See "Blocker" below.
+**Status (18 Aug 2026, re-verified against the live CFP):** the paper and every
+required attachment are ready. **The submission site still does not exist**: the CFP
+page contains exactly one HotCRP link, the closed April cycle. See "Blocker" below.
+
+A sentinel now watches for it: `~/.cache/watch_asplos.sh` fetches the CFP every three
+hours and shouts on any HotCRP link it has not seen before, plus on the CFP naming a
+September submission site. Validated in both directions (silent on today's page, fires
+on the target text) so it cannot be a blind guard. Log: `~/.cache/watch_asplos.log`.
+It dies on reboot, so **re-run it after a restart**, and do not treat its silence as
+proof on a machine that has been off.
+
+Paper conforms: 10 pages against a limit of 11.
 
 ## Venue facts (read directly from <https://www.asplos-conference.org/asplos2027/cfp/>)
 
