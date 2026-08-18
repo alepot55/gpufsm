@@ -52,9 +52,7 @@ if modal is not None:
     volume = modal.Volume.from_name(VOLUME, create_if_missing=True)
     image = (
         modal.Image.debian_slim(python_version="3.12")
-        .apt_install(
-            "git", "cmake", "ninja-build", "ccache", "clang", "lld", "zlib1g-dev", "curl"
-        )
+        .apt_install("git", "cmake", "ninja-build", "ccache", "clang", "lld", "zlib1g-dev", "curl")
         .pip_install("lit")
     )
     app = modal.App("llvm-upstream")
