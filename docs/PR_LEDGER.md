@@ -214,7 +214,7 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 | [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
 | [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
 | [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
-| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | appena aperta, `Fixes #216225` |
+| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | **APPROVATA** da FedericoBruzzone (`LGTM % nits`), 2 nit di commento applicati e spinti (`cfa881865`), risposto nei thread. Attende `banach-space` |
 
 **In riserva, IMPLEMENTATA E VERIFICATA, non ancora aperta:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
 `scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'

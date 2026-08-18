@@ -27,4 +27,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [I watcher upstream, fuori dalla repo](scheduled-watchers.md) — due livelli su 11 thread Triton+LLVM: il Monitor muore con la sessione, il cron no.
 - [L'ultimo che ha parlato non e' un criterio](last-speaker-is-not-a-criterion.md) — usato per capire di chi fosse la palla: tre falsi positivi su tre.
 - [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
+- [Autorizzazione permanente ad agire upstream](standing-authorization-to-act-upstream.md) — rispondere e pushare senza chiedere; il SUBMIT del paper resta suo.
 
