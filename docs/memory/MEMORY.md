@@ -17,3 +17,5 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Triton chiude le PR "trivial"](triton-rejects-trivial-prs.md) — conta l'impatto misurato, non la dimensione; la coda issue è satura.
 - [Dinamica di review upstream](upstream-review-dynamics.md) — cosa sblocca una PR ferma, e quando contraddire un maintainer.
 - [Un output vuoto non e' un risultato](empty-output-is-not-a-result.md) — controllare stderr prima di concludere "non si puo' fare".
+- [Tre watcher schedulati, fuori dalla repo](scheduled-watchers.md) — review upstream, deadline ASPLOS, gate notturno: dove vivono e perché sono report-only.
+
