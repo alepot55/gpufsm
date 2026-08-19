@@ -216,7 +216,8 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 | [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
 | [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | **APPROVATA** da FedericoBruzzone (`LGTM % nits`), 2 nit di commento applicati e spinti (`cfa881865`), risposto nei thread. Attende `banach-space` |
 
-**In riserva, IMPLEMENTATA E VERIFICATA, non ancora aperta:** [#203858](https://github.com/llvm/llvm-project/issues/203858)
+**APERTA il 19 ago 2026 come [#217392](https://github.com/llvm/llvm-project/pull/217392)** (era la riserva), per
+l'issue [#203858](https://github.com/llvm/llvm-project/issues/203858)
 `scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'
 piu' largo di come lo descrive la segnalazione: `constantTripCount` risponde su **tre** strade in cui
 gli estremi NON sono costanti, e la funzione le legge tutte come costanti.
@@ -229,11 +230,12 @@ Fix (10 righe): si imbocca il ramo costante solo se **tutti e tre** gli estremi 
 cade sul percorso dinamico gia' esistente, che li gestisce correttamente. Gli altri due chiamanti di
 `getStaticTripCount` in quel file usano solo il conteggio, mai gli estremi: il difetto e' confinato.
 
-- Worktree `~/.cache/llvmwt/wt-unroll`, ramo `scf-unroll-nonconstant-bounds`, commit `2d8ed2135`,
-  base `da1fb5cf9`. Test: 3 casi in `mlir/test/Dialect/SCF/loop-unroll.mlir`, uno per strada.
-- Verificato ai due estremi **allo stesso ref**: baseline `rc=134` su tutti e tre i repro; con la patch
-  `rc=0` e IR dinamico corretto (conteggi 0, 1, 4 con fattore 2, controllati a mano). Il file di test
-  **fallisce** sull'albero baseline e **passa** su quello patchato.
+- Worktree `~/.cache/llvmwt/wt-unroll`, ramo `scf-unroll-nonconstant-bounds`, **ribasato il 19 ago su
+  `0ed130af5`** (284 commit assorbiti senza conflitti), commit `86bbca689`. Test: 3 casi in `mlir/test/Dialect/SCF/loop-unroll.mlir`, uno per strada.
+- Verificato ai due estremi **allo stesso ref**, rifatto il 19 ago su `0ed130af5`: i tre repro,
+  **isolati uno per file**, danno `rc=134` sul baseline e `rc=0` con la patch. Tutte e **10 le RUN line**
+  di `loop-unroll.mlir` passano. (Isolarli conta: eseguendo il file intero si misura tre volte lo stesso
+  aborto, non le tre strade.)
 - Regressione: 343 test scoperti (SCF 45, Affine 72, Vector 101, MemRef 33, Transforms 92), tutti verdi.
   L'unico XFAIL (`parallel-loop-invalid.mlir`) e' identico sul baseline, quindi preesistente.
 - `clang-format` pulito sul file intero. Nessuna PR duplicata (ricontrollare comunque prima di aprire).
