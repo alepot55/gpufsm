@@ -209,7 +209,7 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 
 | PR | cosa | stato al 18 ago |
 |---|---|---|
-| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | **3 APPROVAZIONI** (FedericoBruzzone, gysit, **Jianhui-Li** il 18 ago). Ultimo nit (`c` -> `multiple`) applicato, head `ab541fe1e`. **Nessun revisore mancante: chiesto il landing**, non abbiamo commit access |
+| [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | ✅ **MERGIATA il 19 ago 2026 15:59Z**, commit `0ed130af5`, landing fatto da FedericoBruzzone dopo 3 approvazioni (lui, gysit, Jianhui-Li). **Prima patch LLVM atterrata.** |
 | [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | LGTM % nits; 6 suggerimenti applicati e spinti, head `5a4138d5a` |
 | [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
 | [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
@@ -237,6 +237,10 @@ cade sul percorso dinamico gia' esistente, che li gestisce correttamente. Gli al
 - Regressione: 343 test scoperti (SCF 45, Affine 72, Vector 101, MemRef 33, Transforms 92), tutti verdi.
   L'unico XFAIL (`parallel-loop-invalid.mlir`) e' identico sul baseline, quindi preesistente.
 - `clang-format` pulito sul file intero. Nessuna PR duplicata (ricontrollare comunque prima di aprire).
+
+⚠️ **GATE APERTO il 19 ago 2026**: #216851 e' atterrata, quindi la riserva #203858 si puo' aprire. Prima di
+aprirla pero' va rifatta la verifica: il ramo `scf-unroll-nonconstant-bounds` e' **284 commit indietro** e la
+prova "ai due estremi allo stesso ref" descritta qui sotto vale per `da1fb5cf9`, non per main di oggi.
 
 Regola: **non aprire la settima finche' una delle sei non atterra** ([[llvm-pr-register-short-and-staggered]]).
 Il collo di bottiglia e' l'attenzione dei revisori, non la nostra produzione.
