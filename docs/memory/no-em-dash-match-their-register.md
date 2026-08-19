@@ -37,3 +37,23 @@ diff lo mostra gia'.
 Il contrario vale allo stesso modo: a un rilievo tecnico lungo e argomentato si risponde nel merito,
 non con un "done". La brevita' non e' mai un motivo per tacere un fatto che cambierebbe la decisione
 di chi legge ([[verify-by-running-not-by-agent-verdict]]).
+
+## Seconda botta, lo stesso giorno
+
+Dopo aver registrato la lezione qui sopra ho riscritto la descrizione di `triton#10766` portandola
+da 4900 a 3205 caratteri, con tabella e quattro sezioni, e l'ho considerata "concisa". Thomas ha
+risposto:
+
+> please make a reasonable description that is meaningful and concise. If you are asking for
+> reviewers to spend time you need to also show that you are not sending random patches.
+
+Due cose da capire in quella frase. La prima e' che **3205 caratteri non sono concisi**: il mio
+metro era ancora sbagliato di un fattore tre, la versione buona sta a 880. La seconda e' il
+sottotesto, che e' piu' importante: **una descrizione gonfia non legge come completezza, legge come
+patch generata in serie.** In un momento in cui i maintainer sono sommersi di contributi automatici,
+il volume di prosa e' un segnale negativo, non una prova di lavoro.
+
+Regola operativa: una descrizione di PR dice **cosa cambia, perche' conta con un numero, quale
+vincolo non ovvio ha il codice, dove sono i test.** Tutto il resto va tolto. Se serve una tabella,
+probabilmente il posto e' il thread di review, non il corpo della PR, che diventa il messaggio di
+commit permanente.
