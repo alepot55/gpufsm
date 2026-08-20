@@ -78,8 +78,8 @@ work compares modern GPU kernel DSLs on an irregular workload.
 
 We answer the question on finite-automata simulation, a canonical irregular workload
 (deep-packet inspection, regular-expression matching, bioinformatics) with \emph{two
-complementary faces}: a nondeterministic (NFA) active-set traversal that is
-control-flow-bound, and a deterministic (DFA)
+complementary faces}: a nondeterministic finite automaton (NFA) active-set traversal that is
+control-flow-bound, and a deterministic finite automaton (DFA)
 dense-table walk that is memory-bound. We name the cost \emph{abstraction regret}---the
 performance a DSL forecloses, with the algorithm held fixed, because it cannot express the
 memory layout or control flow a workload needs---and find it is large (Triton pays $6$--$8\times$

@@ -27,29 +27,14 @@ What was trimmed from the 8pp version to fit 6 body pages (content preserved):
   and the kernel-limitations paragraph. The 2×2, capability→cost map, causal control, two faces,
   and A100 cross-arch result are all intact. All 35 references kept (they don't count).
 
-## Plain-text abstract for the CMT "abstract" field (≤5000 chars; this is ~1.7k)
+## Plain-text abstract for the CMT "abstract" field (≤5000 chars; this is ~2.1k)
 
-GPU domain-specific languages (DSLs) such as OpenAI Triton deliver near-CUDA performance at far
-lower effort on regular tensor algebra. We ask what that abstraction costs on irregular workloads
-and answer it with a metric we call abstraction regret: the performance a DSL forecloses, with the
-algorithm held fixed, because it cannot express the memory layout or control flow a workload needs.
-We decompose regret along these two capability axes and instantiate it on finite automata across
-the paradigm axis CUDA and NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend
-(tile-SPMD). Automata expose two complementary faces: an NFA active-set traversal that is
-control-flow bound, and a DFA dense-table walk that is memory bound (its throughput halves as the
-table crosses L2). On both faces the regret is large for the tile-SPMD DSLs and small for the
-thread-SIMT ones: Triton pays 5-13x versus CUDA across the two faces, while Warp, an equally
-high-level Python DSL, matches or beats hand CUDA on the NFA (0.6-0.9x) and pays only 1.4-2.3x on
-the DFA. So regret is set by the execution paradigm, not by how high-level the DSL looks. We make
-the attribution falsifiable with the Triton-Gluon controlled pair (identical MLIR compiler stack;
-Gluon only adds explicit layout/shared-memory control): Gluon still cannot express the kernel, so
-the binding constraint is the paradigm, not tuning or layout. A two-parameter cost model
-corroborates the regret (predictive for the thread model; holdout 2.7%) and we name the missing IR
-primitives (scalar gather in a tile, register-resident bitset, data-dependent loop). Along the way
-we build a portable work-efficient automata engine (~330x-10^4x over a faithful full scan, 15-170
-Gbps, validated bit-for-bit against a CPU oracle on six real ANMLZoo automata up to 48k states). We
-confirm the centerpiece on a second GPU architecture (NVIDIA A100): the 2x2 regret pattern and the
-architecture-independent tile-SPMD scalar ceiling both reproduce.
+⚠️ Deve essere **identico** a quello del PDF: gli atti e il sito estraggono da CMT, non
+dal PDF. Rigenerato dal `.tex` il 20 ago 2026, dopo l'espansione di NFA/DFA chiesta dal
+Reviewer 1. Non ricopiare la versione precedente.
+
+GPU domain-specific languages (DSLs) such as OpenAI Triton deliver near-CUDA performance at far lower effort on regular tensor algebra. We ask what that abstraction costs on irregular workloads and answer it with a metric we call abstraction regret: the performance a DSL forecloses-with the algorithm held fixed-because it cannot express the memory layout or control flow a workload needs. We decompose regret along these two capability axes and instantiate it on finite automata across the paradigm axis CUDA and NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-SPMD). Automata expose two complementary faces: a nondeterministic finite automaton (NFA) active-set traversal that is control-flow bound, and a deterministic finite automaton (DFA) dense-table walk that is memory bound (its throughput halves as the table crosses L2). On both faces the regret is large for the tile-SPMD DSLs and small for the thread-SIMT ones-Triton pays 5-13x versus CUDA across the two faces, while Warp, an equally high-level Python DSL, matches or beats hand CUDA on the NFA (0.6-0.9x) and pays only 1.4-2.3x on the DFA. So regret is set by the execution paradigm, not by how high-level the DSL looks. We make the attribution falsifiable with the Triton<->Gluon controlled pair (identical MLIR compiler stack; Gluon only adds explicit layout/shared-memory control): Gluon still cannot express the kernel, so the binding constraint is the paradigm, not tuning or layout. A two-parameter cost model corroborates the regret (predictive for the thread model; holdout 2.7%) and we name the missing IR primitives (scalar gather in a tile, register-resident bitset, data-dependent loop). Along the way we build a portable work-efficient automata engine (~330x to 10^4x over a faithful full scan, 15-170~Gbps, validated bit-for-bit against a CPU oracle on six real ANMLZoo automata up to 48k states). We confirm the centerpiece on a second GPU architecture (NVIDIA A100): the 2x2 regret pattern and the architecture-independent tile-SPMD scalar ceiling both reproduce.
+
 
 ## Suggested CMT metadata
 - **Title:** The Two Faces of Abstraction Regret: Control-Flow and Memory-Layout Limits of GPU DSLs on Irregular Automata
