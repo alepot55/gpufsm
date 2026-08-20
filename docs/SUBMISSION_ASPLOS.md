@@ -92,9 +92,15 @@ been submitted to ASPLOS.
 - Anonymity: no author name, affiliation, repo name or personal URL in the text; PDF
   metadata carries no Author field. The one anonymous self-citation is to our paper 1,
   which is correct under double-blind.
-- Every figure carries the ACM-required `\Description`. Zero em dashes.
-- References: 27 entries, full author names throughout (no "et al."), DOIs or
-  resolvable URLs on all but the anonymous self-citation, citations hyperlinked.
+- Every figure carries the ACM-required `\Description`, all six of them, and the build
+  emits zero "possible image without description" warnings. Check this by grepping the log
+  rather than the source: the restructure dropped all eight of the old ones silently and
+  this line claimed otherwise for a while.
+- Zero em dashes.
+- References: 29 entries, full author names throughout (no "et al."), DOIs or
+  resolvable URLs on all but the anonymous self-citation, citations hyperlinked. bibtex
+  emits warnings for missing page numbers and publishers on several entries; cosmetic for
+  review, worth closing before camera-ready.
 
 ## Files to upload
 

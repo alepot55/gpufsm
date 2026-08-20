@@ -94,6 +94,13 @@ residual is the per-warp \emph{straggler} tax. Lock-step time grows linearly wit
 $\mathbb{E}[\max\ \mathrm{trip}]$; the line is fitted on six designed trip distributions
 ($R^2=0.997$) and the four open markers are held out from it. Per-lane retirement collapses
 the same times to a flat, distribution-independent floor. All points oracle-gated; every number traces to a versioned CSV.}
+\Description{Two stacked panels. The upper bar chart shows NFA worklist throughput rising
+across four kernels, from 28 Gbps for the default Triton tile kernel to 104 after setting
+num_warps to one, 383 after lane-packing, and 739 for hand-written CUDA, with an arrow
+marking the final gap as the irreducible residual. The lower scatter plot shows lock-step
+execution time rising linearly with the per-warp straggler across ten trip distributions,
+along a fitted line, while the per-lane retirement points lie flat near 43 microseconds
+regardless of the straggler.}
 \label{fig:teaser}\end{figure}
 
 This paper answers it. The gap is structural, the missing primitive can be named, and it
@@ -266,6 +273,12 @@ as CUDA, and per-lane retirement restores it. \textbf{(b)} The missing time is t
 dependent-load stall (\texttt{long\_scoreboard}), $15.3\times$ CUDA's on the tile and
 $29\times$ lower again once cured. \textbf{(c)} Neither kernel is near a hardware ceiling,
 so this is not a worse kernel: it is a kernel that cannot keep loads in flight.}
+\Description{Three bar panels comparing the Triton tile kernel, hand-written CUDA and the
+cured kernel. The first shows issue-slot activity of 10 percent for the tile against 41
+percent for CUDA and 36 percent once cured. The second, on a logarithmic axis, shows the
+dependent-load stall at 196 thousand cycles for the tile, 13 thousand for CUDA and 7
+thousand cured. The third shows both kernels far below the hardware ceiling on issue rate
+and on DRAM bandwidth.}
 \label{fig:mech}\end{figure*}
 
 Fig.~\ref{fig:mech} settles what the residual is. In the profiled configuration the
@@ -311,6 +324,10 @@ residual and the DFA's closeable gap are one mechanism at two latency scales.
 \caption{The residual is regime-dependent. Lane-packed Triton trails CUDA by ${\sim}1.7\times$
 while the DFA table is cache-resident and reaches parity ($1.05\times$) once a $16$\,MB
 table spills past L2, where both must hide latency across warps.}
+\Description{A line chart of the ratio of lane-packed Triton throughput to CUDA throughput
+against DFA table size on a logarithmic axis. The ratio sits between 0.55 and 0.62 while
+the table is cache-resident and rises to 1.05, crossing the parity line, once the table
+exceeds the roughly six megabyte L2.}
 \label{fig:dfa}\end{figure}
 
 \section{The wall: per-lane exit is inexpressible}\label{sec:wall}
@@ -356,6 +373,11 @@ removed). The lanes already hold one element each, so no layout change can help.
 per-lane predicate \texttt{\%2} exists and is then reduced to a scalar, because
 \texttt{scf.condition} admits exactly one \texttt{i1} for the whole tile. That single
 \texttt{i1} is the lock-step.}
+\Description{A trimmed listing of TritonGPU intermediate representation. The blocked layout
+declares one element per thread. Inside an scf.while loop an arith.cmpi computes a per-lane
+predicate over a 32-element tensor, a tt.reduce collapses it to a single i32, a comparison
+turns that into one i1, and scf.condition consumes that single i1 for the whole tile. The
+loop body then does masked full-width work.}
 \label{fig:ir}
 \end{figure}
 
@@ -555,6 +577,10 @@ each measured, and joining them inside the compiler is engineering we have not d
 \emph{ratio}. Ten trip distributions, filled markers designed, open markers held out.
 A linear fit on the straggler alone explains the cost; the same fit on
 $D=\mathbb{E}[\max\ \mathrm{trip}]/\mathbb{E}[\mathit{trip}]$ does not.}
+\Description{Two scatter panels of lock-step time against two candidate predictors over the
+same ten trip distributions. Against the per-warp straggler the points lie tightly along a
+fitted line with an R-squared of 0.998. Against the divergence ratio they form a scattered
+cloud with an R-squared of 0.286.}
 \label{fig:straggler}\end{figure}
 
 A diagnosis is worth more if it predicts. A controlled sweep over six trip distributions
@@ -611,6 +637,11 @@ other half of the story: no divergence either, but the tile mapping loses occupa
 floor can exist without any control cost. What grows \emph{above} such a floor is set by
 per-step scalar control. Ragged attention inverts the sign, because a dense head-dim payload makes
 the tile issue \emph{fewer} instructions than the thread model.}
+\Description{A bar chart of tile-versus-thread regret across eight workloads, coloured by
+dominant mechanism. The graph pointer-chase sits exactly at the no-regret line at 1.00
+times. Uniform SpMV is 1.94, hash probe 1.40, automata 1.96, power-law SpMV 2.17, MoE
+routing 2.36 and rejection sampling 4.00. Ragged attention alone falls below the no-regret
+line at 0.64 times, where the tile wins.}
 \label{fig:law}\end{figure*}
 
 Is any of this specific to automata? To find out we built six further oracle-gated
