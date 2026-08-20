@@ -34,8 +34,9 @@ the performance a DSL forecloses---with the algorithm held fixed---because it ca
 the memory layout or control flow a workload needs. We decompose regret along these two
 capability axes and instantiate it on finite automata across the paradigm axis CUDA and
 NVIDIA Warp (thread-SIMT) versus Triton and its low-level Gluon frontend (tile-SPMD).
-Automata expose \textbf{two complementary faces}: an NFA active-set traversal that is
-\emph{control-flow bound}, and a DFA dense-table walk that is \emph{memory bound} (its
+Automata expose \textbf{two complementary faces}: a nondeterministic finite automaton
+(NFA) active-set traversal that is \emph{control-flow bound}, and a deterministic finite
+automaton (DFA) dense-table walk that is \emph{memory bound} (its
 throughput halves as the table crosses L2). On both faces the regret is large for the
 tile-SPMD DSLs and small for the thread-SIMT ones---Triton pays $5$--$13\times$ versus CUDA
 across the two faces, while Warp, an equally high-level \emph{Python} DSL, matches or beats
@@ -77,7 +78,8 @@ work compares modern GPU kernel DSLs on an irregular workload.
 
 We answer the question on finite-automata simulation, a canonical irregular workload
 (deep-packet inspection, regular-expression matching, bioinformatics) with \emph{two
-complementary faces}: an NFA active-set traversal that is control-flow-bound, and a DFA
+complementary faces}: a nondeterministic (NFA) active-set traversal that is
+control-flow-bound, and a deterministic (DFA)
 dense-table walk that is memory-bound. We name the cost \emph{abstraction regret}---the
 performance a DSL forecloses, with the algorithm held fixed, because it cannot express the
 memory layout or control flow a workload needs---and find it is large (Triton pays $6$--$8\times$
@@ -195,6 +197,11 @@ structurally mirrored line-for-line from one specification; across a comparison 
 the measured gap an \emph{abstraction} cost rather than an algorithmic one, and it is enforced
 mechanically: a single registry maps a (backend, technique) pair to an executor, and a CPU
 reference oracle gates correctness.
+The best structure in one language need not be best in another, which is why the algorithm is
+pinned: regret is \emph{defined} at a fixed algorithm, so letting each DSL pick its own would
+measure algorithmic redesign, not what the abstraction forecloses. Per-language tuning is not
+excluded---within a DSL we vary the \emph{technique} and report its best---only the algorithm is
+fixed. The limit is one of scope, not of bias.
 
 \textbf{Correctness oracle.} The oracle (\texttt{reference.py}) is the NFA/DFA semantics with
 \emph{latch-first-match} (report at the first accepting configuration). Every backend/technique
@@ -531,7 +538,10 @@ The takeaway is constructive and actionable. ``Abstraction regret'' is not an ar
 high-level GPU DSLs---Warp shows a high-level DSL can match hand CUDA on exactly this irregular
 workload---but a diagnosis with a falsifiable, named cure: \textbf{give a tile/SPMD IR a
 first-class scalar gather within a tile} (and the data-dependent loop it implies), and our map
-predicts the regret on \emph{both} the control-flow and memory faces should collapse. The method
+predicts the regret on \emph{both} the control-flow and memory faces should collapse.
+The map also applies \emph{before} a port exists: whether an IR expresses the needed primitive is
+answerable from the IR alone, so the hand-CUDA baseline calibrates the regret rather than detecting
+it. The method
 generalizes beyond automata: hold the algorithm fixed, vary the DSL across a controlled pair, and
 attribute the residual to a named, missing primitive. We release the framework, oracle, kernels,
 and versioned data so the prediction can be tested as such a primitive lands---and so the same
@@ -542,10 +552,8 @@ All code, the CPU reference oracle, the versioned result CSVs, and the figure ge
 in the project repository. Every figure and table regenerates from the committed CSVs via a
 single command (\texttt{python paper/figures.py}); the CPU correctness suite runs without a
 GPU (\texttt{pytest -m "not gpu"}), and the GPU kernels and the Gluon falsifiability probe run
-on any CUDA device. A versioned snapshot with a Zenodo DOI will be minted at release for
-artifact evaluation. The claim-to-command map is in \texttt{docs/REPRODUCIBILITY.md} and a
-SIGPLAN-style artifact appendix (check-list, install, claims$\to$commands$\to$expected) in
-\texttt{docs/ARTIFACT\_APPENDIX.md}.
+on any CUDA device. A versioned Zenodo snapshot will be minted at release, and the repository
+ships a claim-to-command map and a SIGPLAN-style artifact appendix.
 
 \begin{thebibliography}{99}
 \bibitem{infant} N. Cascarano \emph{et al.}, ``iNFAnt: NFA pattern matching on GPGPU

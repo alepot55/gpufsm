@@ -96,6 +96,13 @@ mypy src/gpufsm && pytest -m "not gpu" -q
 
 ## 6. Stato corrente
 
+### ✅ HPEC 2026: ACCETTATO (orale + Xplore) — camera-ready entro il 4 SET
+
+Paper 133 `Accept-Oral-Xplore`, talk mercoledi 16 set, 20:15 ora italiana. Le due review sono
+gia' state evase nel `.tex` (NFA/DFA espansi, giustificazione del protocollo line-for-line,
+predittivita' della mappa). Restano **camera-ready, Copyright Form e registrazione**: sono azioni
+a nome dell'utente. Dettagli e scadenze in `docs/HPEC_CAMERA_READY.md`.
+
 ### ⚠️ AZIONE APERTA: sottomettere ad **ASPLOS 2027 entro il 9 SET 2026 AoE**
 
 PPoPP 2027 è stata persa creando l'account e non premendo submit. **Premere davvero SUBMIT**:
