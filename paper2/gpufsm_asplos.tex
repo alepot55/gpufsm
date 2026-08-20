@@ -565,9 +565,8 @@ t_{\mathrm{masked}} = 32.4 + 1.09\;\mathbb{E}[\text{warp-max}]\;\mu\text{s},
 \]
 which is what a latch that iterates to the busiest lane must do. The cured kernel collapses
 to the flat floor of \S\ref{sec:cure} because each lane retires at its own trip count. The
-slope is the hardware's per-iteration lock-step cost and the intercept is compiler
-overhead, and the split is stable across builds: an earlier build gave the same slope
-($1.08$) with a higher intercept ($50\,\mu$s).
+slope is the kernel's per-iteration lock-step cost and the intercept is compiler
+overhead.
 
 \paragraph{The intuitive predictor is the wrong one.} It is natural to expect the cost to
 track the intra-warp divergence \emph{ratio}
@@ -582,15 +581,21 @@ counted in absolute iterations.
 
 \paragraph{Out of sample.} With the coefficients frozen, the model predicts four
 \emph{held-out} distributions generated from a different seed (bimodal, log-normal, spike,
-and an adversarial single-straggler warp in which $1/32$ lanes run $256$ iterations and the
-rest run $2$) to within $1.5\%$ on average and $2.1\%$ at worst on lock-step time. Carried
-through to the derived quantity, it predicts every in-sample speedup to under $8\%$. The single-straggler case yields $7.2\times$, the
-effect in its purest form: one slow lane taxing the other $31$, which is exactly what
-per-lane retirement removes.
+and an adversarial single-straggler warp in which $1/32$ lanes run $256$ iterations and the rest
+run $2$) to within $1.5\%$ on average and $2.1\%$ at worst on lock-step time, and every
+in-sample speedup to under $8\%$. That last case yields $7.2\times$, the effect at its
+purest: one slow lane taxing the other $31$, which is what per-lane retirement removes.
 
-This turns a qualitative ``divergent trips cost more'' into a quantity a programmer can
-estimate before writing the kernel, and it corrects a plausible but wrong intuition on the
-way.
+\paragraph{What the law is, and is not.} The validation is across trip
+\emph{distributions} of one kernel, not across kernels, and the two coefficients are that
+kernel's own: change the loop body and both move. What transfers is the \emph{form}, that
+cost follows the absolute straggler rather than the divergence ratio, and two things
+support it beyond one good fit. The coefficients are not free parameters but have a
+mechanical reading, and the slope survived a rebuild of the pass that moved the intercept
+($1.08$ against $1.09$, intercept $50\rightarrow32\,\mu$s). So a programmer gets the right
+\emph{shape} of estimate before writing a kernel and calibrates the constant on their own
+body, which is still better than the qualitative ``divergent trips cost more'' it
+replaces.
 
 \section{Generality, and where it stops}\label{sec:general}
 
@@ -665,9 +670,9 @@ of a device, so we test it directly: a one-command harness re-runs every witness
 GPU, tags output by device, and checks the falsifiable prediction that each regret persists
 in \emph{direction} while magnitudes rescale. On an A100-SXM4-40GB (sm\_80, $6.7\times$ the
 L2) all five portable witnesses confirm it with genuinely re-measured, architecture-different
-magnitudes: hash-probe $1.40\!\to\!1.48$, power-law SpMV $2.17\!\to\!3.20$, uniform SpMV
-$1.95\!\to\!1.78$, rejection sampling $4.0$, and, decisively, the memory-only control stays
-paradigm-neutral ($0.99\!\to\!0.99$). The flagship ladder reproduces too
+magnitudes, from hash-probe ($1.40\!\to\!1.48$) to power-law SpMV
+($2.17\!\to\!3.20$), while the memory-only control stays paradigm-neutral
+($0.99\!\to\!0.99$). The flagship ladder reproduces too
 (Table~\ref{tab:decomp}), as does the built pass (Table~\ref{tab:builtcure}). We report
 the ladder's stage factors from the two devices' own measurements rather than asserting
 they match: the total holds to within $3\%$ while the internal split shifts, and that is
@@ -779,18 +784,14 @@ The cost a tile DSL pays on irregular control flow is not a monolith and not a m
 stages of tuning recover most of the headline gap, and what remains is one shared loop
 latch: lanes that cannot retire independently, and dependent loads that cannot be
 overlapped across them. That residual vanishes for a DRAM-resident DFA, where latency stops
-binding, and its magnitude is set by the per-warp straggler, which makes it predictable
-before a line of kernel code is written.
+binding, and its magnitude is set by the per-warp straggler, so it is predictable before a
+line of kernel code is written.
 
-The primitive the diagnosis asks for is a per-lane sub-tile loop with an independent exit.
-Today's tile IR cannot express it, provably, so we built it below the tile IR: a
-soundness-verified MLIR pass in \texttt{libtriton} that restores per-lane retirement,
-oracle-correct, reproduced on two architectures, and visible in the emitted SASS. It
-recovers $2.3$--$6.7\times$ where the cost is control and nothing where it is memory,
-exactly as the mechanism requires.
-
-The remaining step is a language one: add the per-lane loop and exit to the tile IR itself,
-and the wall this paper documents ceases to exist.
+The primitive this asks for is a per-lane sub-tile loop with an independent exit. Today's
+tile IR provably cannot express it, so we built it underneath, as a soundness-verified MLIR
+pass in \texttt{libtriton} that is oracle-correct on two architectures and visible in the
+emitted SASS. The remaining step is a language one: add the loop and its exit to the tile IR
+itself, and the wall this paper documents ceases to exist.
 
 % Flush every pending float before the bibliography: the page limit counts text
 % and figures but not references, so no figure may land after them.
