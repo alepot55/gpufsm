@@ -31,16 +31,16 @@ poi la pagina pubblica della PR per lo stato esatto.
 
 ## A. Upstream `triton-lang/triton` — l'unico contributo esterno che conta
 
-Score: **1 mergiata, 3 aperte (#10766, #11324, #11325), 5 chiuse + 1 RFC chiusa**, piu' 2 issue
+Score: **2 mergiate (#11311, #11324), 2 aperte (#10766, #11325), 5 chiuse + 1 RFC chiusa**, piu' 2 issue
 aperte da noi (#11326, #11328). **17 ago 10:21: primo scambio tecnico con un maintainer.** Jokeren ha chiuso #11323 come
 "micro optimization" dopo averne discusso con @jeffniu-openai. La patch era corretta (verificato in
 `WarpSpecializeUtility.cpp:555-559`: le due barriere sono incondizionate), il valore no — e lo
-dicevamo noi stessi nella PR. #11324 e #11325 restano aperte e `blocked`.
+dicevamo noi stessi nella PR. **#11324 e' stata mergiata il 20 ago**; #11325 resta aperta e `blocked`.
 
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
 | [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Do not compare subslice offsets across different shapes` | 16 ago | **APERTA** — barriera **mancante** (bug di correttezza), test che fallisce senza patch, 0 regressioni | in attesa |
-| [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | **APERTA** — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | in attesa |
+| [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | ✅ **MERGIATA il 20 ago 13:17Z** da Jokeren, commit `37a4b78fc` — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | chiusa |
 | [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **CHIUSA** 17 ago — "micro optimization" (Jokeren + jeffniu-openai). Patch corretta, valore marginale: non cambiava il codice generato, e lo dicevamo noi | Jokeren |
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
 | [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
@@ -284,7 +284,7 @@ Verificato con `gh api` il 18 ago 08:00 CEST.
 
 | PR | diff | stato | ultima mossa |
 |---|---|---|---|
-| [#11324](https://github.com/triton-lang/triton/pull/11324) | +22/-1 | aperta, CI da approvare sull'ultimo commit | 4 richieste di Jokeren evase |
+| [#11324](https://github.com/triton-lang/triton/pull/11324) | +22/-1 | ✅ **MERGIATA** 20 ago 13:17Z, `37a4b78fc` | 4 richieste di Jokeren evase, poi approvata il 19 e mergiata dopo un sollecito |
 | [#11325](https://github.com/triton-lang/triton/pull/11325) | +115/-3 | aperta | riscritta sull'obiezione di Jokeren |
 | [#10766](https://github.com/triton-lang/triton/pull/10766) | +75/-1 | aperta, sbloccata | test di #9147 ripristinato |
 | [#11323](https://github.com/triton-lang/triton/pull/11323) | — | **chiusa** | "this seems like a micro optimization" |
