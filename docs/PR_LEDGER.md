@@ -216,7 +216,8 @@ tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Tr
 | [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
 | [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | **APPROVATA** da FedericoBruzzone (`LGTM % nits`), 2 nit di commento applicati e spinti (`cfa881865`), risposto nei thread. Attende `banach-space` |
 
-**APERTA il 19 ago 2026 come [#217392](https://github.com/llvm/llvm-project/pull/217392)** (era la riserva), per
+**APERTA il 19 ago 2026 come [#217392](https://github.com/llvm/llvm-project/pull/217392)** (era la riserva),
+**APPROVATA da `matthias-springer` il 20 ago 06:54Z**, CI 12 pass, landing chiesto. Per
 l'issue [#203858](https://github.com/llvm/llvm-project/issues/203858)
 `scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'
 piu' largo di come lo descrive la segnalazione: `constantTripCount` risponde su **tre** strade in cui
