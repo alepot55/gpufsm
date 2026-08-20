@@ -478,6 +478,16 @@ the gain to work, not occupancy: issued instructions fall $39\times$
 $\sum_i \mathit{trip}_i$ rather than $32\times$ the busiest lane, while
 threads-per-instruction is unchanged.
 
+\paragraph{Which cost this closes, and which it does not.} The residual of \S\ref{sec:mech}
+and the tax of \S\ref{sec:law} are both consequences of the shared latch, but they are not
+the same cost, and it matters that the pass addresses one of them. Per-lane retirement
+removes the work the lock-step forces on lanes that should already have stopped, which is
+why Nsight reports its gain as instructions rather than as stall cycles. Restoring the
+intra-warp latency hiding of \S\ref{sec:mech} additionally requires the lanes to be running
+independent work, which is what the thread lowering below does and what the tile IR
+withholds for the same structural reason as \S\ref{sec:wall}. We measured each with the
+metric that applies to it, and we do not claim the pass was shown to do the other's job.
+
 The pass also fires, oracle-correct, on real workloads carrying the same latch: power-law
 CSR SpMV and MoE top-$k$ routing, with \texttt{redux.sync} removed and
 \texttt{bar.warp.sync} present in the emitted PTX. Both carry a per-iteration memory
@@ -698,20 +708,17 @@ show ${\approx}1\times$, was falsified at $1.9\times$. Each correction narrowed 
 and we prefer that record to a cleaner-looking one.
 
 \section{Reproducibility}\label{sec:repro}
-Correctness gates every measurement: each kernel and configuration is checked bit-for-bit
-against the CPU oracle before any throughput is reported. Every number here traces to a
-versioned CSV, and all figures regenerate from those CSVs through a single script, so plots
-cannot drift from measurements. An artifact index maps each claim to the command that
-produces it and the CSV it writes.
+Every number here traces to a versioned CSV, and all figures regenerate from those CSVs
+through a single script, so plots cannot drift from measurements. An artifact index maps
+each claim to the command that produces it and the CSV it writes.
 
-The expressibility and structural claims are \emph{runnable, falsifiable probes} rather
-than prose. The Gluon probe exits $0$ on the expected compile failure and $1$ if some future
-Gluon compiles it. The lowering-wall probe asserts that the MLIR verifier rejects a per-lane
-\texttt{scf.condition}. The detection check confirms the in-\texttt{libtriton} pass tags the
-lock-step region with the flag set and is a no-op without it. The TritonGPU pass is
-reproduced from a versioned patch against a pinned Triton commit; the per-lane-retirement
-pass additionally builds as a wheel from a one-command recipe, and every cure number in
-this paper came from that wheel, on both GPUs. The cross-architecture re-validation is a
+The expressibility and structural claims are \emph{runnable, falsifiable probes} rather than
+prose. The Gluon probe exits $0$ on the expected compile failure and $1$ if some future
+Gluon compiles it; the lowering-wall probe asserts that the MLIR verifier rejects a per-lane
+\texttt{scf.condition}; the detection check confirms the pass tags the lock-step region with
+the flag set and is a no-op without it. The per-lane-retirement pass builds as a wheel from
+a one-command recipe (a pinned upstream commit plus a versioned patch), and every cure
+number here came from that wheel, on both GPUs. The cross-architecture re-validation is a
 single non-mutating command.
 
 \section{Related work}\label{sec:related}
@@ -771,9 +778,9 @@ irregular control flow, which names the missing primitive and builds it.
 The cost a tile DSL pays on irregular control flow is not a monolith and not a mystery. Two
 stages of tuning recover most of the headline gap, and what remains is one shared loop
 latch: lanes that cannot retire independently, and dependent loads that cannot be
-overlapped across lanes. The size of that residual is set by the latency regime, which is
-why it vanishes for a DRAM-resident DFA, and its magnitude is set by the per-warp
-straggler, which makes it predictable before a line of kernel code is written.
+overlapped across them. That residual vanishes for a DRAM-resident DFA, where latency stops
+binding, and its magnitude is set by the per-warp straggler, which makes it predictable
+before a line of kernel code is written.
 
 The primitive the diagnosis asks for is a per-lane sub-tile loop with an independent exit.
 Today's tile IR cannot express it, provably, so we built it below the tile IR: a
