@@ -18,7 +18,6 @@ INTERVAL="${GPUFSM_WATCH_INTERVAL:-120}"
 
 # "repo:numero" -- il registro sta in docs/PR_LEDGER.md, questo e' solo il bersaglio del polling.
 TARGETS="
-triton-lang/triton:11324
 triton-lang/triton:11325
 triton-lang/triton:10766
 triton-lang/triton:11326
@@ -26,7 +25,7 @@ triton-lang/triton:11328
 llvm/llvm-project:216947
 llvm/llvm-project:216853
 llvm/llvm-project:216605
-llvm/llvm-project:216851
+llvm/llvm-project:217392
 llvm/llvm-project:216854
 llvm/llvm-project:216852
 "
