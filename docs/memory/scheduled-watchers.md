@@ -95,6 +95,18 @@ era già costato una serata. È quello armato oggi per ASPLOS.
 Da consolidare: o si portano in `tools/watch/` come si è fatto con `upstream.sh`, o si cancellano.
 Due stack che sorvegliano le stesse cose sono il modo di credersi coperti mentre nessuno guarda.
 
+## La lista dei bersagli non si aggiorna da sola
+
+I numeri di PR sorvegliati sono **scritti a mano** in `tools/watch/upstream.sh`. Il 19 ago ho aperto
+llvm#217392 e non l'ho aggiunta: l'approvazione di `matthias-springer` del mattino dopo **non ha
+prodotto nessuna notifica**, e l'ho scoperta solo perché l'utente ha chiesto di ricontrollare. Nello
+stesso momento la lista conteneva ancora #216851, già mergiata, cioè sprecava una chiamata API per
+sorvegliare una PR morta.
+
+Regola: **aprire o chiudere una PR upstream include modificare `TARGETS`.** Il watcher tace sia
+quando non succede niente sia quando guarda dalla parte sbagliata, e i due silenzi sono identici
+([[empty-output-is-not-a-result]]).
+
 ## Dettagli che si pagano se si dimenticano
 
 - Lo stato è in `since`, `open-prs-v2`, `ci-seen` nella stessa cartella. Cancellare `since` fa
