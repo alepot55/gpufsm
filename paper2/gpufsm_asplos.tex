@@ -40,7 +40,7 @@ The missing primitive is a per-lane loop exit, and we prove TritonGPU cannot exp
 IR, as an MLIR pass in \texttt{libtriton} guarded by a soundness verifier. It gives
 $2.3$--$6.7\times$ on control-bound kernels, $1.6$--$3.8\times$ on an A100 from the same
 wheel, and ${\approx}1.0\times$ on gather-bound SpMV and MoE, exactly as the mechanism
-requires. A one-parameter straggler model predicts the cost with $R^2=0.997$, and
+requires. A single-predictor straggler model predicts the cost with $R^2=0.997$, and
 out-of-sample to $1.5\%$.
 \end{abstract}
 
@@ -80,23 +80,24 @@ work the bet pays: tile kernels match, and often beat, hand-tuned CUDA.
 
 On irregular kernels they do not. A work-efficient NFA worklist written in Triton runs an
 order of magnitude below the equivalent CUDA. That much is folklore. What matters for
-language design is the next question, and it is the one nobody has answered: is the gap a
+language design is the next question, and to our knowledge it has not been answered
+mechanistically: is the gap a
 \emph{tuning} deficit, which a better autotuner closes, or is it something the abstraction
 \emph{forecloses}, which no amount of tuning can reach?
 
 \begin{figure}[t]\centering
 \includegraphics{figures/fig_anatomy_and_cure.pdf}
 \caption{The lock-step tax, and its removal. \textbf{(a)} The NFA worklist gap
-(batch 16384, $\le 64$ states) is not a monolith: two stages of tuning recover
-$3.7\times$ each, and an irreducible residual remains. \textbf{(b)} That residual is the
-per-warp \emph{straggler} tax. Lock-step time grows linearly with
-$\mathbb{E}[\max\ \mathrm{trip}]$ over ten trip distributions ($R^2=0.997$; open markers
-are held out from the fit), while per-lane retirement collapses it to a flat, distribution
-independent floor. All points oracle-gated; every number traces to a versioned CSV.}
+(batch 16384, $\le 64$ states) is not a monolith: a launch-configuration fix and a kernel
+rewrite recover $3.7\times$ each, and an irreducible residual remains. \textbf{(b)} That
+residual is the per-warp \emph{straggler} tax. Lock-step time grows linearly with
+$\mathbb{E}[\max\ \mathrm{trip}]$; the line is fitted on six designed trip distributions
+($R^2=0.997$) and the four open markers are held out from it. Per-lane retirement collapses
+the same times to a flat, distribution-independent floor. All points oracle-gated; every number traces to a versioned CSV.}
 \label{fig:teaser}\end{figure}
 
-This paper answers it. The gap is structural, we can name the primitive that is missing,
-and we can supply it in the real compiler.
+This paper answers it. The gap is structural, the missing primitive can be named, and it
+can be supplied inside the compiler itself.
 
 \paragraph{One shared latch.} The mechanism is simpler than the symptom suggests. A tile
 program's lanes advance in lock step under a single instruction stream, and in particular
@@ -136,7 +137,7 @@ the recoverable cost scales with per-step \emph{control}, not with memory irregu
 
 \paragraph{Predictable a priori.} Finally the tax is not merely explicable after the fact.
 It is set by the per-warp straggler, $\mathbb{E}[\max\ \mathrm{trip}]$, a quantity a
-programmer can estimate before writing the kernel. A one-parameter fit predicts lock-step
+programmer can estimate before writing the kernel. A single-predictor fit predicts lock-step
 time with $R^2=0.997$ and, with coefficients frozen, predicts four held-out distributions
 to $1.5\%$ (Fig.~\ref{fig:teaser}b). The natural competing intuition, that cost tracks the
 \emph{ratio} of straggler to mean, is wrong, and we falsify it.
@@ -517,7 +518,7 @@ each measured, and joining them inside the compiler is engineering we have not d
 \includegraphics{figures/fig_straggler_law.pdf}
 \caption{The lock-step cost is set by the absolute straggler, not by the divergence
 \emph{ratio}. Ten trip distributions, filled markers designed, open markers held out.
-A one-parameter fit on the straggler explains the cost; the same fit on
+A linear fit on the straggler alone explains the cost; the same fit on
 $D=\mathbb{E}[\max\ \mathrm{trip}]/\mathbb{E}[\mathit{trip}]$ does not.}
 \label{fig:straggler}\end{figure}
 
@@ -565,8 +566,10 @@ way.
 \includegraphics{figures/fig_regret_law.pdf}
 \caption{Tile-versus-thread regret across eight oracle-gated irregular witnesses, coloured
 by dominant mechanism. The graph pointer-chase is the negative control: irregular memory
-and dependent loads with a \emph{fixed} step count cost nothing. Regret grows with per-step
-scalar control. Ragged attention inverts the sign, because a dense head-dim payload makes
+and dependent loads with a \emph{fixed} step count cost nothing at all. Uniform SpMV is the
+other half of the story: no divergence either, but the tile mapping loses occupancy, so a
+floor can exist without any control cost. What grows \emph{above} such a floor is set by
+per-step scalar control. Ragged attention inverts the sign, because a dense head-dim payload makes
 the tile issue \emph{fewer} instructions than the thread model.}
 \label{fig:law}\end{figure*}
 
@@ -574,7 +577,10 @@ Is any of this specific to automata? To find out we built six further oracle-gat
 tile-versus-thread witnesses spanning the irregularity space, each with identical machinery
 (a Triton tile kernel, the same per-lane source lowered to CUDA threads, and a CPU oracle),
 and then two more drawn from ML. Fig.~\ref{fig:law} reports the result. The law is that
-\textbf{regret is created by per-step scalar control, not by memory irregularity}.
+\textbf{the regret that grows, and that the cure recovers, is created by per-step scalar
+control rather than by memory irregularity}. It is deliberately not the stronger claim that
+all regret is, because a tile mapping can also lose occupancy and charge a floor with no
+divergence anywhere, which we measure below.
 
 \paragraph{The negative control.} A graph pointer-chase, one million random walkers with
 data-dependent gather addresses over scattered \texttt{colidx} at degree CV $3.79$, but a
@@ -587,15 +593,19 @@ full intra-warp memory-level parallelism.
 \paragraph{Two channels, not one.} We first stated the law as a single ``tile issue
 deficit'' predictor. Completing the Nsight profiling falsified that, and the honest form has
 two channels. \emph{Issue starvation}: a data-dependent scalar recurrence drives the tile's
-issue rate below the thread's, as in the NFA worklist ($2.0\times$ at $9.9\%$ vs.\ $41\%$).
+issue rate below the thread's, as in the NFA worklist ($1.96\times$ at $9.9\%$ vs.\ $41\%$).
 \emph{Masked-lane waste}: divergent trip counts make the tile do full-width work where the
 thread retires lanes, as in rejection sampling ($4.0\times$, tile threads-per-instruction
 $32$ against the thread's $17$) whose issue rate is if anything \emph{above} the thread's,
-so the waste is in what the active lanes compute. A third, divergence-free effect sets the
-floor: a tile-lowering baseline of $1.9\times$ on uniform-\texttt{nnz} SpMV with zero
-divergence, from occupancy and masking on a bandwidth-bound gather, which falsified our
-initial guess that it would be ${\approx}1\times$. Divergence then adds on top, taking
-power-law SpMV from $2.2\times$ at tile width $32$ to $5.8\times$ at $256$.
+so the waste is in what the active lanes compute. The floor is the third component, and it is
+divergence-free: uniform-\texttt{nnz} SpMV has zero divergence and still costs
+$1.94\times$, because the tile mapping loses occupancy against the thread mapping on a
+bandwidth-bound gather. It is not universal, since the pointer-chase pays no floor at
+matched occupancy, but it is real where the mapping costs occupancy. That falsified our
+initial guess that it would be ${\approx}1\times$, and it is why the law above is scoped
+to the regret that \emph{grows}. Divergence then adds on top of the floor, taking power-law
+SpMV from $2.17\times$ at tile width $32$ to $5.8\times$ at $256$. So the law is
+multi-component, and only its variable part is what per-lane retirement can return.
 
 \paragraph{It reaches ML, including where it reverses.} Two witnesses on the kernels tile
 DSLs are actually built for. \emph{MoE top-$k$ routing}, with ragged data-dependent expert
