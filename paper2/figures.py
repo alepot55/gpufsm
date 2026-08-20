@@ -194,7 +194,7 @@ def fig_mechanism() -> None:
     names = ["Triton\ntile", "hand\nCUDA", "cured"]
     colors = ["#2980b9", "#27ae60", "#8e44ad"]
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(WIDE, 2.15))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(WIDE, 1.95))
 
     issue = [float(ns[k]["issue_active_pct"]) for k in order]
     for b, v in zip(ax1.bar(names, issue, color=colors, width=0.6), issue, strict=True):
@@ -367,7 +367,7 @@ def fig_regret_law() -> None:
     vals = [float(rows[w]["regret"]) for w in order]
     colors = [mech[rows[w]["dominant_mechanism"]][0] for w in order]
 
-    fig, ax = plt.subplots(figsize=(WIDE, 2.25))
+    fig, ax = plt.subplots(figsize=(WIDE, 2.05))
     for b, v in zip(
         ax.bar([nice[w] for w in order], vals, color=colors, width=0.62), vals, strict=True
     ):

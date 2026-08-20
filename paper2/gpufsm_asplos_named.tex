@@ -527,7 +527,10 @@ kernel through \texttt{nvcc}. Oracle-validated on no-accept automata, which remo
 early-exit confound, that lowering runs $4.2\times$ the tile lowering (${\approx}1555$
 vs.\ ${\approx}378$\,Gbps) and exceeds hand-written CUDA ($2.15\times$, the generated
 kernel being a minimal thread worklist). It is an existence proof and an upper bound, not
-the contribution: the front-end source was never the problem, the tile lowering is. It also
+the contribution: the front-end source was never the problem, the tile lowering is. The
+second number cuts our way and we would rather state it than let it be found: our hand-CUDA
+baseline is evidently not the thread model's ceiling, so every gap this paper reports
+against it is a \emph{lower} bound on what the tile lowering forgoes. It also
 acts through the diagnosed mechanism, restoring issue activity to $36\%$ against the tile's
 $9.9\%$ and CUDA's $41\%$ and cutting the dependent-load stall $29\times$
 (Fig.~\ref{fig:mech}).
