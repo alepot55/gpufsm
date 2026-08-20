@@ -150,9 +150,9 @@ irreducible residual and attributes the residual to abstraction-denied intra-war
 hiding rather than to divergence, occupancy, instruction count, or bandwidth
 (\S\ref{sec:anatomy}--\S\ref{sec:mech}).
 \item A structural impossibility result: per-lane loop termination cannot be expressed in
-TritonGPU's tile control flow, shown by a verifier-rejected rewrite, which names the
-missing primitive precisely and tells a language designer where it has to live
-(\S\ref{sec:wall}).
+TritonGPU's tile control flow, shown by a verifier-rejected rewrite. We do not stop at
+naming the missing primitive but specify it, including the body restriction it forces and
+the one composition question it leaves open (\S\ref{sec:wall}).
 \item That primitive, built: a soundness-verified MLIR pass in \texttt{libtriton} that
 restores per-lane retirement below the tile IR, oracle-correct, reproduced on two GPUs from
 one pinned wheel, and confirmed at the PTX and SASS level (\S\ref{sec:cure}).
@@ -376,6 +376,28 @@ That is falsifiable and it is actionable. It is falsifiable because adding a per
 sub-tile loop and exit op to the tile IR would make the statement false, which is precisely
 the language change we are arguing for. It is actionable because it tells us where the cure
 has to live: below the tile IR, in the lowering to the thread model.
+
+\paragraph{What the primitive would have to be.} Naming a missing op is cheap unless one
+says what it must mean, so here is the specification our lowering already implies. Take
+\texttt{scf.while}'s condition from \texttt{i1} to a tile of \texttt{i1} under the same
+layout as the carried tensors, and read it lane-wise: a lane whose predicate is false takes
+no further trips and stops updating its slice of the iter-args, and the region exits when
+no lane is still live. Live-outs freeze, per lane, at the trip on which that lane left.
+That freezing is what makes the construct observationally equivalent to today's masked
+loop, rather than merely faster than it.
+
+The price is a restriction on the body, and it is not incidental. A retired lane cannot
+participate in a cross-lane operation, so the region may not contain reductions,
+broadcasts, or tile-wide shared-memory operations. That is exactly the body-safety
+condition our verifier already discharges (\S\ref{sec:cure}), so the analysis a compiler
+would need in order to admit the op is one we have had to write anyway. Reconvergence for
+whatever tile operation follows is a barrier at the join, which is the
+\texttt{bar.warp.sync} our pass inserts.
+
+What stays genuinely open is composition with tile operations that assume full width,
+\texttt{tt.dot} above all. The op is an escape hatch for scalar control and has no business
+inside a matmul, so the question is where a language draws that boundary, not whether the
+lowering works.
 
 \section{Per-lane retirement, built}\label{sec:cure}
 

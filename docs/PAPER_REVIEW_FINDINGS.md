@@ -68,3 +68,79 @@ versioned perlane_retire_full.patch; built on Modal CPU, run on Modal A100 + loc
 - **NEW (soundness)** cure_rejection witness: the verifier correctly DECLINES the accumulate-OR
   early-exit latch on both GPUs (PTX redux stays 1) -> scope explicit, sound by default.
 Paper: paper2/gpufsm_cgo.tex (sigplan, 10pp incl. refs vs 11pp text limit, 0 overfull).
+
+
+## ASPLOS restructure + integrity audit (2026-08-21)
+
+Rewrote `paper2/gpufsm_asplos.tex` for the September cycle. The presentation items below
+were the point of the exercise; the integrity items were found on the way and matter more.
+
+### The constraint that drove the restructure
+
+The CFP runs a **rapid-review round that reads only the first two pages**. Those pages held
+a 350-word abstract that spilled onto page 2, a bolded contribution list, and no figure.
+They now hold the abstract, a teaser figure, the mechanism, the impossibility result, the
+built cure with its numbers, the predictive law, and four contributions. M7 and the
+"abstract firehose" item from the TACO pass are closed by this.
+
+### Integrity items found (all fixed)
+
+- **Cross-arch stage factors did not reproduce.** The paper quoted the ladder as matching
+  across GPUs (4070 2.6x/2.8x vs A100 2.3x/3.1x). Those four numbers reproduce from no
+  versioned CSV. `m2e` gives 3.0x/2.4x on the 4070 and 2.3x/3.0x on the A100, and the two
+  halves used *different* lane-packed kernels (`wp2` on the 4070, `wp` on the A100), which
+  is why they looked comparable and were not. Table 1 is now the same four kernels measured
+  the same way on both devices. The surviving claim is weaker and true: total 26x vs 25x,
+  launch stage identical, last two stages trade places.
+- **"num_warps is 3.7x on both architectures"** held at batch 65536, not at the batch 16384
+  the surrounding text specifies (3.44 and 3.05 there). Now given as the 2.8-3.7x range.
+- **A sample-fragile statistic.** `corr(speedup, D) = 0.06` was computed over the six
+  designed distributions; adding the four held-out ones raises it to **0.55**. Replaced by
+  the comparison of fits, stable on both samples: R2 0.997/0.998 (straggler) against
+  0.00/0.29 (divergence ratio). Conclusion unchanged, evidence no longer fragile.
+- **The generality law contradicted its own floor.** It claimed regret is created by scalar
+  control, then reported uniform-nnz SpMV at 1.94x with zero divergence. Now scoped to the
+  regret that grows and that the cure recovers, with the occupancy floor as a separate
+  component, present where the tile mapping costs occupancy and absent at matched occupancy
+  (pointer-chase, 1.00x).
+- **`t = 32.4 + 1.09x` has two parameters**, so "one-parameter model" was wrong, in three
+  places and in the submission abstract. It is a single-*predictor* model.
+- **Citation error**: `hopps2025` had Yufeng Du; the first author is **Xingran Du**
+  (verified against the ACM DL record). Venue and year were right.
+- **Out-of-sample max error** was quoted as 2.2%; the CSV says 2.1%.
+- **NFA regret** quoted as 2.0x in the law section where the figure and CSV say 1.96x.
+- **A format-compliance defect**: figures were generated 6in wide and included at
+  `width=\columnwidth`, a 0.55x downscale putting axis labels near 5pt against the CFP's 8pt
+  floor. `docs/SUBMISSION_ASPLOS.md` had passed this because it looked for `\resizebox`.
+- **A de-anonymization risk**: the captured TTGIR embeds an absolute path containing the
+  author's username. The new IR listing is stripped of every `loc(...)`.
+- **A scope ambiguity I introduced**: reordering put the selector immediately after the
+  in-compiler pass, so "routes the region to the thread lowering" read as if it routed to
+  that pass. It routes to the out-of-band `nvcc` lowering. Now stated, with the seam called
+  out explicitly.
+
+### Substantive additions
+
+- A listing of the matched TritonGPU IR, so the impossibility result is read off the code:
+  the per-lane predicate exists, `tt.reduce` destroys it, `scf.condition` takes one `i1`.
+- A **specification** of the proposed primitive, not just its name: lane-wise condition,
+  per-lane live-out freezing, the body restriction it forces (no cross-lane ops, which is
+  the body-safety condition the verifier already discharges), and the open composition
+  question (`tt.dot`).
+- **ML-Triton** (arXiv:2503.14985) added to related work. It is the strongest "isn't this
+  already solved" risk in the tile-DSL space: it descends Triton's interface to the warp.
+  Answered precisely, since a warp is still 32 lanes under one latch. DARM (CGO'22) added
+  alongside the linearization work.
+- The Warp control (0.9x of hand-CUDA) restored to the method section, where it does its
+  real job of separating abstraction *height* from execution *paradigm*.
+
+### Still open
+
+- The honest end-to-end value of the in-compiler pass on real workloads is ~1.0x. The paper
+  frames this as the thesis confirmed (recoverable cost scales with control, not memory),
+  which is correct, but it remains the largest reject risk and no measurement in the repo
+  changes it. Closing it needs the pass to fire on a control-bound *real* workload.
+- The selector is not wired to the in-IR pass; the two halves of the loop are each real and
+  measured, and joining them is unbuilt.
+- `refs.bib` has bibtex warnings for missing page numbers and publishers on several
+  entries. Cosmetic for review, worth fixing for camera-ready.
