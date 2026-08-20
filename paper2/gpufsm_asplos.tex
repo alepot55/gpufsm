@@ -195,8 +195,11 @@ the occupancy-gated component below saturates.
 \texttt{num\_warps=4}, and four warps per program redundantly process the \emph{same}
 string. Sweeping \texttt{num\_warps}$\in\{1,2,4,8\}$, \texttt{nw=1} beats \texttt{nw=4} by
 $2.77\times$ at batch 4096, $3.44\times$ at 16384 and $3.69\times$ at 65536, each doubling
-roughly halving throughput. This is pure tuning, it inflates previously reported worklist
-gaps, and it must be disclosed rather than absorbed into an abstraction claim.
+roughly halving throughput. The ladder of Table~\ref{tab:decomp} measures the same stage on
+its own harness and lands at $3.7\times$; we quote both rather than pick the flattering
+one, and take the component to be $2.8$--$3.7\times$ depending on batch. Either way this is
+pure tuning, it inflates previously reported worklist gaps, and it must be disclosed rather
+than absorbed into an abstraction claim.
 
 \paragraph{B: warp redundancy, recoverable by packing.} The scalar Triton program executes
 warp-uniformly. Its \texttt{thread\_inst\_per\_inst} is $32.00$ against CUDA's $30.34$: the
@@ -220,28 +223,37 @@ does not touch it: sweeping \texttt{BLOCK}$\in\{32,64,128,256\}$ makes it \emph{
 ($0.49\times \rightarrow 0.31\times$), because wider lock-step tiles admit more divergence.
 
 \begin{table}[t]\centering
-\caption{The gap decomposes multiplicatively, and the ladder reproduces on a second
-architecture. Batch 16384, $\le 64$ states, every row oracle-gated.
-$28 \rightarrow 739$\,Gbps is $3.7 \times 3.7 \times 1.9 = 26\times$.}
+\caption{The staged ladder reproduces on a second architecture. Both columns are the
+\emph{same} four kernels measured the same way (batch 16384, $\le 64$ states, medians over
+seeds and state counts, every row oracle-gated), so the stages are comparable across
+devices. The total is architecture-stable; the split between the last two stages is not.
+Fig.~\ref{fig:teaser}a shows the sharper per-lane lane-packed variant, which reaches
+$383$\,Gbps but was measured on the 4070 only.}
 \label{tab:decomp}
 \small
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-& & \multicolumn{2}{c}{stage factor} \\
-\cmidrule(l){3-4}
-Kernel & Gbps & RTX 4070 & A100 \\
+& \multicolumn{2}{c}{RTX 4070} & \multicolumn{2}{c}{A100} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+Kernel & Gbps & stage & Gbps & stage \\
 \midrule
-Triton worklist (\texttt{nw=4}) & 28 & --- & --- \\
-\quad $+$ \texttt{nw=1} & 104 & $3.7\times$ & $3.7\times$ \\
-\quad $+$ lane-packing & 383 & $2.6\times$ & $2.3\times$ \\
-CUDA worklist (thread-SIMT) & 739 & $2.8\times$ & $3.1\times$ \\
+Triton worklist (\texttt{nw=4}) & 28 & --- & 28 & --- \\
+\quad $+$ \texttt{nw=1} & 104 & $3.7\times$ & 101 & $3.7\times$ \\
+\quad $+$ lane-packing & 314 & $3.0\times$ & 233 & $2.3\times$ \\
+CUDA worklist (thread-SIMT) & 739 & $2.4\times$ & 705 & $3.0\times$ \\
+\midrule
+total & & $\mathbf{26\times}$ & & $\mathbf{25\times}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:decomp} puts the three components together and, more importantly, repeats
-the whole ladder on an A100. The total closes to the same $26\times$ with matching stage
-factors, so the anatomy is a property of the paradigm and not of one GPU.
+Table~\ref{tab:decomp} puts the three components together and repeats the whole ladder on
+an A100. The total is architecture-stable, $26\times$ against $25\times$, and the
+launch-configuration stage is identical on both devices. The remaining two stages trade
+places, $3.0\times$ then $2.4\times$ on the 4070 against $2.3\times$ then $3.0\times$ on
+the A100, which is what one expects when the A100's larger L2 and lower clock move where
+the occupancy-gated benefit saturates. What does not move is that the ladder ends with a
+stage the tile model cannot climb.
 
 \section{The mechanism}\label{sec:mech}
 
@@ -473,22 +485,31 @@ Rejection sampling & control & \emph{declines} & \emph{declines} \\
 \end{tabular}
 \end{table}
 
-\subsection{Closing the loop, and an out-of-band bound}
-A selector completes the pipeline: it runs the detection pass and, when the lock-step
-signature is present, routes the region to the thread lowering, otherwise leaving it on the
-tile path. Oracle-gated, the NFA worklist is auto-routed and gains $3.9\times$ over the
-tile across a $16$--$64$ state sweep, while a fixed-trip negative control is
-detected-negative and correctly stays on the tile path. Detect, decide, lower, measured.
+\subsection{An out-of-band bound, and the loop closed}
+Two results sit beside the in-compiler pass, and which is which matters.
 
-Separately, and out of band, we lower the \emph{same} idiomatic per-lane source, the
+\emph{The bound.} Out of band, we lower the \emph{same} idiomatic per-lane source, the
 active-set \texttt{ffs} worklist with its data-dependent CSR loop, to a per-thread CUDA
 kernel through \texttt{nvcc}. Oracle-validated on no-accept automata, which removes the
-early-exit confound, the thread lowering runs $4.2\times$ the tile lowering (${\approx}1555$
-vs.\ ${\approx}378$\,Gbps) and exceeds hand-written CUDA ($2.15\times$, since the generated
-kernel is a minimal thread worklist). This is an existence proof and a bound, not the
-contribution: it says the front-end source was never the problem. It also acts through the
-diagnosed mechanism, restoring issue activity to $36\%$ against the tile's $9.9\%$ and
-CUDA's $41\%$, and cutting the dependent-load stall $29\times$ (Fig.~\ref{fig:mech}).
+early-exit confound, that lowering runs $4.2\times$ the tile lowering (${\approx}1555$
+vs.\ ${\approx}378$\,Gbps) and exceeds hand-written CUDA ($2.15\times$, the generated
+kernel being a minimal thread worklist). It is an existence proof and an upper bound, not
+the contribution: the front-end source was never the problem, the tile lowering is. It also
+acts through the diagnosed mechanism, restoring issue activity to $36\%$ against the tile's
+$9.9\%$ and CUDA's $41\%$ and cutting the dependent-load stall $29\times$
+(Fig.~\ref{fig:mech}).
+
+\emph{The loop.} A selector then closes the pipeline. It runs the detection pass of
+\S\ref{sec:cure}, and where the lock-step signature is present routes the region to
+\emph{that out-of-band lowering}, otherwise leaving it on the tile path. Oracle-gated, the
+NFA worklist is auto-routed for $3.9\times$ over the tile across a $16$--$64$ state sweep,
+consistent with the $4.2\times$ above, while a fixed-trip negative control is
+detected-negative and stays on the tile path. Detect, decide, lower, measured, end to end.
+
+We are explicit about the seam. The detection is a pass inside \texttt{libtriton}; the
+lowering the selector routes to is not, and we have not wired the selector to the in-IR
+per-lane-retirement pass of \S\ref{sec:cure}. The two halves of the loop are each real and
+each measured, and joining them inside the compiler is engineering we have not done.
 
 \section{The tax is the straggler}\label{sec:law}
 
@@ -529,8 +550,8 @@ counted in absolute iterations.
 \paragraph{Out of sample.} With the coefficients frozen, the model predicts four
 \emph{held-out} distributions generated from a different seed (bimodal, log-normal, spike,
 and an adversarial single-straggler warp in which $1/32$ lanes run $256$ iterations and the
-rest run $2$) to within $1.5\%$ on average and $2.1\%$ at worst; in-sample it predicts
-every measured speedup to under $8\%$. The single-straggler case yields $7.2\times$, the
+rest run $2$) to within $1.5\%$ on average and $2.1\%$ at worst on lock-step time. Carried
+through to the derived quantity, it predicts every in-sample speedup to under $8\%$. The single-straggler case yields $7.2\times$, the
 effect in its purest form: one slow lane taxing the other $31$, which is exactly what
 per-lane retirement removes.
 
@@ -605,7 +626,10 @@ L2) all five portable witnesses confirm it with genuinely re-measured, architect
 magnitudes: hash-probe $1.40\!\to\!1.48$, power-law SpMV $2.17\!\to\!3.20$, uniform SpMV
 $1.95\!\to\!1.78$, rejection sampling $4.0$, and, decisively, the memory-only control stays
 paradigm-neutral ($0.99\!\to\!0.99$). The flagship ladder reproduces too
-(Table~\ref{tab:decomp}), as does the built pass (Table~\ref{tab:builtcure}). The
+(Table~\ref{tab:decomp}), as does the built pass (Table~\ref{tab:builtcure}). We report
+the ladder's stage factors from the two devices' own measurements rather than asserting
+they match: the total holds to within $3\%$ while the internal split shifts, and that is
+the honest form of the claim. The
 batch-4096 anchor rescales $10.1\times\!\to\!5.6\times$, because that register-resident
 regime is clock-sensitive and the A100's lower clock compresses both sides; the direction
 persists.
@@ -674,6 +698,11 @@ thread and warp control. The closest, Gluon's Linear Layouts~\cite{linearlayouts
 gives per-thread \emph{data placement} but not per-lane \emph{control flow}, as our probe
 shows; Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
 drop-to-scalar escape; Warp~\cite{warp2022} is the thread-SIMT existence proof.
+ML-Triton~\cite{mltriton2025} is the clearest sign of the trend and of its stopping point:
+it moves Triton's interface one level finer, adding warp-level programming and a
+workgroup$\rightarrow$warp$\rightarrow$intrinsic lowering, and reaches $95\%$ of
+expert-written kernels on dense GEMM and attention. A warp is still $32$ lanes under one
+latch, so it halts exactly one level above where the cost we measure lives.
 
 \textbf{Mixing thread- and tile-level execution} is the live frontier, and every approach
 is programmer-directed or differently directed. Prism~\cite{prism2026} makes thread
@@ -694,7 +723,10 @@ and our structural result says why an in-tile-IR rewrite cannot suffice.
 analysis~\cite{volkov2016latency,hongkim2009} and place both kernels on the instruction
 roofline~\cite{instroofline2022}; we distinguish it from divergence~\cite{fung2007} and
 from the \emph{hardware} fix of Subwarp Interleaving~\cite{subwarp2022}, attributing the
-same stall to the DSL at equal occupancy and fewer instructions.
+same stall to the DSL at equal occupancy and fewer instructions. Compiler work on
+divergence reduces it by melding similar control flow~\cite{darm2022} or by linearizing
+it~\cite{partialcfg2018}; both keep one instruction stream per warp, where we hand the
+lanes their own.
 
 \textbf{Methodology and lineage.} Rigorous benchmarking~\cite{hoefler2015},
 roofline~\cite{roofline2009}, and the performance-portability metric~\cite{pennycook2016},
