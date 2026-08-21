@@ -702,6 +702,8 @@ routing 2.36 and rejection sampling 4.00. Ragged attention alone falls below the
 line at 0.64 times, where the tile wins.}
 \label{fig:law}\end{figure*}
 
+\emph{Regret} here is the performance a DSL forecloses at a fixed algorithm on fixed
+hardware, the framing introduced for automata by Potenza~\cite{twofaces2026}.
 Is any of this specific to automata? To find out we built six further oracle-gated
 tile-versus-thread witnesses spanning the irregularity space, each with identical machinery
 (a Triton tile kernel, the same per-lane source lowered to CUDA threads, and a CPU oracle),
@@ -866,6 +868,15 @@ implementation; none compares programming models or holds the algorithm fixed ac
 The sole IR-for-automata work~\cite{mlirregex2025} lowers regex to one fixed
 domain-specific accelerator, a hardware target rather than a GPU-paradigm study, with no
 tile-versus-thread cost. Our axis is orthogonal: fixed algorithm, varied programming model.
+
+\textbf{The closest measurement} is Potenza~\cite{twofaces2026}, which reports a
+tile-versus-thread cost on automata across four DSLs at a fixed algorithm and argues that
+the cost tracks the execution paradigm rather than the height of the abstraction, naming
+the missing per-lane control in prose. It stops there. It does not isolate the mechanism
+from occupancy and instruction count, does not establish that the primitive is
+inexpressible in TritonGPU, builds no compiler pass, reports a single architecture, offers
+no predictive law tested out of sample, and carries no negative control. Each of those is a
+contribution here.
 
 \textbf{Tile GPU DSLs.} Triton~\cite{triton2019} and the 2024--26 wave exposing more
 thread and warp control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025},
