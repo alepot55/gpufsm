@@ -554,24 +554,22 @@ it is the variable held. These runs are on an \emph{H100}, a third architecture,
 geometric law gives $1.47\times$ against $2.46\times$ and $1.8\times$ with the PTX evidence
 unchanged.
 
-\paragraph{Two real algorithms that meet both halves.} The condition is met outside our own
-microbenchmarks. Stein's binary GCD, the subtract-and-shift loop crypto libraries use, has a
-data-dependent trip count and a body of shifts and a subtract with no memory traffic at all;
-the Collatz step count is the same shape at the extreme of the divergence axis. Both carry
-the lock-step latch, both are oracle-gated against numpy, and on both the pass fires and
-pays: $1.27\times$ on the GCD (straggler $47$) and $1.79\times$ on Collatz (straggler
-$215$), ordered by absolute straggler as the law requires. The gains are modest next to the
-synthetic $2.3$--$6.7\times$, a cheap body not being a free one. What matters is the
-contrast with the gather-bound workloads, whose stragglers are \emph{larger} and which get
-nothing.
+The condition is also met outside our own microbenchmarks. Stein's binary GCD, the
+subtract-and-shift loop crypto libraries use, and the Collatz step count both have
+data-dependent trip counts over bodies with no memory traffic at all, and on both the pass
+fires and pays ($1.27\times$ at straggler $47$, $1.79\times$ at straggler $215$, ordered by
+absolute straggler as the law requires). A cheap body is not a free one, so these are modest
+beside the synthetic range; what matters is that the gather-bound workloads, whose
+stragglers are \emph{larger}, get nothing.
 
 \begin{table}[t]\centering
 \caption{The built pass, rebuilt from one pinned wheel and run on three GPUs. Speedup is
 against the masked tile baseline; every row is oracle-correct, and every row traces to a
 versioned CSV. The benefit scales with control-boundedness, and the verifier declines the
-out-of-scope latch rather than rewriting it. $^\dagger$the SpMV row-length distribution over
-a cheap body, on an H100 from the same wheel (geometric law $1.47\times$ there): the
-controlled counterpart to the SpMV row below.}
+out-of-scope latch rather than rewriting it. $^\dagger$measured on an H100 from the same
+wheel, where the geometric law gives $1.47\times$. All three are divergent trips over a
+cheap body: the first is the SpMV row-length distribution itself, run over an accumulate
+instead of the gather, and is the controlled counterpart to the SpMV row below.}
 \label{tab:builtcure}
 \small
 \begin{tabular}{@{}llrr@{}}
@@ -582,6 +580,8 @@ Lock-step \texttt{while} (6 dists) & control & $\mathbf{2.3}$--$\mathbf{6.7\time
 \quad geometric ($n{=}5$ seeds) & control & $2.46\times$ & $1.8\times$ \\
 \quad single-straggler (held out) & control & $7.2\times$ & n/a \\
 \quad real SpMV rows$^\dagger$ & control & $6.31\times$ & n/a \\
+Binary GCD, Stein$^\dagger$ & control & $1.27\times$ & n/a \\
+Collatz step count$^\dagger$ & control & $1.79\times$ & n/a \\
 MoE top-$k$ routing & gather & ${\approx}1.0\times$ & ${\approx}1.0\times$ \\
 SpMV CSR (power-law) & gather & ${\approx}1.0\times$ & ${\approx}1.0\times$ \\
 Rejection sampling & control & \emph{declines} & \emph{declines} \\
