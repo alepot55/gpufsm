@@ -175,7 +175,7 @@ gather \texttt{trans[cur*256+sym]} per symbol, is memory bound. Between them the
 two faces we need. CUDA and NVIDIA Warp~\cite{warp2022} are thread-SIMT, one thread per
 string; Triton~\cite{triton2019} is tile/SPMD, one program over tiles. Warp is the control
 that keeps the two axes apart, because it is high-level \emph{and} thread-SIMT at once: on
-this workload it reaches $0.9\times$ of hand-written CUDA. Nothing that follows is a claim
+this workload it runs at $0.6$--$0.9\times$ of hand-written CUDA. Nothing that follows is a claim
 about abstraction \emph{height}.
 
 Correctness gates speed. Every kernel and every configuration is validated bit-for-bit
@@ -225,7 +225,7 @@ not load-bearing, and we report it as such.
 
 \paragraph{C: what is left.} A per-lane Triton worklist, in which each lane runs its own
 \texttt{ffs} and its own CSR gather with no cross-lane reduction and no active-set union,
-beats the union variant by $1.27\times$ and still reaches only $0.51\times$ of CUDA. That
+beats the union variant by $1.26\times$ and still reaches only $0.51\times$ of CUDA. That
 residual, ${\approx}2\times$, is the subject of the rest of the paper. Raising occupancy
 does not touch it: sweeping \texttt{BLOCK}$\in\{32,64,128,256\}$ makes it \emph{worse}
 ($0.49\times \rightarrow 0.31\times$), because wider lock-step tiles admit more divergence.
@@ -674,9 +674,19 @@ $1.94\times$, because the tile mapping loses occupancy against the thread mappin
 bandwidth-bound gather. It is not universal, since the pointer-chase pays no floor at
 matched occupancy, but it is real where the mapping costs occupancy. That falsified our
 initial guess that it would be ${\approx}1\times$, and it is why the law above is scoped
-to the regret that \emph{grows}. Divergence then adds on top of the floor, taking power-law
-SpMV from $2.17\times$ at tile width $32$ to $5.8\times$ at $256$. So the law is
-multi-component, and only its variable part is what per-lane retirement can return.
+to the regret that \emph{grows}. At a fixed tile width the divergence increment sits on top
+of it: on the A100 at width $32$, the zero-divergence matrix costs $1.80\times$ and the
+power-law one $3.20\times$. So the law is multi-component, and only its variable part is
+what per-lane retirement can return.
+
+We had also held that widening the tile amplifies that increment. It does not. Across
+widths $\{32,64,128,256\}$ on the A100 the \emph{zero-divergence} matrix climbs
+$1.80\rightarrow5.64\rightarrow5.65\rightarrow5.73\times$ while the divergent one climbs
+only $3.20\rightarrow3.94\rightarrow4.57\rightarrow5.60\times$, so by width $256$ the
+matrix with \emph{no} control divergence is the dearer of the two. What grows with tile
+width is the lowering baseline, not the divergence cost, and part of it is the
+launch-configuration artifact of \S\ref{sec:anatomy}, since the width sets
+\texttt{num\_warps}. The components are separable but not additive in width.
 
 \paragraph{It reaches ML, including where it reverses.} Two witnesses on the kernels tile
 DSLs are actually built for. \emph{MoE top-$k$ routing}, with ragged data-dependent expert
@@ -743,7 +753,7 @@ judgement call.
 report them where they arose rather than in a footnote: warp redundancy as the bottleneck
 (\S\ref{sec:anatomy}), a request-count deficit as the mechanism (\S\ref{sec:mech}), and a
 single-channel issue-deficit law (\S\ref{sec:general}); a fourth, that uniform SpMV would
-show ${\approx}1\times$, was falsified at $1.9\times$. Each correction narrowed the claim,
+show ${\approx}1\times$, was falsified at $1.9\times$; and a fifth, that widening the tile amplifies the divergence increment, was falsified by the width sweep of \S\ref{sec:general}. Each correction narrowed the claim,
 and we prefer that record to a cleaner-looking one.
 
 \section{Reproducibility}\label{sec:repro}

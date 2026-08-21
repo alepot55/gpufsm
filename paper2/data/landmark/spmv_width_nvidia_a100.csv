@@ -1,0 +1,18 @@
+# SpMV CSR tile-width sweep, NVIDIA A100-SXM4-40GB (Modal), oracle-gated in every row.
+# experiments/cure/landmarks/landmark_spmv.py with SPMV_BLOCK in {32,64,128,256};
+# NUM_WARPS = BLOCK/32, so BLOCK=32 is num_warps=1 and the wider tiles raise it.
+# Measured 21 Aug 2026 to settle a claim that had no CSV behind it: the paper asserted the
+# divergence increment grows with tile width (2.2x@32 -> 5.8x@256). It does not. The
+# ZERO-divergence matrix grows faster and overtakes the divergent one, so what grows with
+# width is the tile-lowering baseline, not the divergence cost.
+# Cross-check: at BLOCK=32 this reproduces the committed cross-arch A100 figures
+# (uniform 1.78, power-law 3.20 in regret_nvidia_a100_sxm4_40gb.csv).
+block,num_warps,matrix,nnz_cv,tile_gflop_s,thread_gflop_s,regret,oracle,gpu
+32,1,uniform,0.00,58.2,104.7,1.80,OK,A100-SXM4-40GB
+32,1,powerlaw,3.79,11.8,37.9,3.20,OK,A100-SXM4-40GB
+64,2,uniform,0.00,18.5,104.4,5.64,OK,A100-SXM4-40GB
+64,2,powerlaw,3.79,9.5,37.4,3.94,OK,A100-SXM4-40GB
+128,4,uniform,0.00,18.1,102.1,5.65,OK,A100-SXM4-40GB
+128,4,powerlaw,3.79,8.4,38.2,4.57,OK,A100-SXM4-40GB
+256,8,uniform,0.00,18.3,104.7,5.73,OK,A100-SXM4-40GB
+256,8,powerlaw,3.79,6.7,37.7,5.60,OK,A100-SXM4-40GB

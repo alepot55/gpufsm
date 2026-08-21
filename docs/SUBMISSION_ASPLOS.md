@@ -11,7 +11,7 @@ on the target text) so it cannot be a blind guard. Log: `~/.cache/watch_asplos.l
 It dies on reboot, so **re-run it after a restart**, and do not treat its silence as
 proof on a machine that has been off.
 
-Paper conforms: 9 pages of text and figures against a limit of 11.
+Paper conforms: 10 pages of text and figures against a limit of 11.
 
 ## Venue facts (read directly from <https://www.asplos-conference.org/asplos2027/cfp/>)
 
@@ -75,8 +75,8 @@ been submitted to ASPLOS.
 
 ## Compliance check (against the rebuilt PDF, 21 Aug 2026)
 
-- **9 pages of text and figures**; acknowledgments and references both start on p.10.
-  Limit is 11 excluding those. Comfortably inside.
+- **10 pages of text and figures**; acknowledgments and references start on p.11.
+  Limit is 11 excluding those.
 - LaTeX: **0 errors, 0 overfull boxes, 0 undefined references.**
 - Fonts: body 10pt, tables and the IR listing `\footnotesize` (8pt floor), captions 9pt.
   No `\resizebox` and no `\vspace` squeezing.

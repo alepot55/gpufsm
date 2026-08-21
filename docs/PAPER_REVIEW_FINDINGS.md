@@ -134,6 +134,31 @@ built cure with its numbers, the predictive law, and four contributions. M7 and 
 - The Warp control (0.9x of hand-CUDA) restored to the method section, where it does its
   real job of separating abstraction *height* from execution *paradigm*.
 
+### A claim that had no CSV, measured and found false (21 Aug 2026)
+
+The sweep of every numeric claim against its CSV turned up one with no CSV at all: *"divergence
+adds on top of the floor, taking power-law SpMV from 2.2x at tile width 32 to 5.8x at 256."*
+The 5.8x lived only in a docstring comment in `experiments/cure/landmarks/landmark_spmv.py:11`;
+the committed CSV has the default `BLOCK=32` only. For a paper whose thesis is that every number
+traces to a versioned CSV, that is the worst kind of gap.
+
+Measured it on a Modal A100, oracle-gated in every row
+(`paper2/data/landmark/spmv_width_nvidia_a100.csv`). **The claim is false.**
+
+| tile width (num_warps) | uniform, CV=0 | power-law, CV=3.79 | increment |
+|---|---|---|---|
+| 32 (1) | 1.80x | 3.20x | +1.40 |
+| 64 (2) | 5.64x | 3.94x | -1.70 |
+| 128 (4) | 5.65x | 4.57x | -1.08 |
+| 256 (8) | 5.73x | 5.60x | -0.13 |
+
+By width 256 the matrix with **no** control divergence is the dearer of the two. What grows with
+tile width is the lowering baseline, and part of it is the same `num_warps` artifact as the NFA
+worklist, since `NUM_WARPS = BLOCK/32`. The paper now reports this as its fifth self-correction.
+
+Trust check on the run: at width 32 it reproduces the committed cross-arch A100 figures
+(uniform 1.78, power-law 3.20) to within noise, so the harness is measuring what it did before.
+
 ### Still open
 
 - The honest end-to-end value of the in-compiler pass on real workloads is ~1.0x. The paper
