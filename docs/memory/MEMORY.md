@@ -30,3 +30,4 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Autorizzazione permanente ad agire upstream](standing-authorization-to-act-upstream.md) — rispondere e pushare senza chiedere; il SUBMIT del paper resta suo.
 - [Verso l esterno: em dash e registro](no-em-dash-match-their-register.md) — em dash vietato solo fuori, e a chi scrive nove parole non si risponde con sessanta.
 
+- [Un binario mancante non è un test rosso](a-missing-binary-is-not-a-red-test.md) — 127 e $FC vuoto si travestono da gate rosso; gatea la probe sul build e stampa l'md5 del binario.
