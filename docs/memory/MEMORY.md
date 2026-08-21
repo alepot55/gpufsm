@@ -32,3 +32,4 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Figure alla dimensione finale](figures-at-final-printed-size.md) — `width=\columnwidth` su una figura da 6in è una riscalatura a 0.55×, e il compliance check cercava `\resizebox`.
 - [Citazioni: verificare sulla fonte](verify-citations-on-the-source.md) — un primo autore sbagliato sopravvissuto a uno sweep, e il vicino più prossimo che mancava.
 
+- [Un binario mancante non è un test rosso](a-missing-binary-is-not-a-red-test.md) — 127 e $FC vuoto si travestono da gate rosso; gatea la probe sul build e stampa l'md5 del binario.

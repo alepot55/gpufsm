@@ -702,6 +702,8 @@ routing 2.36 and rejection sampling 4.00. Ragged attention alone falls below the
 line at 0.64 times, where the tile wins.}
 \label{fig:law}\end{figure*}
 
+\emph{Regret} here is the performance a DSL forecloses at a fixed algorithm on fixed
+hardware, the framing introduced for automata by Potenza~\cite{twofaces2026}.
 Is any of this specific to automata? To find out we built six further oracle-gated
 tile-versus-thread witnesses spanning the irregularity space, each with identical machinery
 (a Triton tile kernel, the same per-lane source lowered to CUDA threads, and a CPU oracle),
@@ -867,6 +869,15 @@ The sole IR-for-automata work~\cite{mlirregex2025} lowers regex to one fixed
 domain-specific accelerator, a hardware target rather than a GPU-paradigm study, with no
 tile-versus-thread cost. Our axis is orthogonal: fixed algorithm, varied programming model.
 
+\textbf{The closest measurement} is Potenza~\cite{twofaces2026}, which reports a
+tile-versus-thread cost on automata across four DSLs at a fixed algorithm and argues that
+the cost tracks the execution paradigm rather than the height of the abstraction, naming
+the missing per-lane control in prose. It stops there. It does not isolate the mechanism
+from occupancy and instruction count, does not establish that the primitive is
+inexpressible in TritonGPU, builds no compiler pass, reports a single architecture, offers
+no predictive law tested out of sample, and carries no negative control. Each of those is a
+contribution here.
+
 \textbf{Tile GPU DSLs.} Triton~\cite{triton2019} and the 2024--26 wave exposing more
 thread and warp control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025},
 gives per-thread \emph{data placement} but not per-lane \emph{control flow}, as our probe
@@ -945,18 +956,15 @@ and the wall this paper documents ceases to exist.
 % option suppresses acks, and this disclosure has to be visible to reviewers.
 \section*{Acknowledgments}
 \emph{Disclosure of generative AI use, per the ACM Publications Policy on
-Authorship.} We used a generative AI coding assistant (Anthropic's Claude, driven
-through an agentic command-line interface) extensively in producing this work. It
-wrote and refactored the bulk of the kernel, harness, and analysis code, including
-the compiler passes described in Section~\ref{sec:cure}; it ran the measurement
-scripts; it generated the figures from the versioned CSVs; and it drafted and
-revised the text of this paper. The research questions, the hypotheses, the
-experimental designs, and every scientific claim are ours, as are the decisions
-about what to keep, retract, or re-measure. No number in this paper is
-assistant-generated prose: each one is a recorded measurement in a versioned CSV,
-and each kernel is correctness-gated against a CPU oracle, so the results stand or
-fall on the artifact rather than on the assistant. We have verified the content
-and take full responsibility for it.
+Authorship.} A generative AI coding assistant (Anthropic's Claude, driven through
+an agentic command-line interface) wrote and refactored most of the kernel,
+harness, and analysis code, including the compiler passes of
+Section~\ref{sec:cure}; it ran the measurement scripts, generated the figures from
+the versioned CSVs, and drafted and revised text that we subsequently reviewed. The
+research questions, the experimental designs, and every scientific claim are ours.
+No number in this paper is assistant-generated: each is a recorded measurement in a
+versioned CSV, and each kernel is correctness-gated against a CPU oracle. We have
+verified the content and take full responsibility for it.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}

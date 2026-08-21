@@ -113,14 +113,17 @@ un draft salvato non conta.
 - Pronto e committato: `paper2/gpufsm_asplos.{tex,pdf}` (anonimo, da caricare),
   `paper2/gpufsm_asplos_named.*` (NON caricare, si rigenera dall'anonimo),
   `paper2/ASPLOS_ABSTRACT.txt` (**deve essere identico all'abstract del PDF**),
-  `paper2/resubmission_note.pdf`, compliance in `docs/SUBMISSION_ASPLOS.md`.
-- 🚫 Bloccante esterno: il sito HotCRP di settembre non è ancora aperto. **Prendere l'URL dal
-  CFP, non indovinarlo.**
+  `paper2/resubmission_note.pdf`, compliance in `docs/SUBMISSION_ASPLOS.md`, e il materiale
+  per compilare il form in `paper2/ASPLOS_SUBMISSION_KIT.md`.
+- ⏳ Sito **linkato ma non aperto**: il CFP punta a **https://asplos27-sep.hotcrp.com/**, che
+  però risponde **404**. Il link esiste, il sito non è ancora stato creato. Sentinella in
+  cron ogni 30 min (`~/.cache/watch_asplos.sh`) sul codice HTTP di quell'URL, non sul CFP.
+  Quando apre resta solo **premere SUBMIT**, ed è azione dell'utente.
 - ⚠️ Il CFP ha un **rapid-review che legge solo le prime due pagine**: se si tocca il paper,
   ricontrollare che l'argomento intero ci stia ancora dentro.
 - Build: `pdflatex → bibtex → pdflatex ×2`. Serve `texlive-fonts-extra` +
   `texlive-latex-extra` (`libertine`, `newtxmath`): senza, `acmart` ripiega su font bitmap e
-  pdftex **muore**, non degrada. Corpo a 10 pagine su 11.
+  pdftex **muore**, non degrada.
 
 ### Upstream Triton
 
