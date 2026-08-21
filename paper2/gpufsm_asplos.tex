@@ -830,7 +830,10 @@ tile-versus-thread cost. Our axis is orthogonal: fixed algorithm, varied program
 thread and warp control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025},
 gives per-thread \emph{data placement} but not per-lane \emph{control flow}, as our probe
 shows; Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
-drop-to-scalar escape; Warp~\cite{warp2022} is the thread-SIMT existence proof. The tile direction is being invested in beyond
+drop-to-scalar escape; Warp~\cite{warp2022} is the thread-SIMT existence proof. TileLang~\cite{tilelang2025} and Hexcute~\cite{hexcute2025} push further into the same
+space, the first decoupling schedule from dataflow and the second synthesising layout and
+task mapping by type inference, but both allocate \emph{work and data} to threads rather
+than giving a lane control flow of its own. The tile direction is being invested in beyond
 CUDA C++ as well, including an ownership-typed Rust frontend over the same tile
 model~\cite{fearless2026}, a safety axis orthogonal to what a tile can express.
 ML-Triton~\cite{mltriton2025} is the clearest sign of the trend and of its stopping point:
