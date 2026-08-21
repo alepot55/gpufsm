@@ -41,7 +41,9 @@ The missing primitive is a per-lane loop exit, and we prove TritonGPU cannot exp
 IR, as an MLIR pass in \texttt{libtriton} guarded by a soundness verifier. It gives
 $2.3$--$6.7\times$ on control-bound kernels and $1.6$--$3.8\times$ on an A100 from the same
 wheel, and ${\approx}1.0\times$ on SpMV and MoE, which carry larger stragglers still but a
-per-iteration gather that dwarfs the tax. A single-predictor straggler model predicts the cost with $R^2=0.997$, and
+per-iteration gather that dwarfs the tax. Run on that same distribution with a cheap body
+the pass gives $6.3\times$, so the scope condition is a divergent trip count over a cheap
+body, measured rather than argued. A single-predictor straggler model predicts the cost with $R^2=0.997$, and
 out-of-sample to $1.5\%$.
 \end{abstract}
 
@@ -170,7 +172,7 @@ TritonGPU's tile control flow, shown by a verifier-rejected rewrite. We do not s
 naming the missing primitive but specify it, including the body restriction it forces and
 the one composition question it leaves open (\S\ref{sec:wall}).
 \item That primitive, built: a soundness-verified MLIR pass in \texttt{libtriton} that
-restores per-lane retirement below the tile IR, oracle-correct, reproduced on two GPUs from
+restores per-lane retirement below the tile IR, oracle-correct, reproduced on three GPUs from
 one pinned wheel, and confirmed at the PTX and SASS level (\S\ref{sec:cure}).
 \item A predictive model of the cost and a generality law with correct negative controls
 across eight oracle-gated workloads, including a case where the sign inverts and the tile
@@ -518,14 +520,14 @@ $\sum_i \mathit{trip}_i$ rather than $32\times$ the busiest lane, while
 threads-per-instruction is unchanged.
 
 \paragraph{Which cost this closes, and which it does not.} The residual of \S\ref{sec:mech}
-and the tax of \S\ref{sec:law} are both consequences of the shared latch, but they are not
-the same cost, and it matters that the pass addresses one of them. Per-lane retirement
-removes the work the lock-step forces on lanes that should already have stopped, which is
-why Nsight reports its gain as instructions rather than as stall cycles. Restoring the
-intra-warp latency hiding of \S\ref{sec:mech} additionally requires the lanes to be running
-independent work, which is what the thread lowering below does and what the tile IR
-withholds for the same structural reason as \S\ref{sec:wall}. We measured each with the
-metric that applies to it, and we do not claim the pass was shown to do the other's job.
+and the tax of \S\ref{sec:law} both follow from the shared latch, but they are not the same
+cost and the pass addresses one of them. Per-lane retirement removes the work the lock-step
+forces on lanes that should already have stopped, which is why Nsight reports its gain as
+instructions rather than stall cycles. Restoring intra-warp latency hiding additionally
+requires the lanes to be running independent work, which is what the thread lowering below
+does and what the tile IR withholds for the reason of \S\ref{sec:wall}. We measured each
+with the metric that applies to it, and do not claim the pass was shown to do the other's
+job.
 
 The pass also fires, oracle-correct, on real workloads carrying the same latch: power-law
 CSR SpMV and MoE top-$k$ routing, with \texttt{redux.sync} removed and
@@ -542,16 +544,29 @@ denominator. A DRAM gather costs so much more per iteration than the control it 
 beside that removing the tax moves the total by noise. So the condition for the pass to pay
 is not merely a divergent trip count, which SpMV has in abundance, but a divergent trip
 count \emph{over a cheap body}, and that is a sharper scope statement than
-``control-bound''. We report this as the honest end-to-end
-value, and as a confirmation rather than a failure: that the \emph{same} pass yields
-$2.3$--$6.7\times$ on control-bound work and nothing on gather-bound work is the thesis,
-measured.
+``control-bound''.
+
+\paragraph{The condition, separated experimentally.} Distribution and body are independent
+variables, so the claim can be tested rather than argued. We ran the lock-step kernel on the
+\emph{same} power-law row lengths the SpMV witness uses, with the accumulate body in place
+of the gather. Same input, same straggler, different denominator: the pass gives
+$\mathbf{6.31\times}$ where SpMV gets ${\approx}1.0\times$, while uniform rows, the matched
+control with no divergence, give $1.09\times$. The cured time is flat across the two,
+$36.4$ and $37.5\,\mu$s over a tenfold difference in straggler. The ${\approx}1.0\times$ on
+real SpMV is therefore the body cost alone. This is a controlled factorization, not a
+real-workload speedup: the body is synthetic on purpose, because it is the variable being
+held. The runs are from the same wheel on an \emph{H100}, a third architecture, where the
+geometric law gives $1.47\times$ against $2.46\times$ and $1.8\times$, with the PTX
+evidence unchanged; the ratio narrows on a faster device because the cured floor falls more
+slowly than the baseline, and nothing else moves.
 
 \begin{table}[t]\centering
-\caption{The built pass, rebuilt from one pinned wheel and run on two GPUs. Speedup is
+\caption{The built pass, rebuilt from one pinned wheel and run on three GPUs. Speedup is
 against the masked tile baseline; every row is oracle-correct, and every row traces to a
 versioned CSV. The benefit scales with control-boundedness, and the verifier declines the
-out-of-scope latch rather than rewriting it.}
+out-of-scope latch rather than rewriting it. $^\dagger$the SpMV row-length distribution over
+a cheap body, on an H100 from the same wheel (geometric law $1.47\times$ there): the
+controlled counterpart to the SpMV row below.}
 \label{tab:builtcure}
 \small
 \begin{tabular}{@{}llrr@{}}
@@ -561,6 +576,7 @@ Workload & Bound by & RTX 4070 & A100 \\
 Lock-step \texttt{while} (6 dists) & control & $\mathbf{2.3}$--$\mathbf{6.7\times}$ & $1.6$--$3.8\times$ \\
 \quad geometric ($n{=}5$ seeds) & control & $2.46\times$ & $1.8\times$ \\
 \quad single-straggler (held out) & control & $7.2\times$ & n/a \\
+\quad real SpMV rows$^\dagger$ & control & $6.31\times$ & n/a \\
 MoE top-$k$ routing & gather & ${\approx}1.0\times$ & ${\approx}1.0\times$ \\
 SpMV CSR (power-law) & gather & ${\approx}1.0\times$ & ${\approx}1.0\times$ \\
 Rejection sampling & control & \emph{declines} & \emph{declines} \\
@@ -801,13 +817,12 @@ through a single script, so plots cannot drift from measurements. An artifact in
 each claim to the command that produces it and the CSV it writes.
 
 The expressibility and structural claims are \emph{runnable, falsifiable probes} rather than
-prose. The Gluon probe exits $0$ on the expected compile failure and $1$ if some future
-Gluon compiles it; the lowering-wall probe asserts that the MLIR verifier rejects a per-lane
-\texttt{scf.condition}; the detection check confirms the pass tags the lock-step region with
-the flag set and is a no-op without it. The per-lane-retirement pass builds as a wheel from
-a one-command recipe (a pinned upstream commit plus a versioned patch), and every cure
-number here came from that wheel, on both GPUs. The cross-architecture re-validation is a
-single non-mutating command.
+prose: the Gluon probe exits $0$ on the expected compile failure and $1$ if some future
+Gluon compiles it, the lowering-wall probe asserts that the MLIR verifier rejects a per-lane
+\texttt{scf.condition}, and the detection check confirms the pass tags the region with the
+flag set and is a no-op without it. The per-lane-retirement pass builds as a wheel from a
+one-command recipe, a pinned upstream commit plus a versioned patch, and every cure number
+here came from that wheel on all three GPUs.
 
 \section{Related work}\label{sec:related}
 \textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA. The
@@ -888,10 +903,10 @@ binding, and its magnitude is set by the per-warp straggler, so it is predictabl
 line of kernel code is written.
 
 The primitive this asks for is a per-lane sub-tile loop with an independent exit. Today's
-tile IR provably cannot express it, so we built it underneath, as a soundness-verified MLIR
-pass in \texttt{libtriton} that is oracle-correct on two architectures and visible in the
-emitted SASS. The remaining step is a language one: add the loop and its exit to the tile IR
-itself, and the wall this paper documents ceases to exist.
+tile IR provably cannot express it, so we built it underneath: a soundness-verified MLIR
+pass in \texttt{libtriton}, oracle-correct on three architectures and visible in the emitted
+SASS. The remaining step is a language one. Add the loop and its exit to the tile IR itself,
+and the wall this paper documents ceases to exist.
 
 % Flush every pending float before the bibliography: the page limit counts text
 % and figures but not references, so no figure may land after them.

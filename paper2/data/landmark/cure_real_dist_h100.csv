@@ -1,0 +1,15 @@
+# Per-lane retirement on the SpMV row-length distributions with a CHEAP body.
+# NVIDIA H100 80GB HBM3 (Modal), pinned wheel recipe (triton 3.8.0@81a46fa +
+# perlane_retire_full.patch), oracle-gated in both modes, PTX redux.sync 1->0 confirmed.
+# Sanity check of the same wheel on this GPU: the geometric law gives 1.47x
+# (masked 55.6us, cured 37.7us), against 2.46x on the RTX 4070 and 1.8x on the A100.
+# experiments/cure/passes/bench_perlane_real_dist.py
+#
+# The controlled separation the paper needs: the SpMV witness runs the SAME power-law
+# row-length distribution and gets ~1.0x, because its per-iteration body is a DRAM gather.
+# Here the distribution is identical and the body is an accumulate. Only the denominator
+# changes, and the pass goes from ~1.0x to 6.31x. Uniform rows are the matched control:
+# same body, no divergence, nothing to recover.
+distribution,mean_trip,mean_warp_max,masked_us,cured_us,speedup,oracle,gpu
+uniform,16.00,16.00,39.5,36.4,1.09,OK,H100-80GB-HBM3
+powerlaw,15.59,150.51,236.6,37.5,6.31,OK,H100-80GB-HBM3
