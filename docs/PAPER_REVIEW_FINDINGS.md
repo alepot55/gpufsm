@@ -161,8 +161,24 @@ Trust check on the run: at width 32 it reproduces the committed cross-arch A100 
 
 ### Still open
 
-- The in-compiler pass still shows ~1.0x on real workloads. **Much better answered than it
-  was**: the power-law CSR matrix the SpMV witness runs on has a per-warp straggler of 150
+- **CLOSED (21 Aug, measured).** The pass showing ~1.0x on real workloads was the largest
+  reject risk. It is now a measured, controlled result rather than an argument. Built the
+  pinned cure wheel on Modal and ran the lock-step kernel on the SAME power-law row lengths
+  the SpMV witness uses, with an accumulate body instead of the DRAM gather (H100, both
+  modes oracle-gated, PTX redux.sync 1->0):
+
+  | distribution | body | speedup |
+  |---|---|---|
+  | power-law rows | DRAM gather (the SpMV witness) | ~1.0x |
+  | power-law rows | cheap accumulate | **6.31x** |
+  | uniform rows | cheap accumulate | 1.09x (control) |
+
+  Only the denominator changes. `paper2/data/landmark/cure_real_dist_h100.csv`. The H100 is
+  also a third architecture for the pass: geometric law 1.47x, against 2.46x on the 4070 and
+  1.8x on the A100.
+
+- The older, weaker form of the same point, kept because it is the reason the experiment was
+  worth running: the power-law CSR matrix the SpMV witness runs on has a per-warp straggler of 150
   rows against a mean of 16 (D=9.65), a *larger* straggler than five of the six synthetic
   distributions the law was fitted on and a higher divergence ratio than any of them
   (`paper2/data/landmark/straggler_of_real_inputs.csv`, computed from the generator, no GPU).
