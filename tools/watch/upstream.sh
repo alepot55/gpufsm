@@ -22,6 +22,8 @@ triton-lang/triton:11325
 triton-lang/triton:10766
 triton-lang/triton:11326
 triton-lang/triton:11328
+triton-lang/triton:11393
+triton-lang/triton:11396
 llvm/llvm-project:216947
 llvm/llvm-project:216853
 llvm/llvm-project:216605

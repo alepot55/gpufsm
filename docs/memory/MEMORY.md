@@ -31,5 +31,6 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Verso l esterno: em dash e registro](no-em-dash-match-their-register.md) — em dash vietato solo fuori, e a chi scrive nove parole non si risponde con sessanta.
 - [Figure alla dimensione finale](figures-at-final-printed-size.md) — `width=\columnwidth` su una figura da 6in è una riscalatura a 0.55×, e il compliance check cercava `\resizebox`.
 - [Citazioni: verificare sulla fonte](verify-citations-on-the-source.md) — un primo autore sbagliato sopravvissuto a uno sweep, e il vicino più prossimo che mancava.
-
 - [Un binario mancante non è un test rosso](a-missing-binary-is-not-a-red-test.md) — 127 e $FC vuoto si travestono da gate rosso; gatea la probe sul build e stampa l'md5 del binario.
+- [Il crash sparito non è il criterio](judge-a-fix-by-the-invariant-not-the-symptom.md) — ho sponsorizzato una fix upstream perché il sintomo spariva; toglieva un assert per tutte le altre op.
+- [Il proprio lavoro si cita in terza persona](cite-your-prior-work-in-third-person.md) — sotto double-blind una voce `{{Anonymous}}` ti tradisce invece di proteggerti, e aggiungerne una rinumera la bibliografia.

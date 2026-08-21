@@ -13,7 +13,7 @@ $OPT $T $PIPE | $FC $T && echo VERDE || echo ROSSO
 `python/triton/FileCheck` dentro il tree, non sotto `/root/.triton/llvm`. Col path giusto:
 verde su `test/Conversion/tritonnvidiagpu_to_llvm.mlir` e `test/Analysis/test-membar.mlir`.
 
-È **la stessa forma** dell'errore già registrato in [[il-gate-gira-solo-dal-venv]]: `command not
+È **la stessa forma** dell'errore già registrato in [[venv-and-the-real-gate]]: `command not
 found` che si traveste da gate rosso. La differenza è che lì il comando mancava nel PATH, qui la
 variabile che lo conteneva era vuota. Regola operativa: **se un gate diventa rosso, prima stampa
 il path del binario che stai invocando.** Una riga di `echo` separa "il codice è rotto" da "il

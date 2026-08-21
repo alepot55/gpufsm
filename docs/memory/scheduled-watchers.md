@@ -107,6 +107,17 @@ Regola: **aprire o chiudere una PR upstream include modificare `TARGETS`.** Il w
 quando non succede niente sia quando guarda dalla parte sbagliata, e i due silenzi sono identici
 ([[empty-output-is-not-a-result]]).
 
+**Ricorso il 21 ago 2026, con la stessa forma.** whutsunxu ha aperto triton#11396 e Jokeren ci ha
+messo `CHANGES_REQUESTED` con due commenti inline nel giro di un'ora. Nessuna notifica: #11396 e
+#11393 non erano in `TARGETS`. L'ho scoperto solo perché l'utente ha chiesto "hai controllato gli
+ultimi commenti?" — **la stessa domanda che aveva scoperto il buco la volta prima**. Aggiunti
+entrambi.
+
+Nota su cosa non basta guardare: un watcher ad hoc scritto al volo che polla solo
+`issues/<n>/comments` **non vede le review**. Il verdetto di un maintainer arriva su
+`pulls/<n>/reviews` e i suoi commenti su `pulls/<n>/comments`, che sono endpoint diversi. Sono tre
+canali più lo stato della PR, e `upstream.sh` li copre tutti: una copia frettolosa, no.
+
 ## Dettagli che si pagano se si dimenticano
 
 - Lo stato è in `since`, `open-prs-v2`, `ci-seen` nella stessa cartella. Cancellare `since` fa
