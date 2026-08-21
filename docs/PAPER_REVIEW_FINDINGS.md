@@ -196,3 +196,49 @@ Trust check on the run: at width 32 it reproduces the committed cross-arch A100 
   measured, and joining them is unbuilt.
 - `refs.bib` has bibtex warnings for missing page numbers and publishers on several
   entries. Cosmetic for review, worth fixing for camera-ready.
+
+## Bibliography audit (21 Aug 2026) — seven errors, two of them severe
+
+Every non-arXiv entry in `paper2/refs.bib` was checked against Crossref, Wiley, dblp and the
+publishers' own pages. The edits landed in commit `34a2f40`, whose message is about the
+beyond-64-state result and does not mention them; this is the record.
+
+**Two DOIs resolved to entirely different papers.** Verified independently on Crossref:
+
+| key | DOI in the paper | what it actually resolves to | corrected to |
+|---|---|---|---|
+| `fung2007` | `10.1109/MICRO.2007.12` | Dubach et al., *Microarchitectural Design Space Exploration* | `10.1109/MICRO.2007.30` |
+| `subwarp2022` | `10.1109/HPCA53966.2022.00065` | Kao & Krishna, *MAGMA* | `10.1109/HPCA53966.2022.00090` |
+
+Both are load-bearing citations: Fung is the divergence baseline we distinguish ourselves
+from, Subwarp Interleaving is the hardware fix we distinguish ourselves from. A reader
+following either DOI would have landed on an unrelated paper. Note that ACM DL serves the
+Fung paper at the `.12` URL, so ACM's own record is self-inconsistent; Crossref and dblp
+both say `.30`.
+
+**Two author lists were wrong**, the same class as the `hopps2025` error found earlier:
+
+- `mlirregex2025` had "Somaini, Filippo and Carloni, Luca". The authors are **Andrea
+  Somaini** and **Filippo Carloni**: the first names were shifted by one and "Luca" was
+  invented. Luca Carloni is a different and well-known researcher, so this misattributed
+  the work to someone who did not write it.
+- `bitgen2025` had "Chu, Hongyu"; the second author is **Xiaowen Chu**.
+
+**One entry conflated two papers.** `instroofline2022` carried the title and authors of the
+PMBS@SC'19 paper but the DOI of the CPE'22 journal article, which has a third author
+(Awan). Aligned to the DOI.
+
+**One title was truncated.** `hoefler2015` was missing "Twelve Ways to Tell the Masses When
+Reporting Performance Results".
+
+Left alone deliberately: `insum2026`'s author order, where ACM's deposited metadata
+disagrees with the camera-ready and arXiv, and ours matches the camera-ready; and the
+accent in `hopps2025`'s "Sánchez", where Crossref and dblp disagree.
+
+Result: bibtex warnings 48 -> 0, no "et al." in the rendered bibliography, every field
+sourced. The remaining `Overfull \vbox (1.888pt)` is on page 13, inside the references,
+caused by the bibliography growing; it is sub-millimetre and vertical, and clearing it would
+mean removing accurate metadata.
+
+**Lesson, already recorded in `docs/memory/verify-citations-on-the-source.md`:** a DOI that
+looks plausible is not a verified DOI. The only check that catches this is resolving it.
