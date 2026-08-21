@@ -5,6 +5,11 @@ figures were not regenerable. This script is the canonical source: it prints the
 fit, the floor, the correlations and the held-out errors, and reports each
 per-run block separately so an appended rerun cannot silently move a number.
 
+Predictions use the ROUNDED coefficients the paper publishes, because freezing those
+is the method the paper declares. The unrounded refit is printed beside them, on its
+own labelled line, so the small gap between the two is visible and explained instead
+of looking like a number that fails to reproduce.
+
 Usage: python experiments/cure/verify_straggler_law.py
 """
 
@@ -84,13 +89,25 @@ def report_run(label: str, pred: list[dict[str, str]], held: list[dict[str, str]
     masked = [off[d]["time"] for d in dists]
     a, b, r2 = linfit(warpmax, masked)
 
+    # The paper publishes the fit ROUNDED, t = 32.4 + 1.091 * E[warp-max], and its
+    # out-of-sample check freezes exactly those published coefficients. Predicting with
+    # the unrounded refit instead is a different method: it moves the worst held-out
+    # error from 2.1% to 2.2%, which has already been read once as a paper number that
+    # does not reproduce. It is not. Both are printed, the published pair first, so the
+    # gap is visible and labelled rather than looking like a contradiction.
+    a_pub, b_pub = round(a, 1), round(b, 3)
+
     floors = [retire[d]["time"] for d in dists]
     speedup = {d: off[d]["time"] / retire[d]["time"] for d in dists}
 
     print(f"\n=== {label} ===")
     bad = [d for d in dists if off[d]["oracle"] != "OK" or retire[d]["oracle"] != "OK"]
     print(f"oracle: {'all OK' if not bad else 'FAIL on ' + ','.join(bad)}")
-    print(f"straggler law : t_masked = {a:.1f} + {b:.2f} * E[warp-max] us   R^2 = {r2:.3f}")
+    print(
+        f"straggler law : t_masked = {a_pub} + {b_pub} * E[warp-max] us   R^2 = {r2:.3f}"
+        "   <- published, and used for every prediction below"
+    )
+    print(f"                (unrounded refit, for reference: {a:.4f} + {b:.6f} * E[warp-max])")
     # pstdev (ddof=0) matches the numpy convention the paper's figure used.
     print(f"cured floor   : {statistics.mean(floors):.1f} +/- {statistics.pstdev(floors):.1f} us")
 
@@ -103,7 +120,7 @@ def report_run(label: str, pred: list[dict[str, str]], held: list[dict[str, str]
     print("  per-distribution speedup:")
     errs = []
     for d in dists:
-        pred_t = a + b * off[d]["warpmax"]
+        pred_t = a_pub + b_pub * off[d]["warpmax"]
         pred_s = pred_t / statistics.mean(floors)
         err = abs(pred_s - speedup[d]) / speedup[d] * 100
         errs.append(err)
@@ -115,18 +132,29 @@ def report_run(label: str, pred: list[dict[str, str]], held: list[dict[str, str]
 
     if held:
         h_off, h_ret = by_dist(held, "off"), by_dist(held, "retire")
-        print("  held-out (coefficients frozen from above):")
-        h_errs = []
+        print(f"  held-out (published coefficients {a_pub} + {b_pub}, frozen):")
+        h_errs, h_errs_raw = [], []
         for d in sorted(h_off):
-            pred_t = a + b * h_off[d]["warpmax"]
+            pred_t = a_pub + b_pub * h_off[d]["warpmax"]
             err = abs(pred_t - h_off[d]["time"]) / h_off[d]["time"] * 100
             h_errs.append(err)
+            h_errs_raw.append(
+                abs(a + b * h_off[d]["warpmax"] - h_off[d]["time"]) / h_off[d]["time"] * 100
+            )
             sp = h_off[d]["time"] / h_ret[d]["time"] if d in h_ret else float("nan")
             print(
-                f"    {d:16} measured {h_off[d]['time']:6.1f}us  predicted {pred_t:6.1f}us  "
-                f"err {err:4.1f}%   speedup {sp:5.2f}x"
+                f"    {d:16} measured {h_off[d]['time']:6.1f}us  predicted {pred_t:7.2f}us  "
+                f"err {err:5.3f}%   speedup {sp:5.2f}x"
             )
-        print(f"  out-of-sample error: mean {statistics.mean(h_errs):.1f}%  max {max(h_errs):.1f}%")
+        print(
+            f"  out-of-sample error: mean {statistics.mean(h_errs):.3f}% -> "
+            f"{statistics.mean(h_errs):.1f}%   max {max(h_errs):.3f}% -> {max(h_errs):.1f}%"
+            "   <- THE PAPER'S NUMBERS"
+        )
+        print(
+            f"  unrounded refit, for reference: mean {statistics.mean(h_errs_raw):.3f}%  "
+            f"max {max(h_errs_raw):.3f}%  (a different method, not a failure to reproduce)"
+        )
 
 
 def main() -> int:
