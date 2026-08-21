@@ -11,7 +11,7 @@ on the target text) so it cannot be a blind guard. Log: `~/.cache/watch_asplos.l
 It dies on reboot, so **re-run it after a restart**, and do not treat its silence as
 proof on a machine that has been off.
 
-Paper conforms: 10 pages against a limit of 11.
+Paper conforms: 10 pages of text and figures against a limit of 11.
 
 ## Venue facts (read directly from <https://www.asplos-conference.org/asplos2027/cfp/>)
 
@@ -73,19 +73,39 @@ Note that ASPLOS's own resubmission bar does not apply to us: only papers reject
 from an immediately preceding **ASPLOS** cycle are barred, and this work has never
 been submitted to ASPLOS.
 
-## Compliance check (against the rebuilt PDF, 14 Aug 2026)
+## Compliance check (against the rebuilt PDF, 21 Aug 2026)
 
-- **9 pages of text and figures**; acknowledgments and references both start on p.10.
-  Limit is 11 excluding those. Comfortably inside.
+- **10 pages of text and figures**; acknowledgments and references start on p.11.
+  Limit is 11 excluding those.
 - LaTeX: **0 errors, 0 overfull boxes, 0 undefined references.**
-- Fonts: body 10pt, tables `\footnotesize` (8pt floor), captions `\small` (9pt). No
-  `\resizebox`, so nothing is scaled below the limit. No `\vspace` squeezing.
+- Fonts: body 10pt, tables and the IR listing `\footnotesize` (8pt floor), captions 9pt.
+  No `\resizebox` and no `\vspace` squeezing.
+- **Figures carry no hidden downscale.** They are emitted by `paper2/figures.py` as vector
+  PDFs at their final printed size (3.33 in for a column, 7.0 in for a `figure*`) and
+  included at scale 1.0, so an 8 pt label in the source is 8 pt on the page. The earlier
+  set was generated at 6 in wide and included with `width=\columnwidth`, i.e. scaled to
+  0.55x, which put every axis label near 5 pt. That was below the CFP floor and this
+  compliance check had missed it, because `\resizebox` was absent but the shrink came
+  from the `width=` instead.
+- The IR listing (Fig. 4) is a trimmed excerpt with all `loc(...)` source locations
+  stripped: the raw capture embeds an absolute path containing the author's username.
 - Anonymity: no author name, affiliation, repo name or personal URL in the text; PDF
   metadata carries no Author field. The one anonymous self-citation is to our paper 1,
   which is correct under double-blind.
-- Every figure carries the ACM-required `\Description`. Zero em dashes.
-- References: 27 entries, full author names throughout (no "et al."), DOIs or
-  resolvable URLs on all but the anonymous self-citation, citations hyperlinked.
+- Every figure carries the ACM-required `\Description`, all six of them, and the build
+  emits zero "possible image without description" warnings. Check this by grepping the log
+  rather than the source: the restructure dropped all eight of the old ones silently and
+  this line claimed otherwise for a while.
+- Zero em dashes.
+- References: 34 entries, full author names throughout (no "et al." -- `subwarp2022` used
+  to carry `and others` and now does not), DOIs or resolvable URLs on all but the anonymous
+  self-citation, citations hyperlinked, zero bibtex errors. bibtex still warns about missing
+  page numbers and publishers on several entries; cosmetic for review, worth closing before
+  camera-ready.
+- Every reference added in the 21 Aug sweep was verified on the publisher or arXiv page
+  rather than from the earlier sweep's notes, after that pass turned out to carry a wrong
+  first author on `hopps2025`. See `paper2/RELATED_WORK.md` for what was checked and
+  deliberately not cited.
 
 ## Files to upload
 
@@ -102,7 +122,7 @@ opens (historically a few weeks before the deadline):
 
 1. Open the site linked from the CFP's "Submission Website" section, create an
    account or sign in.
-2. Title: `From Diagnosis to Cure: Decomposing the Tile-SPMD Abstraction Regret on Irregular Automata`
+2. Title: `The Lock-Step Tax: Per-Lane Control Flow as the Missing Primitive in Tile GPU DSLs`
 3. Abstract: paste `paper2/ASPLOS_ABSTRACT.txt`.
 4. Authors: Alessandro Potenza, Politecnico di Milano (in the form only, never in the PDF).
 5. Topics: select accurately. Bad topic selection means bad reviewer matching, and

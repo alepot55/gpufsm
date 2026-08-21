@@ -43,8 +43,10 @@
 @article{hybridsa2024,
   author = {Le Glaunec, Alexis and Kong, Lingkun and Mamouras, Konstantinos},
   title = {HybridSA: {GPU} Acceleration of Multi-pattern Regex Matching using Bit Parallelism},
-  journal = {Proc. ACM Program. Lang. (OOPSLA2)},
+  journal = {Proc. ACM Program. Lang.},
   volume = {8},
+  number = {OOPSLA2},
+  articleno = {331},
   pages = {1699--1728},
   year = {2024},
   doi = {10.1145/3689771}
@@ -80,7 +82,7 @@
   doi = {10.1145/3696443.3708916}
 }
 @inproceedings{subwarp2022,
-  author = {Damani, Sana and others},
+  author = {Damani, Sana and Stephenson, Mark and Rangan, Ram and Johnson, Daniel R. and Kulkarni, Rishkul and Keckler, Stephen W.},
   title = {{GPU} Subwarp Interleaving},
   booktitle = {HPCA},
   year = {2022},
@@ -104,6 +106,9 @@
   author = {Williams, Samuel and Waterman, Andrew and Patterson, David},
   title = {Roofline: An Insightful Visual Performance Model for Multicore Architectures},
   journal = {Commun. ACM},
+  volume = {52},
+  number = {4},
+  pages = {65--76},
   year = {2009},
   doi = {10.1145/1498765.1498785}
 }
@@ -127,7 +132,7 @@
   doi = {10.1145/3656411}
 }
 @inproceedings{hopps2025,
-  author = {Du, Yufeng and Emer, Joel S. and S{\'a}nchez, Daniel},
+  author = {Du, Xingran and Emer, Joel S. and S{\'a}nchez, Daniel},
   title = {Hopps: Leveraging Sparsity to Accelerate Automata Processing},
   booktitle = {ASPLOS},
   year = {2025},
@@ -165,7 +170,7 @@
   author = {{NVIDIA}},
   title = {{cuTile} and {CUDA Tile IR}: a tile-level model and {MLIR} {IR}, with a {Tile IR} backend for {OpenAI Triton}},
   year = {2025},
-  note = {CUDA 13.1; developer.nvidia.com/blog (CUDA Tile IR Backend for OpenAI Triton); \url{https://github.com/NVIDIA/cuda-tile}}
+  note = {CUDA 13.1. Quotations from the CUDA Programming Guide, \emph{Writing Tile Kernels}, \url{https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/writing-tile-kernels.html}; see also \url{https://github.com/NVIDIA/cuda-tile}}
 }
 @misc{tawa2026,
   author = {Chen, Hongzheng and Fan, Bin and Collins, Alexander and Hagedorn, Bastian and Gaburov, Evghenii and Masuda, Masahiro and Brookhart, Matthew and Sullivan, Chris and Knight, Jason and Zhang, Zhiru and Grover, Vinod},
@@ -186,4 +191,57 @@
   title = {{NVIDIA} {Tesla} {V100} {GPU} Architecture: The World's Most Advanced Data Center {GPU}},
   year = {2017},
   note = {Whitepaper WP-08608-001-v1.1; introduces Independent Thread Scheduling}
+}
+
+@misc{mltriton2025,
+  author = {Wang, Dewei and Zhu, Wei and Ling, Liyang and Tiotto, Ettore and Wang, Quintin and Tsang, Whitney and Opperman, Julian and Deng, Jacky},
+  title = {{ML-Triton}, A Multi-Level Compilation and Language Extension to {Triton} {GPU} Programming},
+  year = {2025},
+  note = {arXiv:2503.14985}, url = {https://arxiv.org/abs/2503.14985}
+}
+
+@inproceedings{darm2022,
+  author = {Saumya, Charitha and Sundararajah, Kirshanthan and Kulkarni, Milind},
+  title = {{DARM}: Control-Flow Melding for {SIMT} Thread Divergence Reduction},
+  booktitle = {Proc. CGO},
+  year = {2022},
+  doi = {10.1109/CGO53902.2022.9741285}
+}
+
+@inproceedings{insum2026,
+  author = {Won, Jaeyeon and Ahrens, Willow and Emer, Joel S. and Amarasinghe, Saman},
+  title = {{Insum}: Sparse {GPU} Kernels Simplified and Optimized with Indirect Einsums},
+  booktitle = {ASPLOS},
+  year = {2026},
+  doi = {10.1145/3779212.3790176}
+}
+
+@inproceedings{whyslownfa2020,
+  author = {Liu, Hongyuan and Pai, Sreepathi and Jog, Adwait},
+  title = {Why {GPUs} are Slow at Executing {NFAs} and How to Make them Faster},
+  booktitle = {ASPLOS},
+  pages = {251--265},
+  year = {2020},
+  doi = {10.1145/3373376.3378471}
+}
+
+@misc{fearless2026,
+  author = {Elibol, Melih and Roesch, Jared and Gelado, Isaac and Buehler, Eric and Garland, Michael},
+  title = {Fearless Concurrency on the {GPU}},
+  year = {2026},
+  note = {arXiv:2606.15991}, url = {https://arxiv.org/abs/2606.15991}
+}
+
+@misc{tilelang2025,
+  author = {Wang, Lei and Cheng, Yu and Shi, Yining and Tang, Zhengju and Mo, Zhiwen and Xie, Wenhao and Ma, Lingxiao and Xia, Yuqing and Xue, Jilong and Yang, Fan and Yang, Zhi},
+  title = {{TileLang}: A Composable Tiled Programming Model for {AI} Systems},
+  year = {2025},
+  note = {arXiv:2504.17577}, url = {https://arxiv.org/abs/2504.17577}
+}
+
+@misc{hexcute2025,
+  author = {Zhang, Xiao and Ding, Yaoyao and Hu, Yang and Pekhimenko, Gennady},
+  title = {{Hexcute}: A Tile-based Programming Language with Automatic Layout and Task-Mapping Synthesis},
+  year = {2025},
+  note = {arXiv:2504.16214}, url = {https://arxiv.org/abs/2504.16214}
 }
