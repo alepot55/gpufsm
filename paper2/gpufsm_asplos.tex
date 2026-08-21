@@ -172,8 +172,9 @@ TritonGPU's tile control flow, shown by a verifier-rejected rewrite. We do not s
 naming the missing primitive but specify it, including the body restriction it forces and
 the one composition question it leaves open (\S\ref{sec:wall}).
 \item That primitive, built: a soundness-verified MLIR pass in \texttt{libtriton} that
-restores per-lane retirement below the tile IR, oracle-correct, reproduced on three GPUs from
-one pinned wheel, and confirmed at the PTX and SASS level (\S\ref{sec:cure}).
+restores per-lane retirement below the tile IR, oracle-correct, reproduced on four GPUs from
+one pinned wheel, confirmed at the PTX and SASS level, and driven by a detector in the same
+compiler (\S\ref{sec:cure}).
 \item A predictive model of the cost and a generality law with correct negative controls
 across eight oracle-gated workloads, including a case where the sign inverts and the tile
 legitimately wins, and one piece of directly actionable guidance: on irregular work a wider
@@ -563,7 +564,7 @@ beside the synthetic range; what matters is that the gather-bound workloads, who
 stragglers are \emph{larger}, get nothing.
 
 \begin{table}[t]\centering
-\caption{The built pass, rebuilt from one pinned wheel and run on three GPUs. Speedup is
+\caption{The built pass, rebuilt from one pinned wheel and run on four GPUs. Speedup is
 against the masked tile baseline; every row is oracle-correct, and every row traces to a
 versioned CSV. The benefit scales with control-boundedness, and the verifier declines the
 out-of-scope latch rather than rewriting it. $^\dagger$measured on an H100 from the same
@@ -613,10 +614,16 @@ NFA worklist is auto-routed for $3.9\times$ over the tile across a $16$--$64$ st
 consistent with the $4.2\times$ above, while a fixed-trip negative control is
 detected-negative and stays on the tile path. Detect, decide, lower, measured, end to end.
 
-We are explicit about the seam. The detection is a pass inside \texttt{libtriton}; the
-lowering the selector routes to is not, and we have not wired the selector to the in-IR
-per-lane-retirement pass of \S\ref{sec:cure}. The two halves of the loop are each real and
-each measured, and joining them inside the compiler is engineering we have not done.
+\emph{The loop, without the seam.} That selector routes to an out-of-band lowering, so the
+decision and the rewrite live in different toolchains. They need not. Built into one wheel,
+the detection pass marks the region in \texttt{make\_ttgir} and the retirement pass rewrites
+its latch in \texttt{make\_llir}, so the whole decision runs in one process against one
+compiler: read the attribute, and recompile with retirement where it fired. On an H200 the
+lock-step worklist is detected and routed for $\mathbf{1.90\times}$ ($69.8\rightarrow36.7\,
+\mu$s, \texttt{redux.sync} $1\!\rightarrow\!0$), while a fixed-trip variant of the
+\emph{same} body is not detected and keeps the tile path. Asking the detection pass for its
+in-IR rewrite mode instead changes neither decision nor timing. The kernel here is the
+lock-step worklist rather than the full NFA, so this closes the loop and not the workload.
 
 \section{The tax is the straggler}\label{sec:law}
 
@@ -841,7 +848,7 @@ prose: the Gluon probe exits $0$ on the expected compile failure and $1$ if some
 Gluon compiles it, and the lowering-wall probe asserts that the MLIR verifier rejects a
 per-lane \texttt{scf.condition}. The per-lane-retirement pass builds as a wheel from a
 one-command recipe, a pinned upstream commit plus a versioned patch, and every cure number
-here came from that wheel on all three GPUs.
+here came from that wheel, on all four GPUs.
 
 \section{Related work}\label{sec:related}
 \textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA. The
@@ -923,7 +930,7 @@ line of kernel code is written.
 
 The primitive this asks for is a per-lane sub-tile loop with an independent exit. Today's
 tile IR provably cannot express it, so we built it underneath: a soundness-verified MLIR
-pass in \texttt{libtriton}, oracle-correct on three architectures and visible in the emitted
+pass in \texttt{libtriton}, oracle-correct on four architectures and visible in the emitted
 SASS. The remaining step is a language one. Add the loop and its exit to the tile IR itself,
 and the wall this paper documents ceases to exist.
 

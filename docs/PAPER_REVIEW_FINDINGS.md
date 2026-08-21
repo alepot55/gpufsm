@@ -192,8 +192,16 @@ Trust check on the run: at width 32 it reproduces the committed cross-arch A100 
   workstream may need, and the paper's own mechanism predicts a null there anyway, since the
   NFA residual is the latency channel and the pass removes the straggler channel. Left to
   the user.
-- The selector is not wired to the in-IR pass; the two halves of the loop are each real and
-  measured, and joining them is unbuilt.
+- **CLOSED (21 Aug, measured).** The selector was not wired to the in-IR pass. It is now.
+  The two halves had never coexisted in one Triton build because `ThreadRegion.cpp` carries a
+  superseded second pass that `registration.patch` does not declare, so the file will not
+  compile once the patch is applied. With that pass removed the wheel carries both, and the
+  whole decision runs in one process: on an H200 the lock-step worklist is detected and
+  routed for **1.90x** (69.8 -> 36.7 us, PTX redux.sync 1 -> 0), while a fixed-trip variant of
+  the same body is not detected and keeps the tile path. Asking the detector for its in-IR
+  rewrite mode changes neither decision nor timing.
+  Data: `paper2/data/landmark/selector_incompiler_h200.csv`. Recipe and the three traps:
+  `experiments/cure/triton_thread_region_pass/README.md`.
 - `refs.bib` has bibtex warnings for missing page numbers and publishers on several
   entries. Cosmetic for review, worth fixing for camera-ready.
 

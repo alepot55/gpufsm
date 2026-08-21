@@ -1,0 +1,15 @@
+# detect -> route -> lower, closed inside ONE process against ONE compiler.
+# NVIDIA H200 (Modal). Triton 3.8.0@81a46fa carrying BOTH halves for the first time:
+#   registration.patch  -> tritongpu-thread-region marks ttg.thread_region_candidate in make_ttgir
+#   perlane_retire_full -> per_lane_loop_retirement rewrites the latch in make_llir
+# See experiments/cure/triton_thread_region_pass/README.md for why they had never coexisted.
+#
+# The selector compiles once to read the detection attribute, routes on it, and recompiles
+# with retirement where it fired. Both kernels oracle-gated; the routed kernel's PTX shows
+# redux.sync 1 -> 0 and bar.warp.sync 0 -> 1. The negative control is a fixed-trip variant of
+# the same body: no lock-step latch, so detection stays silent and it keeps the tile path.
+# Repeated with GPUFSM_THREAD_REGION=hoist: same decision, same 1.90x, so the decision does
+# not depend on which in-IR mode the detection pass is asked for.
+kernel,detected,routed_to,tile_us,routed_us,speedup,oracle,gpu
+lockstep_worklist,1,retire,69.8,36.7,1.90,OK,H200
+fixedtrip_control,0,tile,54.8,,,OK,H200
