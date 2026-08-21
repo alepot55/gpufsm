@@ -779,12 +779,13 @@ control with the same MLIR stack in which only the expressivity lever moves, and
 \S\ref{sec:wall} converts the claim into a verifier-checkable statement rather than a
 judgement call.
 
-\paragraph{On our own corrections.} Three intermediate hypotheses of ours were wrong and we
-report them where they arose rather than in a footnote: warp redundancy as the bottleneck
-(\S\ref{sec:anatomy}), a request-count deficit as the mechanism (\S\ref{sec:mech}), and a
-single-channel issue-deficit law (\S\ref{sec:general}); a fourth, that uniform SpMV would
-show ${\approx}1\times$, was falsified at $1.9\times$; and a fifth, that widening the tile amplifies the divergence increment, was falsified by the width sweep of \S\ref{sec:general}. Each correction narrowed the claim,
-and we prefer that record to a cleaner-looking one.
+\paragraph{On our own corrections.} Five hypotheses of ours were wrong, and we report each
+where it arose rather than collecting them in a footnote: warp redundancy as the bottleneck
+(\S\ref{sec:anatomy}); a request-count deficit as the mechanism (\S\ref{sec:mech}); a
+single-channel issue-deficit law, uniform SpMV at ${\approx}1\times$ when it is
+$1.9\times$, and tile width amplifying the divergence increment when it amplifies the
+baseline instead (all \S\ref{sec:general}). Every one of them narrowed a claim, and we
+prefer that record to a cleaner-looking one.
 
 \section{Reproducibility}\label{sec:repro}
 Every number here traces to a versioned CSV, and all figures regenerate from those CSVs
