@@ -7,7 +7,7 @@
 \pagestyle{empty}
 
 \title{\vspace{-2.5em}Resubmission note\\
-\large From Diagnosis to Cure: Decomposing the Tile-SPMD Abstraction Regret on Irregular Automata}
+\large The Lock-Step Tax: Per-Lane Control Flow as the Missing Primitive in Tile GPU DSLs}
 \date{}
 \author{}
 
@@ -50,11 +50,26 @@ generality law over eight oracle-gated workloads, including a pointer-chase nega
 control at 1.00$\times$ and a case where the sign inverts and the tile wins
 (0.64$\times$). These bound the claim instead of extending it.
 
+\emph{5. One statistic was replaced with a more robust one.} The claim that the
+lock-step cost is set by the absolute per-warp straggler rather than by the
+divergence \emph{ratio} previously rested on a correlation computed over the six
+designed distributions, where it is 0.06. Adding the four held-out distributions
+raises it to 0.55, so the statistic was sample-fragile. The claim now rests on the
+comparison of fits, which is stable on both samples: $R^2 = 0.997$ and $0.998$ for
+the straggler against $0.00$ and $0.29$ for the divergence ratio. The conclusion is
+unchanged; the evidence for it is no longer fragile.
+
 \textbf{Presentation.} The manuscript was condensed from the 16-page
-\texttt{acmsmall} journal format to the ASPLOS format and page limit, the
-contribution list was consolidated, and the abstract was tightened. An
-acknowledgments section disclosing the use of a generative AI assistant was added,
-per the ACM authorship policy. The technical content is otherwise the content
-described above.
+\texttt{acmsmall} journal format to the ASPLOS format and page limit, and then
+restructured: the paper is retitled after the mechanism it identifies rather than
+after the workload it was first measured on, the contribution list is consolidated
+to four items, the abstract is roughly half its former length, and the argument now
+reaches its central claim, its figure and its contributions within the first two
+pages. The compiler section was broken into subsections, the figures were rebuilt as
+vector graphics at their final printed size, and a listing of the matched TritonGPU
+IR was added so the structural impossibility result can be read off the code rather
+than taken on trust. An acknowledgments section disclosing the use of a generative AI
+assistant was added, per the ACM authorship policy. The technical content is
+otherwise the content described above.
 
 \end{document}

@@ -108,12 +108,19 @@ a nome dell'utente. Dettagli e scadenze in `docs/HPEC_CAMERA_READY.md`.
 PPoPP 2027 è stata persa creando l'account e non premendo submit. **Premere davvero SUBMIT**:
 un draft salvato non conta.
 
+- Titolo (cambiato il 21 ago): **The Lock-Step Tax: Per-Lane Control Flow as the Missing
+  Primitive in Tile GPU DSLs**. Riscritto attorno al meccanismo, non al workload.
 - Pronto e committato: `paper2/gpufsm_asplos.{tex,pdf}` (anonimo, da caricare),
-  `paper2/gpufsm_asplos_named.*` (NON caricare), `paper2/ASPLOS_ABSTRACT.txt`,
+  `paper2/gpufsm_asplos_named.*` (NON caricare, si rigenera dall'anonimo),
+  `paper2/ASPLOS_ABSTRACT.txt` (**deve essere identico all'abstract del PDF**),
   `paper2/resubmission_note.pdf`, compliance in `docs/SUBMISSION_ASPLOS.md`.
 - ✅ Sito aperto (21 ago 2026, preso dal CFP ufficiale): **https://asplos27-sep.hotcrp.com/**.
   Non resta nessun bloccante esterno: manca solo **premere SUBMIT**, ed è azione dell'utente.
-- Toolchain LaTeX installata; build: `pdflatex → bibtex → pdflatex ×2`.
+- ⚠️ Il CFP ha un **rapid-review che legge solo le prime due pagine**: se si tocca il paper,
+  ricontrollare che l'argomento intero ci stia ancora dentro.
+- Build: `pdflatex → bibtex → pdflatex ×2`. Serve `texlive-fonts-extra` +
+  `texlive-latex-extra` (`libertine`, `newtxmath`): senza, `acmart` ripiega su font bitmap e
+  pdftex **muore**, non degrada.
 
 ### Upstream Triton
 

@@ -29,5 +29,7 @@ Aggiungere qui una riga per ogni file nuovo.
 - [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
 - [Autorizzazione permanente ad agire upstream](standing-authorization-to-act-upstream.md) — rispondere e pushare senza chiedere; il SUBMIT del paper resta suo.
 - [Verso l esterno: em dash e registro](no-em-dash-match-their-register.md) — em dash vietato solo fuori, e a chi scrive nove parole non si risponde con sessanta.
+- [Figure alla dimensione finale](figures-at-final-printed-size.md) — `width=\columnwidth` su una figura da 6in è una riscalatura a 0.55×, e il compliance check cercava `\resizebox`.
+- [Citazioni: verificare sulla fonte](verify-citations-on-the-source.md) — un primo autore sbagliato sopravvissuto a uno sweep, e il vicino più prossimo che mancava.
 
 - [Un binario mancante non è un test rosso](a-missing-binary-is-not-a-red-test.md) — 127 e $FC vuoto si travestono da gate rosso; gatea la probe sul build e stampa l'md5 del binario.

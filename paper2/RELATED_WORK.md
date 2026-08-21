@@ -138,3 +138,39 @@ future work": Jia et al. "Dissecting Volta" (arXiv:1804.06826), Volkov, Pennycoo
    batching, BFS frontier all need the same per-lane escape — pre-empts "automata-only, narrow."
 5. **Quantify the Little's-law crossover prediction** for the DFA/occupancy regime (we have the
    crossover; make it a predicted-vs-measured falsifier).
+
+## Sweep refresh (2026-08-21, for the ASPLOS September cycle)
+
+Four findings, all verified on the source rather than on a search summary.
+
+1. **`whyslownfa2020` was missing and it is the nearest neighbour by title.** Liu, Pai and
+   Jog, *Why GPUs are Slow at Executing NFAs and How to Make them Faster*, ASPLOS 2020,
+   pp. 251-265, 10.1145/3373376.3378471. Diagnosis: excessive data movement and poor compute
+   utilization; fix: privatize reads into on-chip memory. One CUDA engine, algorithmic axis.
+   Same first authors as AsyncAP, which we already cited. An ASPLOS reviewer would have
+   thought of this paper immediately, so omitting it was a real hole. The distinction is
+   clean and sharpens us: they ask why *a GPU* is slow at NFAs, we ask why *the tile DSL* is
+   slow when hand CUDA on the same GPU is not, and the pointer-chase control shows memory
+   irregularity alone carries no tile-vs-thread cost.
+
+2. **The cuTile claim in our related work was wrong, and the truth is stronger.** We wrote
+   that cuTile "concedes the irregular case to a hand-written SIMT fallback". The CUDA
+   Programming Guide (*Writing Tile Kernels*) says something better for us: a tile kernel
+   "follows a single control flow path per block", not every control-flow construct is
+   supported, and `__tile__` and `__device__` functions cannot call one another, so a tile
+   kernel cannot drop to SIMT for its irregular part at all. The vendor documents our own
+   property in its own words, which lifts the impossibility result from "TritonGPU today" to
+   "tile abstractions as designed". Quoted in both the introduction and the wall section.
+
+3. **Insum** (Won, Ahrens, Emer, Amarasinghe), ASPLOS 2026, 10.1145/3779212.3790176:
+   sparse GPU kernels from indirect Einsums, 1.14-3.81x, lowering through the PyTorch
+   compiler. Same venue, adjacent topic, so worth citing. Axis is format and representation;
+   it does not touch per-lane control flow, and a tile lowering underneath it pays our tax.
+
+4. **cuTile Rust** (Elibol, Roesch, Gelado, Buehler, Garland, arXiv:2606.15991, Jun 2026):
+   ownership-typed Rust over the same tile model, 96% of cuBLAS on GEMM. Cited for currency;
+   the axis is safety, orthogonal to expressivity.
+
+Checked and NOT cited: PointCNN++ (arXiv:2511.23227) looked like independent corroboration
+of the irregular gap in a search summary, but the paper itself does not make that comparison.
+RAGNAROS (ICDCS'26) is regex-with-neural-nets for DPI, a different axis.
