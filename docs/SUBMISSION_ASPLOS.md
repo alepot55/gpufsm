@@ -97,10 +97,15 @@ been submitted to ASPLOS.
   rather than the source: the restructure dropped all eight of the old ones silently and
   this line claimed otherwise for a while.
 - Zero em dashes.
-- References: 29 entries, full author names throughout (no "et al."), DOIs or
-  resolvable URLs on all but the anonymous self-citation, citations hyperlinked. bibtex
-  emits warnings for missing page numbers and publishers on several entries; cosmetic for
-  review, worth closing before camera-ready.
+- References: 34 entries, full author names throughout (no "et al." -- `subwarp2022` used
+  to carry `and others` and now does not), DOIs or resolvable URLs on all but the anonymous
+  self-citation, citations hyperlinked, zero bibtex errors. bibtex still warns about missing
+  page numbers and publishers on several entries; cosmetic for review, worth closing before
+  camera-ready.
+- Every reference added in the 21 Aug sweep was verified on the publisher or arXiv page
+  rather than from the earlier sweep's notes, after that pass turned out to carry a wrong
+  first author on `hopps2025`. See `paper2/RELATED_WORK.md` for what was checked and
+  deliberately not cited.
 
 ## Files to upload
 
