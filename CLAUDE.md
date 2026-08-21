@@ -111,8 +111,8 @@ un draft salvato non conta.
 - Pronto e committato: `paper2/gpufsm_asplos.{tex,pdf}` (anonimo, da caricare),
   `paper2/gpufsm_asplos_named.*` (NON caricare), `paper2/ASPLOS_ABSTRACT.txt`,
   `paper2/resubmission_note.pdf`, compliance in `docs/SUBMISSION_ASPLOS.md`.
-- 🚫 Bloccante esterno: il sito HotCRP di settembre non è ancora aperto. **Prendere l'URL dal
-  CFP, non indovinarlo.**
+- ✅ Sito aperto (21 ago 2026, preso dal CFP ufficiale): **https://asplos27-sep.hotcrp.com/**.
+  Non resta nessun bloccante esterno: manca solo **premere SUBMIT**, ed è azione dell'utente.
 - Toolchain LaTeX installata; build: `pdflatex → bibtex → pdflatex ×2`.
 
 ### Upstream Triton
