@@ -535,30 +535,35 @@ CSR SpMV and MoE top-$k$ routing, with \texttt{redux.sync} removed and
 gather, so almost none of their cost is the control reduce, and the gain is
 correspondingly ${\approx}1.0\times$ on both GPUs.
 
-It is worth being exact about why, because the obvious reading is wrong. These workloads do
-not lack stragglers. The power-law CSR matrix the SpMV witness runs on has a per-warp
-straggler of $150$ rows against a mean of $16$, a divergence ratio of $9.7$: a
-\emph{larger} straggler than five of the six synthetic distributions and a higher ratio
-than any of them. The lock-step tax is present and large in iterations. What differs is the
-denominator. A DRAM gather costs so much more per iteration than the control it sits
-beside that removing the tax moves the total by noise. So the condition for the pass to pay
-is not merely a divergent trip count, which SpMV has in abundance, but a divergent trip
-count \emph{over a cheap body}, and that is a sharper scope statement than
-``control-bound''.
+The obvious reading of that is wrong, and the difference matters. These workloads do not
+lack stragglers: the power-law CSR matrix the SpMV witness runs on has a per-warp straggler
+of $150$ rows against a mean of $16$, \emph{larger} than five of the six synthetic
+distributions. The lock-step tax is present and large in iterations. What differs is the
+denominator, because a DRAM gather costs so much more per iteration than the control beside
+it that removing the tax moves the total by noise.
 
 \paragraph{The condition, separated experimentally.} Distribution and body are independent
-variables, so the claim can be tested rather than argued. We ran the lock-step kernel on the
-\emph{same} power-law row lengths the SpMV witness uses, with the accumulate body in place
-of the gather. Same input, same straggler, different denominator: the pass gives
-$\mathbf{6.31\times}$ where SpMV gets ${\approx}1.0\times$, while uniform rows, the matched
-control with no divergence, give $1.09\times$. The cured time is flat across the two,
-$36.4$ and $37.5\,\mu$s over a tenfold difference in straggler. The ${\approx}1.0\times$ on
-real SpMV is therefore the body cost alone. This is a controlled factorization, not a
-real-workload speedup: the body is synthetic on purpose, because it is the variable being
-held. The runs are from the same wheel on an \emph{H100}, a third architecture, where the
-geometric law gives $1.47\times$ against $2.46\times$ and $1.8\times$, with the PTX
-evidence unchanged; the ratio narrows on a faster device because the cured floor falls more
-slowly than the baseline, and nothing else moves.
+variables, so that is testable rather than arguable. We ran the lock-step kernel on the
+\emph{same} power-law row lengths, with an accumulate body in place of the gather. Same
+input, same straggler, different denominator: the pass gives $\mathbf{6.31\times}$ where
+SpMV gets ${\approx}1.0\times$, while uniform rows, the matched control with no divergence,
+give $1.09\times$. So the condition is not a divergent trip count, which SpMV has in
+abundance, but a divergent trip count \emph{over a cheap body}. This is a controlled
+factorization and not a real-workload speedup, the body being synthetic on purpose because
+it is the variable held. These runs are on an \emph{H100}, a third architecture, where the
+geometric law gives $1.47\times$ against $2.46\times$ and $1.8\times$ with the PTX evidence
+unchanged.
+
+\paragraph{Two real algorithms that meet both halves.} The condition is met outside our own
+microbenchmarks. Stein's binary GCD, the subtract-and-shift loop crypto libraries use, has a
+data-dependent trip count and a body of shifts and a subtract with no memory traffic at all;
+the Collatz step count is the same shape at the extreme of the divergence axis. Both carry
+the lock-step latch, both are oracle-gated against numpy, and on both the pass fires and
+pays: $1.27\times$ on the GCD (straggler $47$) and $1.79\times$ on Collatz (straggler
+$215$), ordered by absolute straggler as the law requires. The gains are modest next to the
+synthetic $2.3$--$6.7\times$, a cheap body not being a free one. What matters is the
+contrast with the gather-bound workloads, whose stragglers are \emph{larger} and which get
+nothing.
 
 \begin{table}[t]\centering
 \caption{The built pass, rebuilt from one pinned wheel and run on three GPUs. Speedup is
@@ -785,15 +790,30 @@ when the loop carries a cross-lane op. That the cure must live below the tile IR
 property of \emph{today's} tile IR, and \S\ref{sec:wall} states exactly the language change
 that would move it up.
 
-\paragraph{Regime of the clean residual.} A multi-word generalization of the lane-packed
-kernel (NWORDS int64 words per lane) is oracle-validated to 256 states, so the prototype is
-not artificially small. But the clean ${\sim}2\times$ residual is a register-resident
-($\le 64$-state) result. Past 64 states the CUDA register worklist itself degrades under
-register pressure, so the head-to-head is confounded by \emph{both} baselines losing the
-register-resident advantage, and ANMLZoo-scale automata (Brill, 42661 states, 667 words)
-make the per-lane multi-word scatter explode, which is itself a manifestation of the tile
-limitation. Real automata run oracle-valid but sub-Gbps, an \emph{algorithmic} cost
-orthogonal to the regret.
+\paragraph{Regime of the clean residual, and where the ordering reverses.} The clean
+${\sim}2\times$ residual is a register-resident ($\le 64$-state) result, and past that
+boundary the head-to-head does not merely blur, it \emph{inverts}. The CUDA register
+worklist is flat at ${\sim}227$\,Gbps across the whole single-word range (16 to 64 states,
+batch 4096) and then falls to $26.9$\,Gbps at 96 states, an $8.5\times$ cliff at exactly the
+point where its working set needs a second $64$-bit word; it declines again to $15.2$ and
+$13.3$\,Gbps at four words. The degradation tracks \emph{word count}, not state count,
+which is the signature of register pressure rather than of growing work: 96 and 128 states
+differ by a third in size and by under two percent in CUDA throughput. The
+multi-word lane-packed tile kernel crosses the same boundary far more cheaply, so it is
+$1.44$--$2.15\times$ \emph{faster} than hand-written CUDA from 96 to 256 states, including
+at 192 states where our power-of-two tile width makes it carry four words against CUDA's
+three.
+
+This bounds the claim rather than decorating it: regret follows the execution paradigm
+within the regime where that paradigm's resources hold, and the thread-SIMT baseline
+surrenders its advantage exactly when a fixed register file stops holding the working set.
+Two caveats belong with the numbers. These four points are one seed each, against three or
+more elsewhere, and they are batch 4096, where the residual of \S\ref{sec:anatomy} is
+$1.47\times$ rather than ${\sim}2\times$. Above 512 states the register baseline cannot be
+built at all, the bit-packed representation capping at eight words, so ANMLZoo-scale
+automata such as Brill (42661 states, 667 words) have no thread-model baseline to be
+compared against and run oracle-valid but sub-Gbps, an \emph{algorithmic} cost orthogonal
+to the regret.
 
 \paragraph{Tuning, not expressibility.} \texttt{num\_warps} is a knob, and the strongest
 counter-thesis is that this is all under-tuning~\cite{ringlein2025}. We disclose the full
@@ -818,9 +838,8 @@ each claim to the command that produces it and the CSV it writes.
 
 The expressibility and structural claims are \emph{runnable, falsifiable probes} rather than
 prose: the Gluon probe exits $0$ on the expected compile failure and $1$ if some future
-Gluon compiles it, the lowering-wall probe asserts that the MLIR verifier rejects a per-lane
-\texttt{scf.condition}, and the detection check confirms the pass tags the region with the
-flag set and is a no-op without it. The per-lane-retirement pass builds as a wheel from a
+Gluon compiles it, and the lowering-wall probe asserts that the MLIR verifier rejects a
+per-lane \texttt{scf.condition}. The per-lane-retirement pass builds as a wheel from a
 one-command recipe, a pinned upstream commit plus a versioned patch, and every cure number
 here came from that wheel on all three GPUs.
 
