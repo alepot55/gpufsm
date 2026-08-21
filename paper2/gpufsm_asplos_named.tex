@@ -39,9 +39,9 @@ table spills to DRAM.
 The missing primitive is a per-lane loop exit, and we prove TritonGPU cannot express it:
 \texttt{scf.condition} carries a single \texttt{i1}. We therefore build it below the tile
 IR, as an MLIR pass in \texttt{libtriton} guarded by a soundness verifier. It gives
-$2.3$--$6.7\times$ on control-bound kernels, $1.6$--$3.8\times$ on an A100 from the same
-wheel, and ${\approx}1.0\times$ on gather-bound SpMV and MoE, exactly as the mechanism
-requires. A single-predictor straggler model predicts the cost with $R^2=0.997$, and
+$2.3$--$6.7\times$ on control-bound kernels and $1.6$--$3.8\times$ on an A100 from the same
+wheel, and ${\approx}1.0\times$ on SpMV and MoE, which carry larger stragglers still but a
+per-iteration gather that dwarfs the tax. A single-predictor straggler model predicts the cost with $R^2=0.997$, and
 out-of-sample to $1.5\%$.
 \end{abstract}
 
@@ -523,7 +523,18 @@ The pass also fires, oracle-correct, on real workloads carrying the same latch: 
 CSR SpMV and MoE top-$k$ routing, with \texttt{redux.sync} removed and
 \texttt{bar.warp.sync} present in the emitted PTX. Both carry a per-iteration memory
 gather, so almost none of their cost is the control reduce, and the gain is
-correspondingly ${\approx}1.0\times$ on both GPUs. We report this as the honest end-to-end
+correspondingly ${\approx}1.0\times$ on both GPUs.
+
+It is worth being exact about why, because the obvious reading is wrong. These workloads do
+not lack stragglers. The power-law CSR matrix the SpMV witness runs on has a per-warp
+straggler of $150$ rows against a mean of $16$, a divergence ratio of $9.7$: a
+\emph{larger} straggler than five of the six synthetic distributions and a higher ratio
+than any of them. The lock-step tax is present and large in iterations. What differs is the
+denominator. A DRAM gather costs so much more per iteration than the control it sits
+beside that removing the tax moves the total by noise. So the condition for the pass to pay
+is not merely a divergent trip count, which SpMV has in abundance, but a divergent trip
+count \emph{over a cheap body}, and that is a sharper scope statement than
+``control-bound''. We report this as the honest end-to-end
 value, and as a confirmation rather than a failure: that the \emph{same} pass yields
 $2.3$--$6.7\times$ on control-bound work and nothing on gather-bound work is the thesis,
 measured.

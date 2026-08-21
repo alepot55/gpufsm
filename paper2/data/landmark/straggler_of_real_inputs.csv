@@ -1,0 +1,13 @@
+# Per-warp straggler statistics of the inputs the witnesses actually run on, computed
+# deterministically from the generators in experiments/cure/landmarks/landmark_spmv.py
+# (build_csr, seed 0, N_ROWS=2^20, K_UNIFORM=16) by grouping rows into 32-lane warps.
+# No GPU involved: these are properties of the input distribution, not measurements.
+#
+# Why this is here: the built pass gives ~1.0x on power-law SpMV, and the obvious reading
+# is that the workload has no stragglers to remove. It has more than most of the SYNTHETIC
+# distributions the straggler law was fitted on (compare cure_predictive_rtx4070.csv, whose
+# largest D is 8.45 and whose warp-max ranges 63-249). The lock-step tax is present and
+# large in iterations; what defeats the pass is the cost of the per-iteration body.
+source,distribution,mean_trip,mean_warp_max,divergence_ratio_D,max_trip
+landmark_spmv.build_csr,uniform,16.00,16.00,1.00,16
+landmark_spmv.build_csr,powerlaw,15.59,150.51,9.65,4096

@@ -161,10 +161,21 @@ Trust check on the run: at width 32 it reproduces the committed cross-arch A100 
 
 ### Still open
 
-- The honest end-to-end value of the in-compiler pass on real workloads is ~1.0x. The paper
-  frames this as the thesis confirmed (recoverable cost scales with control, not memory),
-  which is correct, but it remains the largest reject risk and no measurement in the repo
-  changes it. Closing it needs the pass to fire on a control-bound *real* workload.
+- The in-compiler pass still shows ~1.0x on real workloads. **Much better answered than it
+  was**: the power-law CSR matrix the SpMV witness runs on has a per-warp straggler of 150
+  rows against a mean of 16 (D=9.65), a *larger* straggler than five of the six synthetic
+  distributions the law was fitted on and a higher divergence ratio than any of them
+  (`paper2/data/landmark/straggler_of_real_inputs.csv`, computed from the generator, no GPU).
+  So the workload is not short of stragglers; the per-iteration DRAM gather dwarfs the tax.
+  The scope condition is therefore "divergent trips **over a cheap body**", not
+  "control-bound", and the paper now says so. What would still strengthen it is the pass
+  firing on a real workload that meets both halves.
+- Attempted the obvious candidate (the NFA worklist through the built pass) and **stopped**:
+  the Modal volume is full, 13 Triton trees of 13 GB each, all at the same commit
+  `c346e50c7b`, from the upstream PR work. Freeing space means deleting build trees another
+  workstream may need, and the paper's own mechanism predicts a null there anyway, since the
+  NFA residual is the latency channel and the pass removes the straggler channel. Left to
+  the user.
 - The selector is not wired to the in-IR pass; the two halves of the loop are each real and
   measured, and joining them is unbuilt.
 - `refs.bib` has bibtex warnings for missing page numbers and publishers on several
