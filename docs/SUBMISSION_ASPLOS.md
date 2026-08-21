@@ -1,17 +1,20 @@
 # ASPLOS 2027 (September cycle) — submission packet
 
-**Status (18 Aug 2026, re-verified against the live CFP):** the paper and every
-required attachment are ready. **The submission site still does not exist**: the CFP
-page contains exactly one HotCRP link, the closed April cycle. See "Blocker" below.
+**Status (21 Aug 2026, re-verified against the live CFP):** the paper and every
+required attachment are ready. The CFP's "Submission Website" section **now links
+`https://asplos27-sep.hotcrp.com/`**, but that URL **still returns 404**: the link exists,
+the site is not provisioned. See "Blocker" below. The form-filling material lives in
+`paper2/ASPLOS_SUBMISSION_KIT.md`.
 
-A sentinel now watches for it: `~/.cache/watch_asplos.sh` fetches the CFP every three
-hours and shouts on any HotCRP link it has not seen before, plus on the CFP naming a
-September submission site. Validated in both directions (silent on today's page, fires
-on the target text) so it cannot be a blind guard. Log: `~/.cache/watch_asplos.log`.
-It dies on reboot, so **re-run it after a restart**, and do not treat its silence as
-proof on a machine that has been off.
+The sentinel that watched the CFP is obsolete and had in fact died (empty log since
+18 Aug, no process): the signal it waited for, a new HotCRP link on the CFP, has already
+fired unobserved. The signal now is `https://asplos27-sep.hotcrp.com/` returning anything
+other than 404. `~/.cache/watch_asplos.sh` was rewritten to probe that URL directly and
+installed as a user cron entry every 30 minutes, so it survives reboots. Log:
+`~/.cache/watch_asplos.log`.
 
-Paper conforms: 10 pages of text and figures against a limit of 11.
+Paper conforms: **11 pages of text and figures against a limit of 11**, i.e. exactly at the
+limit. Acknowledgments and references sit on p12 and p13 and are excluded by the CFP.
 
 ## Venue facts (read directly from <https://www.asplos-conference.org/asplos2027/cfp/>)
 
@@ -47,6 +50,7 @@ Paper conforms: 10 pages of text and figures against a limit of 11.
    → **Done:** `\section*{Acknowledgments}` added to both builds, disclosing the
    agentic coding assistant that wrote most of the code, ran the measurements,
    generated the figures and drafted the text, and stating what remains ours.
+   Compressed to its tight form on 21 Aug 2026; the perimeter it declares is unchanged.
    (Declared with `\section*` and not the `acks` environment on purpose: acmart's
    `anonymous` option suppresses `acks`, which would have silently dropped a
    disclosure that reviewers must see.)
@@ -75,8 +79,8 @@ been submitted to ASPLOS.
 
 ## Compliance check (against the rebuilt PDF, 21 Aug 2026)
 
-- **10 pages of text and figures**; acknowledgments and references start on p.11.
-  Limit is 11 excluding those.
+- **11 pages of text and figures**, exactly at the limit; the Conclusion's last line is on
+  p11 and the acknowledgments open p12. Limit is 11 excluding acknowledgments and references.
 - LaTeX: **0 errors, 0 overfull boxes, 0 undefined references.**
 - Fonts: body 10pt, tables and the IR listing `\footnotesize` (8pt floor), captions 9pt.
   No `\resizebox` and no `\vspace` squeezing.
@@ -112,6 +116,9 @@ been submitted to ASPLOS.
 - `paper2/gpufsm_asplos.pdf` — the anonymous paper.
 - `paper2/resubmission_note.pdf` — the required change note.
 - `paper2/ASPLOS_ABSTRACT.txt` — abstract as plain ASCII, to paste in the form.
+- `paper2/ASPLOS_SUBMISSION_KIT.md` — everything the form asks for: abstract with its
+  symbol audit, title, keywords, CCS, conflicts, topic choice, upload order, and the
+  HPEC prior-work declaration. Not uploaded; read while filling the form.
 - `paper2/gpufsm_asplos_named.{tex,pdf}` — author block restored, for non-blind use.
   **Do not upload this one.**
 
