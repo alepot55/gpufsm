@@ -21,7 +21,8 @@
 \begin{abstract}
 Tile abstractions are how GPU kernels are written now, in Triton and increasingly in the
 vendor's own stack, and on dense tensor work they match hand-written CUDA. On irregular,
-control-driven kernels they lose an order of magnitude. Whether that gap is a tuning
+control-driven kernels, from automata to mixture-of-experts routing, they lose an order of
+magnitude. Whether that gap is a tuning
 deficit or a property of the abstraction is a question about language design, and it has
 not been answered mechanistically.
 
@@ -343,9 +344,8 @@ exceeds the roughly six megabyte L2.}
 The diagnosis names what a fix must provide: independent per-lane \texttt{ffs} and
 \texttt{while}, per-lane data-dependent loop bounds, a register-resident per-lane bitset,
 and a scalar gather. Call it a per-lane sub-tile loop with an independent exit. The
-natural place to add it is the tile IR. It cannot go there, and showing why is the
-sharpest result in this paper because it is a statement about the abstraction rather than
-about one compiler's maturity.
+natural place to add it is the tile IR. It cannot go there, and why it cannot is a
+statement about the abstraction rather than about one compiler's maturity.
 
 We first checked whether a lower-level tile frontend already supplies it. It does not.
 Triton's Gluon exposes per-thread \emph{layout} through Linear
@@ -399,7 +399,8 @@ collapses the 32-lane comparison to one \texttt{i32}, and \texttt{scf.condition}
 a single \texttt{i1}. The natural rewrite is to carry the per-lane condition instead, and
 the MLIR verifier rejects it on the type
 (\emph{``'i1' vs 'tensor}$\langle$\emph{8}$\times$\emph{i1}$\rangle$\emph{'''},
-captured with the built \texttt{triton-opt}). Per-lane loop termination is therefore
+captured with the built \texttt{triton-opt}; the probe uses an eight-lane tile, since the
+type mismatch is the point and not the width). Per-lane loop termination is therefore
 \emph{inexpressible} in TritonGPU's structured tile control flow.
 
 That is falsifiable and it is actionable. It is falsifiable because adding a per-lane
@@ -620,8 +621,10 @@ counted in absolute iterations.
 \emph{held-out} distributions generated from a different seed (bimodal, log-normal, spike,
 and an adversarial single-straggler warp in which $1/32$ lanes run $256$ iterations and the rest
 run $2$) to within $1.5\%$ on average and $2.1\%$ at worst on lock-step time, and every
-in-sample speedup to under $8\%$. That last case yields $7.2\times$, the effect at its
-purest: one slow lane taxing the other $31$, which is what per-lane retirement removes.
+in-sample speedup to under $8\%$. That last case yields $7.2\times$, the effect at its purest:
+one slow lane taxing the other $31$, which is what per-lane retirement removes. It is also
+the least artificial of the six, being the shape of any batch that holds one long
+sequence.
 
 \paragraph{What the law is, and is not.} The validation is across trip
 \emph{distributions} of one kernel, not across kernels, and the two coefficients are that
