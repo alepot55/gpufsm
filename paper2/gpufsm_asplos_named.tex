@@ -713,7 +713,7 @@ launch-configuration artifact of \S\ref{sec:anatomy}, since the width sets
 Read together with the \texttt{BLOCK} sweep of \S\ref{sec:anatomy}, where widening the
 NFA tile takes it from $0.49\times$ to $0.31\times$ of CUDA, this is the one piece of
 directly actionable advice the paper carries: on irregular work a wider tile is
-monotonically worse, on two workloads and two architectures. That is the reverse of the
+monotonically worse, on two workloads measured one on each of two architectures. That is the reverse of the
 dense-tensor intuition, where a wider tile amortizes, and it follows from the mechanism.
 A wider tile puts more lanes under one latch, so it buys more of exactly the thing that
 costs.
