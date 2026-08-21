@@ -1,0 +1,15 @@
+# Per-lane retirement on REAL-SHAPED kernels that meet both halves of the scope condition:
+# a divergent trip count over a cheap body. NVIDIA H100 80GB HBM3 (Modal), pinned wheel
+# (triton 3.8.0@81a46fa + perlane_retire_full.patch). Oracle-gated in both modes; 'fired'
+# means the PTX redux.sync count went 1 -> 0, i.e. the pass actually rewrote the latch.
+#
+# binary_gcd: Stein's subtract-and-shift algorithm, as used in crypto libraries. Body is
+#   shifts, a compare and a subtract, with no memory traffic. Verified against numpy's gcd.
+# collatz:    step count to reach 1. Body is two integer operations. The extreme of the
+#   divergence axis. Seeds < 2^16 so that 3n+1 cannot overflow int32 (2^20 peaks at 2.5e10).
+#
+# Contrast with the gather-bound rows of cure_wheel_*.csv, which get ~1.0x from the same
+# pass on inputs whose stragglers are LARGER. The difference is the per-iteration body.
+kernel,mean_trip,mean_warp_max,masked_us,cured_us,speedup,oracle,fired,gpu
+binary_gcd,39.43,46.69,63.5,50.1,1.27,OK,1,H100-80GB-HBM3
+collatz,103.22,215.44,125.5,70.3,1.79,OK,1,H100-80GB-HBM3

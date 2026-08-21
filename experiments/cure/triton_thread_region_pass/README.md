@@ -1,36 +1,49 @@
-# `thread_region` — the in-Triton compiler pass (P2)
+# The two halves of the cure, and why they had never coexisted
 
-This directory version-controls the gpufsm changes to the Triton compiler (which live in a separate
-source tree, `~/m3full_build/triton-src`), so the landmark P2 contribution is preserved and
-reproducible independent of that build tree.
+This directory carries a research pass in two pieces that were developed against different
+upstream Triton commits. Getting them into one build on 21 Aug 2026 took three attempts, and
+the reasons are worth writing down because none of them is obvious from the files.
 
-**Status: DETECTION half DONE and VERIFIED inside `libtriton`.** A new TritonGPU pass
-`tritongpu-thread-region` compiles into `libtriton.so`, runs in the NVIDIA `make_ttgir` pipeline
-(env-gated), detects the lock-step irregular-region signature, tags each match with a
-`ttg.thread_region_candidate` attribute, and is a clean no-op when disabled.
-Verified by `experiments/cure/p2_pass_verify.py` (pass ON → attribute present; pass OFF → absent;
-kernel still correct). The tile→thread *lowering* half is the next step (see `docs/P2_PASS_DESIGN.md`).
+| file | what it is |
+|---|---|
+| `ThreadRegion.cpp` | **two** passes: `TritonGPUThreadRegion` (detect the lock-step signature, plus a `hoist` mode that is the reduce-hoist rewrite) and `TritonGPULowerThreadRegionRetire` (an **older** LLVM-level retirement, superseded) |
+| `ThreadRegion_detect_only.cpp` | the same file with the superseded second pass removed; this is what builds |
+| `registration.patch` | declares `TritonGPUThreadRegion` in `Passes.td`, adds it to CMakeLists, binds it in `passes.cc`, wires it into `make_ttgir` |
+| `perlane_retire_full.patch` | the **current** retirement, as `third_party/nvidia/.../PerLaneLoopRetirement.cpp`, wired into `make_llir` behind `per_lane_loop_retirement` |
+| `pipeline_wiring.patch` | an earlier wiring of both, superseded by the two above |
+| `Passes.td` | a full copy of upstream's `Passes.td` with **both** declarations; `registration.patch` adds only the first |
 
-## Contents
-- `ThreadRegion.cpp` — the pass (detection): walks the module, matches an `scf.while` whose iter-args
-  are `#blocked` tile tensors and whose `scf.condition` derives from a `tt.reduce`-to-scalar (the
-  lock-step gate = masked-lane waste / issue deficit made syntactic), marks + remarks each match.
-- `registration.patch` — the four supporting edits: the pass def in `Passes.td`, the `CMakeLists.txt`
-  source entry, the Python binding `add_thread_region` in `python/src/passes.cc`, and the env-gated
-  insertion into `make_ttgir` in `third_party/nvidia/backend/compiler.py`.
+## The three traps
 
-## Reproduce
-Base Triton commit: `c05aa65087a9a1a6b8a08fdbb474aba834d5cddf` (built locally as Triton 3.8.0).
-Build recipe (the hard prerequisite): see `docs/P2_PASS_DESIGN.md` (cmake<4, nanobind==2.10.2,
-python3.12-dev, direct `cmake --build`).
+1. **`perlane_retire_full.patch` alone gives you no detection.** The wheel the paper's cure
+   numbers come from carries only the retirement. Running a detection check against it
+   silently reports "not detected" for a kernel that plainly has the signature.
+
+2. **`git apply --3way` fails on the second patch, plain `git apply` works.** The retire
+   patch is applied to the worktree without committing, so the index still matches HEAD and
+   the three-way merge has no blob to work from. It fails with `does not match index` on all
+   four shared files. Plain `git apply` matches on context and succeeds.
+
+3. **`ThreadRegion.cpp` does not compile once `registration.patch` is applied**, with
+   `expected template-name before '<'` at the `LowerThreadRegionRetirePass` declaration.
+   The tablegen base class for that second pass does not exist, because `registration.patch`
+   declares only `TritonGPUThreadRegion`. Remove the superseded pass, or add the second
+   declaration from the local `Passes.td`. Removing is right: the retirement in the wheel is
+   the newer implementation.
+
+## Recipe that works
 
 ```bash
-cd ~/m3full_build/triton-src                     # base commit above
-git apply /path/to/registration.patch            # the 4 registration edits
-cp /path/to/ThreadRegion.cpp lib/Dialect/TritonGPU/Transforms/ThreadRegion.cpp
-cmake --build . -j 8                             # incremental: TableGen regen + relink (~minutes)
-# verify:
-PYTHONPATH=$HOME/m3full_build/triton-src/python .venv/bin/python experiments/cure/p2_pass_verify.py
-# enable in any compile:
-GPUFSM_THREAD_REGION=1 PYTHONPATH=... .venv/bin/python your_kernel.py
+python scripts/modal_triton.py build --tree cure --ref 81a46fa \
+    --patch experiments/cure/triton_thread_region_pass/perlane_retire_full.patch
+python scripts/modal_triton.py run --cpu --tree cure \
+    --upload experiments/cure/triton_thread_region_pass/registration.patch \
+    --upload experiments/cure/triton_thread_region_pass/ThreadRegion_detect_only.cpp \
+    --cmd 'cp -f /work/ThreadRegion_detect_only.cpp lib/Dialect/TritonGPU/Transforms/ThreadRegion.cpp' \
+    --cmd 'git apply /work/registration.patch' \
+    --cmd 'MAX_JOBS=32 CCACHE_DIR=/work/ccache TRITON_BUILD_WITH_CCACHE=true python -m pip install -e . --no-build-isolation'
 ```
+
+The volume needs roughly 18 GB free for a tree plus its venv, and it fills silently: a full
+volume surfaces as `No space left on device` in the middle of `pip install torch`, which
+looks like a network failure and is not.
