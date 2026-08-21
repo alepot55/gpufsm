@@ -83,9 +83,11 @@ On irregular kernels they do not. A work-efficient NFA worklist written in Trito
 order of magnitude below the equivalent CUDA. That much is folklore. Two things make it
 worth more than a footnote. The kernels it afflicts are not a backwater but where the field
 is heading, and we measure the same effect on mixture-of-experts routing and ragged
-attention as on automata. And the tile camp is already routing around it: NVIDIA's own Tile
-IR hands the irregular case to a hand-written SIMT fallback~\cite{cutile2025}, which is a
-workaround offered in place of an answer.
+attention as on automata. And the constraint is being designed in rather than
+designed out: NVIDIA's own tile model documents that a tile kernel ``follows a single
+control flow path per block'' and forbids tile and \texttt{\_\_device\_\_} functions from
+calling one another~\cite{cutile2025}, so a tile kernel cannot even drop to SIMT for its
+irregular part.
 
 The question underneath is about language design, and to our knowledge it has not been
 answered mechanistically: is the gap a \emph{tuning} deficit, which a better autotuner
@@ -402,6 +404,12 @@ the MLIR verifier rejects it on the type
 captured with the built \texttt{triton-opt}; the probe uses an eight-lane tile, since the
 type mismatch is the point and not the width). Per-lane loop termination is therefore
 \emph{inexpressible} in TritonGPU's structured tile control flow.
+
+The constraint is not Triton's alone, which matters because otherwise this would be a
+statement about one compiler's maturity. NVIDIA's tile model documents the same property in
+its own words, that a tile kernel ``follows a single control flow path per
+block''~\cite{cutile2025}, and forbids tile and \texttt{\_\_device\_\_} functions from
+calling one another, so there is no dropping to SIMT for the irregular part of a kernel.
 
 That is falsifiable and it is actionable. It is falsifiable because adding a per-lane
 sub-tile loop and exit op to the tile IR would make the statement false, which is precisely
@@ -802,8 +810,14 @@ number here came from that wheel, on both GPUs. The cross-architecture re-valida
 single non-mutating command.
 
 \section{Related work}\label{sec:related}
-\textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA:
-ngAP's non-blocking multi-symbol processing~\cite{ngap2024}, HybridSA's bit-parallel
+\textbf{GPU automata} form an \emph{algorithmic} axis, all single-implementation CUDA. The
+nearest neighbour is Liu et al.~\cite{whyslownfa2020}, who ask why a GPU is slow at NFAs and
+answer with data movement and compute utilization, then privatize reads into on-chip memory.
+Ours is the adjacent question with an answer of a different kind: why the \emph{tile DSL} is
+slow at NFAs when hand-written CUDA on the same GPU is not. The two are complementary, and
+our pointer-chase control sharpens the boundary, since irregular memory alone carries no
+tile-versus-thread cost at all (\S\ref{sec:general}). The rest of the axis has the same
+shape: ngAP's non-blocking multi-symbol processing~\cite{ngap2024}, HybridSA's bit-parallel
 shift-and~\cite{hybridsa2024}, BitGen's Parabix bitstreams~\cite{bitgen2025}, AsyncAP's
 input-symbol asynchrony~\cite{asyncap2023}, AutomataBLAS's AP-as-SpMV~\cite{automatablas2025},
 and the Hopps sparsity ASIC~\cite{hopps2025}. Each varies the algorithm on one
@@ -816,7 +830,9 @@ tile-versus-thread cost. Our axis is orthogonal: fixed algorithm, varied program
 thread and warp control. The closest, Gluon's Linear Layouts~\cite{linearlayouts2025},
 gives per-thread \emph{data placement} but not per-lane \emph{control flow}, as our probe
 shows; Descend~\cite{descend2024} makes the thread hierarchy first-class but offers no tile
-drop-to-scalar escape; Warp~\cite{warp2022} is the thread-SIMT existence proof.
+drop-to-scalar escape; Warp~\cite{warp2022} is the thread-SIMT existence proof. The tile direction is being invested in beyond
+CUDA C++ as well, including an ownership-typed Rust frontend over the same tile
+model~\cite{fearless2026}, a safety axis orthogonal to what a tile can express.
 ML-Triton~\cite{mltriton2025} is the clearest sign of the trend and of its stopping point:
 it moves Triton's interface one level finer, adding warp-level programming and a
 workgroup$\rightarrow$warp$\rightarrow$intrinsic lowering, and reaches $95\%$ of
@@ -827,11 +843,17 @@ latch, so it halts exactly one level above where the cost we measure lives.
 is programmer-directed or differently directed. Prism~\cite{prism2026} makes thread
 granularity part of the type system so group-coordinated code composes safely, but the
 granularity is still the one the programmer writes, and nothing diagnoses that an existing
-tile kernel is paying a lock-step tax. NVIDIA's cuTile~\cite{cutile2025} and its MLIR Tile
-IR, now being built as a Triton backend, is tile-level and concedes the irregular case to a
-hand-written SIMT fallback, so the per-lane gap we name persists in \emph{both} TritonGPU
-and Tile IR; the primitive we propose is complementary to that direction rather than
-subsumed by it. Tawa~\cite{tawa2026} auto-restructures Triton but for \emph{dense} warp
+tile kernel is paying a lock-step tax. NVIDIA's cuTile~\cite{cutile2025} is the strongest
+evidence that the constraint is designed in rather than incidental. Its programming guide
+states that a tile kernel ``follows a single control flow path per block'', restricts which
+control-flow constructs a tile kernel may use at all, and forbids \texttt{\_\_tile\_\_}
+and \texttt{\_\_device\_\_} functions from calling one another, so a tile kernel cannot
+drop to SIMT for its irregular part. The gap we name therefore persists in \emph{both}
+TritonGPU and Tile IR, and the primitive we propose is complementary to that direction
+rather than subsumed by it. Insum~\cite{insum2026} generates sparse GPU kernels from
+indirect Einsums and reaches $1.14$--$3.81\times$ over hand-written implementations, but on
+the format-and-representation axis, lowering through the PyTorch compiler; it does not touch
+per-lane control flow, and a tile lowering underneath it would pay the same tax. Tawa~\cite{tawa2026} auto-restructures Triton but for \emph{dense} warp
 specialization. Partial control-flow linearization~\cite{partialcfg2018} runs the
 \emph{opposite} way, vectorizing divergent CPU control flow, where we de-vectorize a tile
 region to recover per-lane memory-level parallelism. None automatically detects an
