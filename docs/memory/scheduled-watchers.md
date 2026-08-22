@@ -43,16 +43,32 @@ Oltre ai commenti sorveglia **il gate di `docs/PR_LEDGER.md`**: *"non aprire la 
 delle sei non atterra"*. Quando una PR LLVM atterra, lo script lo dice esplicitamente, perché quello
 è il momento in cui la riserva #203858 diventa apribile.
 
-## Livello 2 — rete di sicurezza: i tre cron
+## Livello 2 — rete di sicurezza: il **crontab di sistema**, non `scheduled-tasks`
 
-| taskId | quando | cosa fa |
+⚠️ **Riscritto il 22 ago 2026.** I tre task `scheduled-tasks` (`triton-review-watch`,
+`asplos-2027-submission-watch`, `gpufsm-nightly-gate`) **non esistono più**: l'utente ha chiesto di
+togliere lo schedule periodico il 21 ago, e `list_scheduled_tasks` oggi risponde "No scheduled tasks
+found". Cercarli lì è tempo perso.
+
+Quello che gira davvero sta nel **crontab utente** (`crontab -l`):
+
+| riga | ogni | cosa fa |
 |---|---|---|
-| `triton-review-watch` | 8:17 e 18:17 | stesso giro dello script, in one-shot, su tutti e 11 i thread |
-| `asplos-2027-submission-watch` | 9:23 | se l'HotCRP di settembre è aperto + giorni alla deadline (9 set 2026 AoE) |
-| `gpufsm-nightly-gate` | 2:13 | `ruff format --check`, `ruff check`, `mypy`, `pytest -m "not gpu"`; parla solo se rosso |
+| `~/.cache/watch_asplos.sh` | 30 min | sonda il codice HTTP di `asplos27-sep.hotcrp.com`, notifica al primo non-404 |
+| `tools/watch/upstream-cron.sh` | 10 min | un giro one-shot di `upstream.sh` sui 12 thread, aggiunto il 22 ago |
 
-Stanno in `~/.claude/scheduled-tasks/<taskId>/SKILL.md`. Il nome `triton-review-watch` è ormai
-bugiardo: copre anche LLVM.
+`upstream-cron.sh` esiste perché il 22 ago il Monitor è morto con la sessione e sono rimaste **sette
+ore scoperte** (per fortuna senza eventi: verificato thread per thread a mano, nessuno si era mosso).
+Quando il Monitor è vivo il cron becca il `flock` ed esce con `[SKIP]`, che finisce nel log e fa da
+battito: log fermo = cron morto, non "nessuna novità".
+
+Serve `/bin/bash -lc` nella riga di crontab: una shell di login eredita `GITHUB_TOKEN`, che cron da
+solo non ha ([[laptop-tokens-in-env]]).
+
+Nota sull'ASPLOS: quella sentinella **non era mai morta**, gira in crontab dal 21 ago e il suo log
+cresce ogni 30 min. Sorveglia il codice HTTP perché il CFP linka un HotCRP che risponde 404: il
+segnale "il CFP ha pubblicato il link" era gia' scattato senza che nessuno lo vedesse, e non
+significava niente.
 
 ## Perché due livelli e non uno
 
