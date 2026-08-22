@@ -1,4 +1,4 @@
-# Ledger delle PR — stato verificato il 2026-08-15 (ri-verificato la sera, da locale)
+# Ledger delle PR — stato verificato il 2026-08-22 (mattina, da locale, `gh api` su tutti i thread)
 
 Registro unico di **tutte** le pull request del progetto, interne e upstream, con lo stato verificato
 alla fonte (non dalla memoria). Serve a non riscoprire ogni sessione cosa è stato mandato, cosa è vivo
@@ -37,13 +37,19 @@ aperte da noi (#11326, #11328). **17 ago 10:21: primo scambio tecnico con un mai
 `WarpSpecializeUtility.cpp:555-559`: le due barriere sono incondizionate), il valore no — e lo
 dicevamo noi stessi nella PR. **#11324 e' stata mergiata il 20 ago**; #11325 resta aperta e `blocked`.
 
+**Aggiornamento 22 ago.** Due cose sono cambiate e nessuna delle due era visibile dal ledger vecchio:
+**#10766 ha la CI verde** (approvata e girata il 20 ago 15:47Z, 10 check su 10, `integration-tests-nvidia`
+su a100/h100/gb200 inclusi) e **#11325 e' ferma per decisione esplicita**, non per silenzio. In piu'
+l'issue #11328 ha prodotto una collaborazione con due contributori esterni, raccontata sotto nella
+sezione "La catena 11328, 11393, 11396".
+
 | PR | Titolo | Aperta | Stato oggi | Chi ha deciso |
 |----|--------|--------|-----------|---------------|
-| [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Do not compare subslice offsets across different shapes` | 16 ago | **APERTA** — barriera **mancante** (bug di correttezza), test che fallisce senza patch, 0 regressioni | in attesa |
+| [#11325](https://github.com/triton-lang/triton/pull/11325) | `[Membar] Key subslice offset comparison on the value they came from` | 16 ago | **APERTA, ma ferma per decisione**: 20 ago 15:03Z Jokeren *"This is just a workaround to conservatively reject these cases so I don't think it's the right fix and will keep this PR pending without merging"* | Jokeren, in sospeso |
 | [#11324](https://github.com/triton-lang/triton/pull/11324) | `[Membar] Treat warp_yield as a CTA sync point` | 16 ago | ✅ **MERGIATA il 20 ago 13:17Z** da Jokeren, commit `37a4b78fc` — −30 barriere nel PTX; misurata su H100 il 16 ago: **nessun guadagno di velocita'**, dato pubblicato sulla PR | chiusa |
 | [#11323](https://github.com/triton-lang/triton/pull/11323) | `[Membar] Treat warp_specialize entry as a CTA sync point` | 16 ago | **CHIUSA** 17 ago — "micro optimization" (Jokeren + jeffniu-openai). Patch corretta, valore marginale: non cambiava il codice generato, e lo dicevamo noi | Jokeren |
 | [#11311](https://github.com/triton-lang/triton/pull/11311) | `[DOCS] examples/plugins: make the Example 4 python block parse` | 14 ago | **MERGIATA** 15 ago | Jokeren |
-| [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, CI da approvare | in attesa (ping 14 ago) |
+| [#10766](https://github.com/triton-lang/triton/pull/10766) | `[TRITON] Fold split(join(a,b)) -> (a,b) and join(split(x)) -> x` | 30 giu | **APERTA**, `mergeable:true` / `blocked`, **CI VERDE** su `e60dc6ff7` (10/10, 20 ago 15:47Z). Manca solo una review che approvi | in attesa (review chiesta 22 ago) |
 | [#10780](https://github.com/triton-lang/triton/pull/10780) | `[DOCS] Precompute the stages-inspection key/hash in the plugin examples` | 2 lug | **APERTA**, contestata, CI da approvare | CRobeck ha obiettato |
 | [#10788](https://github.com/triton-lang/triton/pull/10788) | `[FRONTEND] Fix fp8 block-pointer load with padding_option="zero"` | 4 lug | CHIUSA 4 lug | ThomasRaoux |
 | [#10785](https://github.com/triton-lang/triton/pull/10785) | `[TritonGPU] Fail cleanly when lowering global_scratch_alloc without an offset` | 3 lug | CHIUSA 3 lug | ThomasRaoux |
@@ -62,6 +68,41 @@ Le due issue (#11326 confine di chiamata, #11328 vista multicast) sono aperte **
 PR** di proposito: in un caso la correzione e' una scelta di disegno interprocedurale, nell'altro la
 correzione ovvia fa abortire la compilazione. In entrambe e' offerta l'implementazione.
 
+### La catena 11328, 11393, 11396: la prima volta che qualcuno raccoglie una nostra issue
+
+Aperta il 16 ago come issue e non come PR di proposito (la correzione ovvia fa abortire la
+compilazione), **#11328 e' stata raccolta da due contributori esterni fra il 20 e il 21 ago**:
+`layahaasini` (*"started looking into this"*, 20 ago 23:42Z) e `whutsunxu`, che ha letto
+`AllocationAnalysis` e ha portato un caso minimo.
+
+Come e' andata, nell'ordine, perche' e' il primo scambio tecnico paritetico che abbiamo avuto qui:
+
+1. **21 ago 10:20Z** whutsunxu propone una causa e un repro minimo.
+2. **10:25Z** rispondiamo che il suo caso **non** riproduce su `4d641eca`. Sbagliato: avevamo usato
+   la pipeline di pass sbagliata.
+3. **11:16Z** ritiriamo, con la RUN line giusta presa da `tritonnvidiagpu_to_llvm.mlir` l'errore
+   riproduce. Retrattazione esplicita, non silenziosa.
+4. **13:52Z** whutsunxu scorpora [#11393](https://github.com/triton-lang/triton/issues/11393)
+   perche' i due bug hanno fix dipendenti.
+5. **17:07Z** pubblichiamo cinque arm misurati sullo stesso base `4d641eca2b`, **cinque build
+   separate con md5 diverso** perche' un binario stantio ci aveva gia' ingannati una volta
+   ([[a-missing-binary-is-not-a-red-test]]).
+6. **19:00Z** whutsunxu apre [#11396](https://github.com/triton-lang/triton/pull/11396); riportiamo
+   li' le misure gia' fatte cosi' non vanno rifatte.
+7. **19:11Z** Jokeren mette `CHANGES_REQUESTED`: togliere l'assert e' sbagliato, l'eccezione va
+   ristretta a `LocalAtomicScatterRMWOp`.
+8. **19:54Z** ritiriamo il nostro endorsement pubblicamente: *"Jokeren is right and my endorsement
+   above was wrong"*. Avevamo verificato che il crash sparisse, non cosa succedeva all'invariante
+   per tutti gli altri op ([[judge-a-fix-by-the-invariant-not-the-symptom]]).
+9. **23:01Z** Jokeren chiede a whutsunxu di spostare il test in `membar-cluster`. La palla e' sua.
+
+**Stato al 22 ago:** #11396 aperta, `CHANGES_REQUESTED`, head `fb9cbec0d`. **Il nostro fix di #11328
+dipende da questa**, quindi qui non si spinge: si aspetta e si misura quando serve. #11393 aperta.
+
+Due lezioni gia' pagate in questa catena: la misura vale come contributo anche su una PR che non e'
+nostra, e **una ritrattazione veloce costa meno di una difesa**. Entrambe le volte che abbiamo avuto
+torto, dirlo entro l'ora ha tenuto vivo lo scambio.
+
 ### #11311 — la mergiata (quella che "vale poco", e perché va comunque tenuta)
 `c346e50c7bb102f35f04d7200a3bc6194bec4c33`, un solo file (`examples/plugins/README.md`), **+9/-5**,
 solo documentazione: l'`IndentationError` dell'Example 4 (guardie di early-return a 2 spazi in corpi a
@@ -74,7 +115,7 @@ correzione, impacchettata dentro #10780 insieme a una modifica già respinta da 
 da 43 giorni senza CI; estratta da sola su un branch nuovo da `main`, un file solo, è passata in meno di
 24 ore. Regola derivata: **mai legare un fix non controverso a una modifica contestata.**
 
-### #10766 — la PR che vale davvero (viva, in attesa)
+### #10766 — la PR che vale davvero (viva, CI verde, in attesa di una review)
 Codice nel dialect (`lib/Dialect/Triton/IR/`), non docs. Ping del 14 ago con lo use case misurato che
 Raoux chiedeva dal 1 luglio: helper `@triton.jit` che ritorna `tl.join(cheap, tl.dot(x,w))` + chiamante
 che splitta e usa solo la metà economica → senza il fold il round-trip tiene vivo il `tt.dot` morto **e
@@ -84,14 +125,23 @@ toglie da sola e il SASS è identico → rivendicare **solo** il caso shared-mem
 Sound vs #10749 (che rilassa `JoinOp::verify` a `ignoreRegBroadcast=true`): i nostri fold confrontano i
 tipi per uguaglianza **esatta**, quindi sono strettamente più conservativi; declinano sui round-trip che
 differiscono solo per register broadcast.
-Nessuna risposta di un maintainer dopo il 14 ago. **Branch `fold-split-join` da congelare.**
+**Branch `fold-split-join` da congelare.**
 
-Stato esatto al 15 ago sera (`gh api`, head `00ae4d7e`): `state: open`, `mergeable: true`,
-`mergeable_state: "blocked"`, 8 commenti + 1 review comment (peterbell10, 2 lug), ultimo evento = il
-nostro ping del 14 ago 10:08 con menzione di ThomasRaoux/peterbell10/neildhar. ⚠️ **Zero check-runs sul
-head attuale**: il refresh del 14 ago ha rimesso la run in `action_required`
-([run 31785463900](https://github.com/triton-lang/triton/actions/runs/31785463900)) — cioè oggi la PR
-**non ha il verde**, non perché sia rotta ma perché nessuno ha cliccato "Approve and run workflows".
+**Stato al 22 ago** (`gh api`, head `e60dc6ff7`): `state: open`, `mergeable: true`,
+`mergeable_state: "blocked"`, **CI VERDE**. Il 19 ago ThomasRaoux ha chiesto di riscrivere la
+descrizione perché stesse in piedi da sola come messaggio di commit; fatto, e il 20 ago **qualcuno ha
+approvato la run**: 10 check su 10 verdi alle 15:47Z, `pre-commit`, `build-macos`,
+`integration-tests-nvidia` su a100/h100/gb200, `integration-tests-amd` su gfx90a/gfx942/gfx950, e
+`proton-tests-amd`. Il ledger precedente diceva "zero check-runs, nessun verde": era vero il 15 ago e
+**falso da due giorni**, e non ce ne siamo accorti perché nessuno guarda i check-runs se non li
+chiede. `mergeable_state: blocked` adesso vuol dire una cosa sola: **manca una review che approvi**,
+non manca la CI. Le uniche review sul thread sono un `COMMENTED` di peterbell10 del 2 luglio e due
+nostri. Chiesta la review a ThomasRaoux e peterbell10 il 22 ago.
+
+⚠️ Regola che questo caso stabilisce: **quando chiedi a un maintainer di approvare la CI, il giro non
+finisce quando lui risponde, finisce quando guardi i check-runs.** Qui la risposta non e' mai
+arrivata come commento, e' arrivata come dieci job verdi.
+
 Nota di contesto: **#10749 ("Generalize split and join layout handling") è stata mergiata il 7 lug**;
 i nostri fold restano sound perché confrontano i tipi per uguaglianza esatta.
 
@@ -161,7 +211,7 @@ anche qui nessun check verde finché un maintainer non approva.
 
 ---
 
-## B. Interne `alepot55/gpufsm` — 25 PR, **tutte mergiate**, nessuna aperta
+## B. Interne `alepot55/gpufsm` — 61 PR, **tutte mergiate**, nessuna aperta (al 22 ago 2026)
 
 Sono PR di lavoro auto-mergiate: il contributo è il contenuto, non la PR. Elencate perché sono l'indice
 cronologico più leggibile di cosa è stato fatto e quando.
@@ -200,24 +250,30 @@ periodo nelle PR non lo trova: sta in `git log`, in `docs/TACO_*`, `docs/PPOPP_P
 
 ---
 
-## B-bis. Upstream `llvm/llvm-project` — 6 PR aperte (stato: 18 ago 2026, mattina)
+## B-bis. Upstream `llvm/llvm-project` — 1 mergiata, 6 aperte (stato: 22 ago 2026, mattina)
 
 Bersagli scelti col criterio di [[pick-uncontested-bugs-not-design-changes]]: **solo** bug a cui
 risponde una macchina. Su **14 rilievi ricevuti, ZERO toccano la sostanza** di una correzione: sono
 tutti nomi e commenti. Il criterio regge. Controprova nello stesso giorno: su Triton la PR #11323
 (un'*ottimizzazione*) e' stata chiusa con "this seems like a micro optimization".
 
-| PR | cosa | stato al 18 ago |
+**Il collo di bottiglia oggi non e' la review, e' il landing.** Tre PR su sei sono approvate e verdi
+e nessuna delle tre e' atterrata: non abbiamo commit access, quindi ogni merge richiede che un
+revisore lo faccia a mano, e va **chiesto**. Su #216854 la richiesta non era mai partita.
+
+| PR | cosa | stato al 22 ago |
 |---|---|---|
 | [#216851](https://github.com/llvm/llvm-project/pull/216851) | mem2reg crash su `memref<0xf32>` | ✅ **MERGIATA il 19 ago 2026 15:59Z**, commit `0ed130af5`, landing fatto da FedericoBruzzone dopo 3 approvazioni (lui, gysit, Jianhui-Li). **Prima patch LLVM atterrata.** |
-| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | LGTM % nits; 6 suggerimenti applicati e spinti, head `5a4138d5a` |
-| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su mia indicazione |
-| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | nit applicato (`9482db30f`); helper condiviso rinviato a NFC separata, non bloccante |
-| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro |
-| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | **APPROVATA** da FedericoBruzzone (`LGTM % nits`), 2 nit di commento applicati e spinti (`cfa881865`), risposto nei thread. Attende `banach-space` |
+| [#216605](https://github.com/llvm/llvm-project/pull/216605) | affine LICM ignora valori catturati da regioni | `LGTM % nits` di FedericoBruzzone, 6 suggerimenti applicati il 18 ago (`5a4138d5a`). **Nessuna approvazione formale, ferma da 4 giorni.** Non pingata il 22 per non mandare tre richieste allo stesso revisore in un colpo |
+| [#216853](https://github.com/llvm/llvm-project/pull/216853) | coalescing SCF fonde iter_arg diversi | correzione nido imperfetto spinta (`48097f51b`); revisori richiesti su nostra indicazione. **Zero approvazioni**, nessun movimento dal 19 ago |
+| [#216854](https://github.com/llvm/llvm-project/pull/216854) | `multi_reduction` non valida `reduction_dims` | ✅ **2 approvazioni** (banach-space 19 ago, FedericoBruzzone 20 ago), **entrambe dopo l'ultimo push**, CI verde su `9482db30f`. Federico aveva scritto *"we might wait a day before landing it"*: il giorno e' passato, **landing chiesto il 22 ago** |
+| [#216852](https://github.com/llvm/llvm-project/pull/216852) | SCF non dichiara `cf` dipendente (1 riga) | ⚠️ **unica questione di sostanza aperta**: `Hardcode84` obietta che quella canonicalizzazione non dovrebbe creare `cf`. Concesso, palla a loro. Fermo dal 17 ago |
+| [#216947](https://github.com/llvm/llvm-project/pull/216947) | VectorToSCF asserisce senza `AutomaticAllocationScope` | ✅ **2 approvazioni** (FedericoBruzzone 18 ago, banach-space 19 ago 14:33Z), CI verde su `5e8cc0051`. ⚠️ L'ultimo push e' delle 15:49Z, quindi **posteriore a entrambe**: applicava pero' solo la riformulazione di un commento che Federico aveva suggerito due minuti prima. **Landing chiesto il 22 ago**, dichiarando cosa conteneva quel push |
 
 **APERTA il 19 ago 2026 come [#217392](https://github.com/llvm/llvm-project/pull/217392)** (era la riserva),
-**APPROVATA da `matthias-springer` il 20 ago 06:54Z**, CI 12 pass, landing chiesto. Per
+**APPROVATA da `matthias-springer` il 20 ago 06:54Z**, CI verde (11 pass) su `86bbca689`, landing chiesto
+il 20 ago 09:51Z. ⚠️ **Non e' ancora atterrata due giorni dopo**: ri-pingata il 22 ago. E' il caso che
+ha fatto capire che il landing va inseguito, non dato per fatto una volta chiesto. Per
 l'issue [#203858](https://github.com/llvm/llvm-project/issues/203858)
 `scf::loopUnrollByFactor` asserisce `expected constant loop bound` (`Utils.cpp:404`). Il difetto e'
 piu' largo di come lo descrive la segnalazione: `constantTripCount` risponde su **tre** strade in cui
