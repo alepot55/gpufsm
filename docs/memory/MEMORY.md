@@ -28,6 +28,7 @@ Aggiungere qui una riga per ogni file nuovo.
 - [L'ultimo che ha parlato non e' un criterio](last-speaker-is-not-a-criterion.md) — usato per capire di chi fosse la palla: tre falsi positivi su tre.
 - [Il gate gira solo dal venv](venv-and-the-real-gate.md) — `ruff` nudo da "command not found", e da un worktree `pytest` testa il codice di main.
 - [Autorizzazione permanente ad agire upstream](standing-authorization-to-act-upstream.md) — rispondere e pushare senza chiedere; il SUBMIT del paper resta suo.
+- [Approvato non vuol dire atterrato](approved-is-not-landed.md) — due PR LLVM verdi e approvate ferme perché il landing non era stato chiesto, e una CI Triton passata al verde senza un solo commento.
 - [Verso l esterno: em dash e registro](no-em-dash-match-their-register.md) — em dash vietato solo fuori, e a chi scrive nove parole non si risponde con sessanta.
 - [Figure alla dimensione finale](figures-at-final-printed-size.md) — `width=\columnwidth` su una figura da 6in è una riscalatura a 0.55×, e il compliance check cercava `\resizebox`.
 - [Citazioni: verificare sulla fonte](verify-citations-on-the-source.md) — un primo autore sbagliato sopravvissuto a uno sweep, e il vicino più prossimo che mancava.
