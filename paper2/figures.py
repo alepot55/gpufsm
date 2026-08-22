@@ -13,6 +13,15 @@ Sizing contract: figures are emitted at their FINAL printed size (COL for one ac
 sigplan column, WIDE for a full-width figure*) and included at scale 1.0, so no label is
 ever downscaled below the 8 pt floor the ASPLOS format rules impose. Do not include these
 with a width= that differs from the figsize below.
+
+Greyscale contract: CGO requires a submission "formatted for black-and-white printers and
+not color printers", and says so specifically about plots. So no categorical distinction
+here may rest on hue alone. Every set of bars carries a hatch, every line set carries a
+marker or a dash pattern, and the palette below is built on a LUMINANCE ladder rather than
+a hue wheel: the closest two entries differ by 5 points of relative luminance out of 100,
+against 0.7 for the palette this replaces, where grey, green and orange printed as one
+shade. Colour still carries on screen, which is what the mandatory `screen' class option
+is for; it is simply never the only channel.
 """
 
 from __future__ import annotations
@@ -57,6 +66,30 @@ plt.rcParams.update(
         "savefig.pad_inches": 0.02,
     }
 )
+
+
+# Greyscale-safe palette, ordered by relative luminance (Rec. 709), not by hue.
+# The value after each colour is that luminance on a 0-100 scale; keep them separated if
+# these are ever re-tuned, and keep the paired hatch, because the hatch is what survives a
+# photocopier when two categories land at similar grey.
+INK = "#2b2b2b"  # shared edge and hatch colour: hatches inherit the edge colour
+L_DARK = "#8c2f26"  # 25.9   red
+L_PURPLE = "#6a5aa0"  # 38.6   purple
+L_BLUE = "#3f86b5"  # 48.0   blue
+L_GRAY = "#8f959c"  # 58.1   grey
+L_ORANGE = "#e3a655"  # 66.4   orange
+L_GREEN = "#8fcf9f"  # 74.5   green
+L_TEAL = "#c5e6e2"  # 87.3   teal
+
+# Hatches are the redundant channel. Order matters only in that adjacent categories in a
+# figure should not share one; density is tuned for bars a few millimetres wide in print.
+BAR_KW = dict(edgecolor=INK, linewidth=0.5)
+
+
+def _hatch_bars(bars, hatches) -> None:
+    """Stamp a hatch on each bar, so the series survives a black-and-white printer."""
+    for b, h in zip(bars, hatches, strict=True):
+        b.set_hatch(h)
 
 
 def _read(name: str) -> list[dict]:
@@ -114,8 +147,9 @@ def fig_anatomy_and_cure() -> None:
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(COL, 3.9))
 
     labels, vals = _ladder()
-    colors = ["#c0392b", "#e67e22", "#2980b9", "#27ae60"]
-    bars = ax1.bar(labels, vals, color=colors, width=0.62)
+    colors = [L_DARK, L_BLUE, L_ORANGE, L_GREEN]
+    bars = ax1.bar(labels, vals, color=colors, width=0.62, **BAR_KW)
+    _hatch_bars(bars, ["", "///", "xxx", ".."])
     top = max(vals)
     for b, v, g in zip(
         bars, vals, [None] + [vals[i] / vals[i - 1] for i in (1, 2, 3)], strict=True
@@ -158,18 +192,18 @@ def fig_anatomy_and_cure() -> None:
         grid,
         [FIT_A + FIT_B * g for g in grid],
         "-",
-        color="#c0392b",
+        color=L_DARK,
         lw=1.0,
         zorder=1,
         label=f"${FIT_A}+{FIT_B}\\,x$  ($R^2{{=}}0.997$)",
     )
-    ax2.plot(xs_in, ys_in, "o", color="#c0392b", zorder=3, label="lock-step tile")
-    ax2.plot(xs_out, ys_out, "o", mfc="white", mec="#c0392b", mew=1.0, zorder=3, label="held out")
+    ax2.plot(xs_in, ys_in, "o", color=L_DARK, zorder=3, label="lock-step tile")
+    ax2.plot(xs_out, ys_out, "o", mfc="white", mec=L_DARK, mew=1.0, zorder=3, label="held out")
     ax2.plot(
         [shape[d][0] for d in perf],
         cured,
         "^",
-        color="#27ae60",
+        color=L_BLUE,
         zorder=3,
         label="per-lane retirement",
     )
@@ -192,12 +226,15 @@ def fig_mechanism() -> None:
     ns = {r["kernel"]: r for r in _read("m10_nsight_rtx4070.csv")}
     order = ["wp2_tile", "cuda_worklist", "sp_threads_cure"]
     names = ["Triton\ntile", "hand\nCUDA", "cured"]
-    colors = ["#2980b9", "#27ae60", "#8e44ad"]
+    colors = [L_BLUE, L_GREEN, L_PURPLE]
+    hatches = ["///", "..", "xxx"]
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(WIDE, 1.95))
 
     issue = [float(ns[k]["issue_active_pct"]) for k in order]
-    for b, v in zip(ax1.bar(names, issue, color=colors, width=0.6), issue, strict=True):
+    issue_bars = ax1.bar(names, issue, color=colors, width=0.6, **BAR_KW)
+    _hatch_bars(issue_bars, hatches)
+    for b, v in zip(issue_bars, issue, strict=True):
         ax1.text(b.get_x() + b.get_width() / 2, v + 1.2, f"{v:.0f}%", ha="center", fontsize=8)
     ax1.set_ylabel("issue-slot activity (%)")
     ax1.set_ylim(0, max(issue) * 1.28)
@@ -205,7 +242,9 @@ def fig_mechanism() -> None:
     ax1.tick_params(axis="x", length=0)
 
     stall = [float(ns[k]["long_scoreboard_stall"]) / 1e3 for k in order]
-    for b, v in zip(ax2.bar(names, stall, color=colors, width=0.6), stall, strict=True):
+    stall_bars = ax2.bar(names, stall, color=colors, width=0.6, **BAR_KW)
+    _hatch_bars(stall_bars, hatches)
+    for b, v in zip(stall_bars, stall, strict=True):
         ax2.text(b.get_x() + b.get_width() / 2, v * 1.25, f"{v:.0f}k", ha="center", fontsize=8)
     ax2.set_yscale("log")
     ax2.set_ylabel("dependent-load stall (kcyc)")
@@ -220,18 +259,22 @@ def fig_mechanism() -> None:
         [i - w / 2 for i in x],
         [float(tile["pct_peak_issue"]), float(tile["pct_peak_dram"])],
         w,
-        color="#2980b9",
+        color=L_BLUE,
+        hatch="///",
         label="Triton tile",
+        **BAR_KW,
     )
     ax3.bar(
         [i + w / 2 for i in x],
         [float(cu["pct_peak_issue"]), float(cu["pct_peak_dram"])],
         w,
-        color="#27ae60",
+        color=L_GREEN,
+        hatch="..",
         label="hand CUDA",
+        **BAR_KW,
     )
-    ax3.axhline(100, color="#c0392b", ls="--", lw=0.9)
-    ax3.text(-0.44, 104, "hardware ceiling", fontsize=8, color="#c0392b", ha="left")
+    ax3.axhline(100, color=L_DARK, ls="--", lw=0.9)
+    ax3.text(-0.44, 104, "hardware ceiling", fontsize=8, color=L_DARK, ha="left")
     ax3.set_xticks(x)
     ax3.set_xticklabels(["issue rate", "DRAM bandwidth"])
     ax3.set_ylabel("% of peak")
@@ -253,14 +296,14 @@ def fig_dfa_crossover() -> None:
     tkb = [float(r["table_kb"]) for r in rows]
     ratio = [float(r["triton_packed_gbps"]) / float(r["cuda_gbps"]) for r in rows]
     fig, ax = plt.subplots(figsize=(COL, 1.95))
-    ax.plot(tkb, ratio, "o-", color="#2980b9")
-    ax.axhline(1.0, color="#27ae60", ls="--", lw=1.0)
+    ax.plot(tkb, ratio, "o-", color=L_BLUE)
+    ax.axhline(1.0, color=L_DARK, ls="--", lw=1.0)
     ax.text(
         tkb[0] * 1.15,
         1.035,
         "parity with CUDA",
         fontsize=8,
-        color="#27ae60",
+        color=L_DARK,
         va="bottom",
         ha="left",
     )
@@ -306,11 +349,9 @@ def fig_straggler_law() -> None:
     ):
         a0, b, r2 = _ols(xv, masked)
         grid = [min(xv) * 0.0, max(xv) * 1.08]
-        ax.plot(grid, [a0 + b * g for g in grid], "-", color="#c0392b", lw=1.0, zorder=1)
+        ax.plot(grid, [a0 + b * g for g in grid], "-", color=L_DARK, lw=1.0, zorder=1)
         for x, y, h in zip(xv, masked, held, strict=True):
-            ax.plot(
-                [x], [y], "o", color="#c0392b", mfc=("white" if h else "#c0392b"), mew=1.0, zorder=3
-            )
+            ax.plot([x], [y], "o", color=L_DARK, mfc=("white" if h else L_DARK), mew=1.0, zorder=3)
         ax.set_xlabel(lab, fontsize=8)
         ax.set_xlim(0, max(xv) * 1.08)
         ax.text(
@@ -332,7 +373,7 @@ def fig_straggler_law() -> None:
 
 
 def fig_regret_law() -> None:
-    """Fig. 5: regret across eight oracle-gated witnesses, coloured by dominant mechanism."""
+    """Fig. 5: regret across eight oracle-gated witnesses, keyed by dominant mechanism."""
     rows = {r["workload"]: r for r in _read("landmark/regret_law.csv")}
     order = [
         "pointer_chase",
@@ -354,50 +395,57 @@ def fig_regret_law() -> None:
         "moe_powerlaw": "MoE routing\n(ML, scalar)",
         "attention_powerlaw": "attention\n(ML, dense)",
     }
+    # (colour, hatch, label). This figure is the one place where the category is carried by
+    # the fill and nothing else: there is no axis position, no marker and no annotation that
+    # says which mechanism a bar belongs to. So the hatch is load-bearing, not decoration.
     mech = {
-        "negative_control_latency_equal": ("#27ae60", "no control divergence (control)"),
-        "baseline_occupancy_50v94": ("#7f8c8d", "tile-lowering baseline"),
-        "masked_waste_gather_diluted": ("#2980b9", "masked-lane waste (gather-diluted)"),
-        "latency_starvation": ("#c0392b", "issue starvation"),
-        "baseline_plus_divergence": ("#8e44ad", "baseline $+$ divergence"),
-        "masked_waste_pure_compute": ("#e67e22", "masked-lane waste"),
-        "scalar_control_ml_moe": ("#c0392b", "issue starvation"),
-        "dense_vector_tile_wins": ("#16a085", "dense per-step work: tile wins"),
+        "negative_control_latency_equal": (L_GREEN, "..", "no control divergence (control)"),
+        "baseline_occupancy_50v94": (L_GRAY, "\\\\", "tile-lowering baseline"),
+        "masked_waste_gather_diluted": (L_BLUE, "///", "masked-lane waste (gather-diluted)"),
+        "latency_starvation": (L_DARK, "", "issue starvation"),
+        "baseline_plus_divergence": (L_PURPLE, "xxx", "baseline $+$ divergence"),
+        "masked_waste_pure_compute": (L_ORANGE, "++", "masked-lane waste"),
+        "scalar_control_ml_moe": (L_DARK, "", "issue starvation"),
+        "dense_vector_tile_wins": (L_TEAL, "oo", "dense per-step work"),
     }
     vals = [float(rows[w]["regret"]) for w in order]
     colors = [mech[rows[w]["dominant_mechanism"]][0] for w in order]
+    hatches = [mech[rows[w]["dominant_mechanism"]][1] for w in order]
 
     fig, ax = plt.subplots(figsize=(WIDE, 2.05))
-    for b, v in zip(
-        ax.bar([nice[w] for w in order], vals, color=colors, width=0.62), vals, strict=True
-    ):
+    bars = ax.bar([nice[w] for w in order], vals, color=colors, width=0.62, **BAR_KW)
+    _hatch_bars(bars, hatches)
+    for b, v in zip(bars, vals, strict=True):
         ax.text(
             b.get_x() + b.get_width() / 2, v + 0.06, f"{v:.2f}$\\times$", ha="center", fontsize=8
         )
-    ax.axhline(1.0, color="#27ae60", ls="--", lw=1.0)
+    ax.axhline(1.0, color=L_DARK, ls="--", lw=1.0)
     ax.annotate(
         "the tile wins",
         xy=(7, vals[-1] + 0.14),
         xytext=(7, 1.62),
         ha="center",
         fontsize=8,
-        color="#16a085",
-        arrowprops=dict(arrowstyle="->", color="#16a085", lw=0.9),
+        color=INK,
+        arrowprops=dict(arrowstyle="->", color=INK, lw=0.9),
     )
     ax.set_ylabel(r"tile-vs-thread regret ($\times$)")
-    ax.set_ylim(0, max(vals) * 1.18)
+    # Headroom for the legend. 1.18 used to be enough when the bars were flat fills; with
+    # hatches the legend's last row printed on top of the rejection-sampling bar and both
+    # became unreadable, so the axis is opened up rather than the legend moved.
+    ax.set_ylim(0, max(vals) * 1.34)
     ax.tick_params(axis="x", length=0)
 
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
 
     seen = set()
-    handles = [Line2D([], [], color="#27ae60", ls="--", lw=1.0, label=r"no regret ($1\times$)")]
+    handles = [Line2D([], [], color=L_DARK, ls="--", lw=1.0, label=r"no regret ($1\times$)")]
     for w in order:
-        c, lab = mech[rows[w]["dominant_mechanism"]]
+        c, h, lab = mech[rows[w]["dominant_mechanism"]]
         if lab not in seen:
             seen.add(lab)
-            handles.append(Patch(facecolor=c, label=lab))
+            handles.append(Patch(facecolor=c, hatch=h, edgecolor=INK, linewidth=0.5, label=lab))
     ax.legend(handles=handles, loc="upper left", fontsize=8, ncol=2, columnspacing=1.0)
     fig.tight_layout()
     _save(fig, "fig_regret_law")

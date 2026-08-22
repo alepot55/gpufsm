@@ -18,7 +18,7 @@ stays the fallback for the April 2027 cycle.
 | Rebuttal | ⚠️ **contested**, see below |
 | Notification | ⚠️ **contested**, see below |
 | Conference | 20 to 24 March 2027, Salt Lake City, Utah, USA |
-| Paper | `paper2/gpufsm_cgo27.pdf`, md5 `16b36403b7d0b64fcb8d9426d1379ebf`, 13 pages |
+| Paper | `paper2/gpufsm_cgo27.pdf`, md5 `e08c97e7d13dd61c5d629493188b9f56`, **12 pages**, body p1 to p11 |
 
 ### Two dates CGO contradicts itself on
 
@@ -106,18 +106,41 @@ GPU compilers, tile DSLs, Triton, SIMT, warp-level parallelism, irregular parall
 
 **Davide Conficconi, Politecnico di Milano, Italy, sits on the CGO 2027 Program Committee.**
 
-He is a conflict on two independent grounds, either of which alone would be sufficient:
+He is a conflict on **three independent grounds**, any one of which would be sufficient
+on its own:
 
-1. **Institutional.** Same institution as the author.
-2. **Cited co-author.** He is the last author of reference **[24]**, Somaini, Carloni,
-   Agosta, Santambrogio, Conficconi, *Combining MLIR Dialects with Domain-Specific
-   Architecture for Efficient Regular Expression Matching*, CGO 2025.
+1. **Same institution.** Politecnico di Milano, the author's own.
+2. **Supervision within the last four years.** He was the tutor of the project this line of
+   work grew out of. The relationship is closed, and he knows nothing of these publications,
+   but advisor and supervisor conflicts do not sunset on the CFP's terms and this one falls
+   inside the window regardless.
+3. **Cited co-author.** Last author of reference **[24]**, Somaini, Carloni, Agosta,
+   Santambrogio, Conficconi, *Combining MLIR Dialects with Domain-Specific Architecture for
+   Efficient Regular Expression Matching*, CGO 2025.
 
-Note what this costs, so it is not a surprise: he is plausibly the single best-matched
-reviewer on the committee, since he works on MLIR dialects for regex and automata
-acceleration. Declaring him removes that. It is not optional. Same institution is the
-least arguable conflict there is, and an undeclared one is the kind that gets a paper
-summarily rejected rather than merely reassigned.
+### Declare him BY NAME, not only as an institution
+
+Tick him individually on the conflicts page, in addition to declaring Politecnico di Milano
+as an institution. HotCRP matches institutional conflicts by string against affiliation
+fields, and that match misses routinely: an abbreviation, a second affiliation, an English
+rendering, a stale profile, any of these and the institutional rule silently fails to fire.
+The named tick does not depend on any of that.
+
+**What declaring achieves**, and it is the whole point: it removes him from bidding, from
+assignment, from access to the PDF, from the reviews, and from the discussion of this paper.
+That is the mechanism working as designed, not a cost.
+
+### No contact with him, before or after
+
+Do not write to him about this submission at any point in the cycle. No rule requires it, he
+is not expecting it, and CGO's double-blind rules cut directly against approaching a PC
+member about a paper under review. Declaring the conflict in HotCRP is the complete and
+correct action; a message on top of it would be the thing that causes a problem, not the
+thing that prevents one.
+
+Note what the declaration costs, so it is not a surprise: he works on MLIR dialects for regex
+and automata acceleration, which plausibly makes him the single best-matched reviewer on the
+committee. Declaring removes that. It is still not optional, on any of the three grounds.
 
 ### The full sweep, and how far it reaches
 
@@ -197,10 +220,10 @@ bad assignment. The paper's home is compilers and IR design.
 | 3 | Title, no `Tool:` or `Practical:` prefix | section (b) | ✅ ready |
 | 4 | Abstract | `paper2/ASPLOS_ABSTRACT.txt` | ✅ verified |
 | 5 | Authors | Alessandro Potenza, Politecnico di Milano. **Form only, never the PDF** | ✅ ready |
-| 6 | Conflicts | **Davide Conficconi** plus the six author-only boxes, plus a fresh in-HotCRP sweep | ⚠️ needs the author |
+| 6 | Conflicts | **Davide Conficconi, ticked by name**, plus Politecnico di Milano as an institution, plus the six author-only boxes, plus a fresh in-HotCRP sweep | ⚠️ needs the author |
 | 7 | Topics | section (d) | ✅ ready |
 | 8 | **Artifact evaluation interest: TICK YES** | section (f) | ✅ decided, see below |
-| 9 | Upload the paper | `paper2/gpufsm_cgo27.pdf` | ✅ ready |
+| 9 | Upload the paper | `paper2/gpufsm_cgo27.pdf`, md5 `e08c97e7d13dd61c5d629493188b9f56` | ✅ ready |
 | 10 | Supplementary material | none. See the note below | n/a |
 | 11 | **Press SUBMIT** | | author action |
 | 12 | Keep the confirmation email | | author action |
@@ -236,7 +259,7 @@ Three badge families, up to one of each per paper:
 
 | badge | what it takes |
 |---|---|
-| **Artifacts Available** | deposit in a *qualified archival repository*. **Zenodo, figshare, Dryad.** CGO states explicitly that "Personal webpages, GitHub repositories or alike are **not** sufficient as it can be changed after the submission deadline". No audit needed, awarded by the publisher on a link |
+| **Artifacts Available** | deposit in a *qualified archival repository*. **Zenodo, figshare, Dryad.** CGO states explicitly that "Personal webpages, GitHub repositories or alike are **not** sufficient as it can be changed after the submission deadline". No audit needed, awarded by the publisher on a link. ⚠️ **Post-acceptance only, see below** |
 | **Artifacts Evaluated, Functional or Reusable** | independent audit. Functional means documented, consistent, complete, exercisable, with evidence of verification. Reusable means significantly beyond that, carefully documented and structured for reuse |
 | **Results Validated and Reproduced** | the main results obtained by someone other than the author, within a tolerance that does not change the paper's claims |
 
@@ -247,9 +270,21 @@ Three badge families, up to one of each per paper:
 | Artifact appendix, **up to 2 pages, placed before the References section**, ctuning.org template | ❌ **not written.** Only needed after acceptance, but it is a real writing task |
 | Single-blind: author details may be included in the appendix | note: opposite of the paper |
 | Container or VM (Docker, Singularity, VirtualBox, Vagrant) "strongly encouraged" | ❌ **not built.** Today the artifact is a pinned Triton wheel recipe plus a Python package |
-| Archival deposit for the Available badge | ❌ **not done.** Repo is private, and GitHub would not qualify anyway. Needs a Zenodo deposit |
+| Archival deposit for the Available badge | ⏸️ **deliberately deferred to after the notification.** See below |
 | Oracle-gated correctness, versioned CSVs, pinned rebuild recipe | ✅ already true, and it is the strongest part |
 | ⚠️ **Specific hardware** | ❗ **action required, see below** |
+
+### Do NOT deposit on Zenodo yet
+
+A Zenodo record is public and indexed the moment it is minted. Depositing this artifact
+before the notification would put the repository, its commit history and its author in front
+of anyone who searched for the kernels or the pass, while the paper is under double-blind
+review. That breaks the blind from the author's side, which is the one side that is
+controllable.
+
+**Sequence it after the notification**, whichever date that turns out to be. The Available
+badge does not require an audit and is awarded by the publisher on a link, so it can be
+obtained late without cost. Nothing about the submission on 10 September depends on it.
 
 ### The one thing to do before submitting, not after
 
@@ -329,7 +364,9 @@ straggler law and the negative controls are new here.
 
 ### h1. To the artifact evaluation chairs, about the hardware
 
-Required by the CFP before submission if AE interest is ticked.
+Required by the Call for Artifacts before submission, since AE interest is being ticked and
+the artifact needs specific hardware. **Ready to send: the paper and the figures are final,
+so this describes the artifact as it actually stands.**
 
 ```
 To: owh@cmu.edu, Jackson.Woodruff@ed.ac.uk
@@ -338,28 +375,37 @@ Subject: CGO 2027 AE: artifact requiring specific NVIDIA GPUs, checking in befor
 Dear Olivia Hsu and Jackson Woodruff,
 
 The Call for Artifacts asks authors with an unusual hardware setup to contact you
-before submitting, so I am doing that ahead of the 10 September paper deadline. I
-intend to tick artifact interest on an R2 research paper submission.
+before submitting, so I am doing that ahead of the 10 September R2 deadline. I
+intend to tick artifact interest on a research paper submission.
 
-The artifact needs NVIDIA GPUs and CUDA. Its central claim is a compiler pass built
-into a from-source Triton, so evaluating it means building that wheel from a pinned
-upstream commit plus a versioned patch, then running oracle-gated kernels. The
-headline results were measured on an RTX 4070 and reproduced on an A100, with two
-further results on an H100 and an H200.
+What the artifact is. The paper's central claim is that a primitive is
+inexpressible in a production tile IR, and its cure is a compiler pass that
+supplies that primitive below the IR. So the artifact is a from-source Triton
+build: a pinned upstream commit plus a versioned patch, built to a wheel by a
+one-command recipe, plus a Python package of oracle-gated kernels and the
+versioned CSVs every number in the paper is read from.
 
-The parts an evaluator can run without a GPU are the correctness oracle and the
-figure regeneration, which is driven entirely from versioned CSVs. The parts that
-need a GPU are the speedups themselves.
+What it needs. NVIDIA GPUs and CUDA. The headline speedups were measured on an
+RTX 4070 and reproduced on an A100 from the same wheel, with two further results
+on an H100 and an H200.
+
+What splits cleanly. Two parts of the artifact need no GPU at all: the CPU
+correctness oracle every kernel is gated against, and the regeneration of every
+figure, which is driven entirely from the versioned CSVs. Two more are runnable
+probes rather than prose, and also need no GPU: one exits zero on the expected
+compile failure and one asserts that the MLIR verifier rejects the construct the
+paper says is inexpressible. What needs a GPU is the speedups themselves.
 
 Two questions:
 
-1. Does the committee have access to NVIDIA GPUs of any recent generation? A single
-   consumer-class card is enough to reproduce the main speedup; the cross-architecture
+1. Does the committee have access to NVIDIA GPUs of any recent generation? A
+   single consumer-class card reproduces the main speedup; the cross-architecture
    result needs a datacenter card.
-2. If not, would you accept an artifact evaluated on cloud GPUs, with credentials or
-   a prepared cloud environment provided by me for the evaluation period?
+2. If not, would you accept an artifact evaluated on cloud GPUs, with a prepared
+   environment provided by me for the evaluation period?
 
-I would rather find out now than package for an environment that does not exist.
+I would rather learn the answer now than package for an environment that does not
+exist. I am happy to follow whichever route you prefer.
 
 Sincerely,
 Alessandro Potenza
@@ -394,10 +440,13 @@ Politecnico di Milano
 
 - ⚠️ **Conflicts**: declare Davide Conficconi, fill the six author-only boxes, and re-run the
   Politecnico sweep inside HotCRP once signed in. The ERC and AEC are still being populated.
-- ⚠️ **Two open compliance questions on the PDF itself**, both new at CGO and neither present
-  at ASPLOS. See `docs/SUBMISSION_CGO.md`: whether the acknowledgments count toward the 11
-  pages, and whether the colour figures survive a black-and-white printer.
-- ❗ **Mail h1 to the AE chairs** before submitting, if AE interest is ticked.
+- ✅ **Both PDF compliance questions are closed.** The acknowledgments section is out, so the
+  text is 11 pages exactly, and the figures now key their categories by hatch as well as
+  fill and were checked by eye on a true greyscale render. See `docs/SUBMISSION_CGO.md`.
+- ❗ **Mail h1 to the AE chairs**, ready to send. It describes the final artifact and must go
+  before the submission.
+- ⏸️ **Zenodo deposit is a post-notification step**, not a pre-submission one. Minting a
+  public record now would break the double blind from the author's side.
 - ⏳ **R2 artifact dates** are unpublished. Re-check the AE page nearer acceptance.
 - ⏳ **Re-fetch the CFP in the last week before submitting.** It carries at least five internal
   contradictions today, which suggests it is still being edited.
