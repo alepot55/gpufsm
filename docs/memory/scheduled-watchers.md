@@ -54,8 +54,13 @@ Quello che gira davvero sta nel **crontab utente** (`crontab -l`):
 
 | riga | ogni | cosa fa |
 |---|---|---|
-| `~/.cache/watch_asplos.sh` | 30 min | sonda il codice HTTP di `asplos27-sep.hotcrp.com`, notifica al primo non-404 |
 | `tools/watch/upstream-cron.sh` | 10 min | un giro one-shot di `upstream.sh` sui 12 thread, aggiunto il 22 ago |
+
+**È rimasta una riga sola.** La sentinella ASPLOS (`~/.cache/watch_asplos.sh`, 30 min sul codice HTTP
+dell'HotCRP) è stata **tolta dal crontab il 22 ago 2026 su richiesta esplicita dell'utente**, poche
+ore dopo che questa nota la registrava come viva. Lo script è ancora sul disco e funziona: per
+riarmarla basta rimettere la riga. Finché non la si rimette, **l'apertura del sito di settembre non
+la vede nessuno** e va controllata a mano (18 giorni alla scadenza al momento della rimozione).
 
 `upstream-cron.sh` esiste perché il 22 ago il Monitor è morto con la sessione e sono rimaste **sette
 ore scoperte** (per fortuna senza eventi: verificato thread per thread a mano, nessuno si era mosso).
@@ -65,10 +70,9 @@ battito: log fermo = cron morto, non "nessuna novità".
 Serve `/bin/bash -lc` nella riga di crontab: una shell di login eredita `GITHUB_TOKEN`, che cron da
 solo non ha ([[laptop-tokens-in-env]]).
 
-Nota sull'ASPLOS: quella sentinella **non era mai morta**, gira in crontab dal 21 ago e il suo log
-cresce ogni 30 min. Sorveglia il codice HTTP perché il CFP linka un HotCRP che risponde 404: il
-segnale "il CFP ha pubblicato il link" era gia' scattato senza che nessuno lo vedesse, e non
-significava niente.
+Nota su cosa sorvegliava l'ASPLOS, se un giorno la si riarma: il **codice HTTP** dell'URL, non il
+CFP. Il segnale "il CFP ha pubblicato il link" era gia' scattato senza che nessuno lo vedesse, e non
+significava niente, perche' il link puntava a un sito che risponde 404.
 
 ## Perché due livelli e non uno
 

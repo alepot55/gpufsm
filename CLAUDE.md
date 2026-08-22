@@ -116,9 +116,16 @@ un draft salvato non conta.
   `paper2/resubmission_note.pdf`, compliance in `docs/SUBMISSION_ASPLOS.md`, e il materiale
   per compilare il form in `paper2/ASPLOS_SUBMISSION_KIT.md`.
 - ⏳ Sito **linkato ma non aperto**: il CFP punta a **https://asplos27-sep.hotcrp.com/**, che
-  però risponde **404**. Il link esiste, il sito non è ancora stato creato. Sentinella in
-  cron ogni 30 min (`~/.cache/watch_asplos.sh`) sul codice HTTP di quell'URL, non sul CFP.
-  Quando apre resta solo **premere SUBMIT**, ed è azione dell'utente.
+  però risponde **404** (riverificato il 22 ago, insieme a `-fall`/`asplos27`/`asplos2027`: 404
+  tutti). Il link esiste, il sito non è ancora stato creato.
+- 🚨 **Nessuno sorveglia più l'apertura.** La sentinella in cron è stata **tolta il 22 ago 2026 su
+  richiesta dell'utente**; lo script resta in `~/.cache/watch_asplos.sh` ma non è schedulato.
+  Quindi l'apertura del sito **va controllata a mano**, ed è l'unico segnale che separa "pronto" da
+  "sottomesso". PPoPP 2027 è andata persa esattamente in questo spazio.
+
+  ```bash
+  curl -s -o /dev/null -w '%{http_code}\n' -L https://asplos27-sep.hotcrp.com/
+  ```
 - ⚠️ Il CFP ha un **rapid-review che legge solo le prime due pagine**: se si tocca il paper,
   ricontrollare che l'argomento intero ci stia ancora dentro.
 - Build: `pdflatex → bibtex → pdflatex ×2`. Serve `texlive-fonts-extra` +
