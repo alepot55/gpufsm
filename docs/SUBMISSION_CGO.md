@@ -17,9 +17,13 @@ that is measured, not assumed: both builds close the body on line 1210.
 
 | | |
 |---|---|
-| md5, anonymous | `16b36403b7d0b64fcb8d9426d1379ebf` |
-| md5, named (never uploaded) | `89a10ca224baffffb5bed6ac2bb73df7` |
-| pages | 13. Body p1 to p11, acknowledgments p12, references p12 to p13 |
+| md5, anonymous | `e08c97e7d13dd61c5d629493188b9f56` |
+| md5, named (never uploaded) | `19fa5ee4e042816e6614accb6588ab2b` |
+| pages | **12. Body p1 to p11 exactly, references p12** |
+
+Note that the figure PDFs are not byte-reproducible: matplotlib stamps a creation date, so
+every regeneration changes the md5 of the paper even when nothing visible moves. Compare
+figures by their page size and by eye, not by checksum.
 
 ## Passed
 
@@ -41,68 +45,80 @@ that is measured, not assumed: both builds close the body on line 1210.
   ASPLOS build had), 18 cosmetic underfull.
 - **US Letter**, 612x792.
 
-## Two open questions, both new at CGO
+## Two questions that were open, now closed
 
-Neither existed at ASPLOS. Both are author decisions, deliberately not taken here.
+Both were new at CGO and neither existed at ASPLOS.
 
-### 1. Do the acknowledgments count toward the 11 pages?
+### 1. The acknowledgments are gone from this submission
 
-ASPLOS carved them out explicitly: *"the acknowledgment section (used only to acknowledge use
-of Generative AI as per ACM policy above), the bibliographic references section, and the
-appendices ... are not included in the page limit."*
+ASPLOS carved acknowledgments out of its page limit in so many words. **CGO carves out only
+the bibliography**: *"Your submission is limited to 11 pages of text, excluding bibliography"*
+and *"There is no page limit for references"*. Under that wording the disclosure section was
+text, and the text ran onto p12, which is 12 pages against a limit of 11.
 
-**CGO carves out only the bibliography**: *"Your submission is limited to 11 pages of text,
-excluding bibliography"* and *"There is no page limit for references"*. Acknowledgments are
-not mentioned. Under a strict reading they are text, and this submission's text would then
-run to p12, which is 12 pages.
+**CGO also does not ask for the disclosure.** Its CFP records that ACM's policy changed:
+*"ACM no longer requires authors to disclose the use of AI in preparing a submission"*, with
+the emphasis moved onto the authors' responsibility for correctness.
 
-Compounding it: **CGO does not require an AI disclosure at all.** The CFP states that ACM's
-authorship policy was updated and that *"ACM no longer requires authors to disclose the use of
-AI in preparing a submission"*, placing the emphasis instead on the authors' responsibility
-for correctness. So the section that creates the risk is not one CGO asks for.
-
-Measured, both ways:
+So the section was removed for this venue, and the count is now unambiguous:
 
 | | pages | text ends | references |
 |---|---|---|---|
-| with acknowledgments (current build) | 13 | p12, part of the left column | p12 right column to p13 |
-| without acknowledgments | **12** | **p11, exactly** | **p12 only, one page** |
+| with acknowledgments | 13 | p12, part of a column | p12 to p13 |
+| **without, as shipped** | **12** | **p11 exactly** | **p12, one page** |
 
-Dropping the section makes the count unambiguous at exactly 11 pages of text. Keeping it
-is a defensible reading of an ambiguous rule, and it preserves a disclosure the author chose
-to make deliberately at both venues. **Not decided here.**
+**Restore it at camera-ready if the paper is accepted**, so the disclosure stays aligned with
+the HPEC paper covering the same work. A comment in `gpufsm_cgo27.tex` says so at the point
+where the section used to be, and the text to restore is intact in `gpufsm_asplos.tex`.
 
-### 2. Do the figures survive a black-and-white printer?
+Side effect worth recording: removing the section also cleared the single overfull vbox the
+build had been carrying. The build is now **0 errors, 0 overfull, 0 undefined references**.
+
+### 2. The figures are now readable on a black-and-white printer
 
 CGO, verbatim: *"Your submission must be formatted for black-and-white printers and not color
 printers. This is especially true for plots and graphs in the paper."*
 
-All five figures carry non-gray colour operators. The exposure is not uniform:
+The old palette failed that. Fig. 6 keyed its eight bars to a dominant mechanism by hue
+alone, with a legend of plain colour patches and no second channel, and five of its seven
+categories landed within a few points of the same grey: teal 50.5, grey 53.8, green 54.8,
+orange 55.5, with the closest pair **0.7 points apart out of 100**. Printed, five of the
+eight bars were one shade, and the figure that carries the generality claim conveyed nothing.
 
-Fig. 5, `fig_regret_law`, encodes **dominant mechanism by colour alone**, with a legend of
-colour patches and no second channel: no hatching, no marker shape, no label. Its seven
-categories collapse to these greyscale luminances:
+What changed, in `paper2/figures.py` only:
 
-| colour | role | luminance |
-|---|---|---|
-| `#c0392b` red | issue starvation | 33.2 |
-| `#8e44ad` purple | baseline plus divergence | 35.8 |
-| `#2980b9` blue | masked-lane waste, gather-diluted | 44.6 |
-| `#16a085` teal | dense per-step work, tile wins | 50.5 |
-| `#7f8c8d` gray | tile-lowering baseline | 53.8 |
-| `#27ae60` green | no control divergence | 54.8 |
-| `#e67e22` orange | masked-lane waste | 55.5 |
+- A palette built on a **luminance ladder** rather than a hue wheel: 25.9, 38.6, 48.0, 58.1,
+  66.4, 74.5, 87.3. Closest pair now **5.1 points apart**, up from 0.7.
+- **Hatches on every bar**, in all three bar figures, with the legend patches carrying the
+  same hatch so the mapping is readable: dots, forward and back diagonals, cross, grid,
+  circles, and plain fill.
+- Fig. 6's y-axis opened from `max*1.18` to `max*1.34`, and one legend label shortened from
+  "dense per-step work: tile wins" to "dense per-step work", because the old label ran onto
+  the rejection-sampling bar and the two ink patterns collided. The dropped words were
+  redundant: the arrow annotation already says "the tile wins".
+- Fig. 6's caption and its `\Description` now say the categories are keyed by fill **and**
+  hatch, which tells a reader printing in grey where to look.
 
-The three at the top are separated by **0.7 and 1.7 points out of 100**. Printed grey, teal,
-gray, green and orange are one shade. A reader on paper cannot recover the mechanism, which
-is the finding that figure exists to convey.
+**No measurement was touched.** Figures still regenerate from the versioned CSVs through the
+one script, and every figure comes out at **exactly its previous page size to three decimal
+places**, which matters because the body has only about one column of slack on p11:
 
-The other four figures use colour to decorate a distinction that is already carried by
-position, axis or annotation, so they degrade rather than fail.
+```
+fig_anatomy_and_cure  224.171 x 265.87     fig_regret_law     488.484 x 134.364
+fig_dfa_crossover     226.478 x 125.116    fig_straggler_law  224.171 x 121.87
+fig_mechanism         488.741 x 127.482
+```
 
-The fix, if wanted, is confined to `paper2/figures.py`: add hatch patterns to the bars in
-Fig. 5 and widen the luminance spread of the palette. Figures regenerate from the versioned
-CSVs, so no measurement is touched. **Not done here**, because it changes the paper.
+Verified by converting the built PDF to true greyscale with Ghostscript
+(`-sColorConversionStrategy=Gray`) and reading the rendered pages, not by trusting the
+palette arithmetic. All eight bars in Fig. 6 separate; the teaser on p2 separates; the three
+panels of Fig. 2 separate.
+
+⚠️ **The frozen ASPLOS PDF now predates these figures.** `gpufsm_asplos.pdf` is deliberately
+not rebuilt and stays byte-identical, so it no longer matches the current
+`paper2/figures/*.pdf`. If the ASPLOS April 2027 fallback is ever taken up, rebuild it: it
+will pick up the greyscale-safe figures, which is an improvement, and the caption wording
+should be updated to match.
 
 ## Files, and the ones that must never be uploaded
 

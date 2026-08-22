@@ -689,15 +689,16 @@ replaces.
 
 \begin{figure*}[t]\centering
 \includegraphics{figures/fig_regret_law.pdf}
-\caption{Tile-versus-thread regret across eight oracle-gated irregular witnesses, coloured
-by dominant mechanism. The graph pointer-chase is the negative control: irregular memory
+\caption{Tile-versus-thread regret across eight oracle-gated irregular witnesses, keyed
+by dominant mechanism through both fill and hatch. The graph pointer-chase is the negative control: irregular memory
 and dependent loads with a \emph{fixed} step count cost nothing at all. Uniform SpMV is the
 other half of the story: no divergence either, but the tile mapping loses occupancy, so a
 floor can exist without any control cost. What grows \emph{above} such a floor is set by
 per-step scalar control. Ragged attention inverts the sign, because a dense head-dim payload makes
 the tile issue \emph{fewer} instructions than the thread model.}
-\Description{A bar chart of tile-versus-thread regret across eight workloads, coloured by
-dominant mechanism. The graph pointer-chase sits exactly at the no-regret line at 1.00
+\Description{A bar chart of tile-versus-thread regret across eight workloads, keyed by
+dominant mechanism through both fill shade and hatch pattern, so the categories survive
+greyscale printing. The graph pointer-chase sits exactly at the no-regret line at 1.00
 times. Uniform SpMV is 1.94, hash probe 1.40, automata 1.96, power-law SpMV 2.17, MoE
 routing 2.36 and rejection sampling 4.00. Ragged attention alone falls below the no-regret
 line at 0.64 times, where the tile wins.}
@@ -950,20 +951,22 @@ and the wall this paper documents ceases to exist.
 % and figures but not references, so no figure may land after them.
 \clearpage
 
-% ACM Publications Policy on Authorship: use of generative AI must be fully disclosed
-% authorship policy, in an Acknowledgments section placed immediately before the
-% references. Acknowledgments do not count against the 11-page limit.
-\section*{Acknowledgments}
-\emph{Disclosure of generative AI use, per the ACM Publications Policy on
-Authorship.} A generative AI coding assistant (Anthropic's Claude, driven through
-an agentic command-line interface) wrote and refactored most of the kernel,
-harness, and analysis code, including the compiler passes of
-Section~\ref{sec:cure}; it ran the measurement scripts, generated the figures from
-the versioned CSVs, and drafted and revised text that we subsequently reviewed. The
-research questions, the experimental designs, and every scientific claim are ours.
-No number in this paper is assistant-generated: each is a recorded measurement in a
-versioned CSV, and each kernel is correctness-gated against a CPU oracle. We have
-verified the content and take full responsibility for it.
+% NO ACKNOWLEDGMENTS SECTION IN THE CGO SUBMISSION, ON PURPOSE.
+%
+% Two reasons, and either alone would be enough.
+%
+% 1. CGO does not ask for the disclosure. Its CFP records that ACM's authorship policy
+%    changed: "ACM no longer requires authors to disclose the use of AI in preparing a
+%    submission", with the emphasis moved onto the authors' responsibility for the
+%    correctness of everything they submit.
+% 2. CGO's page limit is "11 pages of text, excluding bibliography". Unlike ASPLOS, which
+%    carved out the acknowledgments in so many words, CGO carves out only the bibliography.
+%    With the section present the text runs onto page 12, which is 12 pages against a limit
+%    of 11. Without it the body closes on page 11 exactly and the references start on 12.
+%
+% RESTORE IT AT CAMERA-READY if the paper is accepted, so the disclosure stays aligned with
+% the HPEC paper covering the same work. The text to restore is in gpufsm_asplos.tex, which
+% is kept intact for the ASPLOS April 2027 fallback.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
